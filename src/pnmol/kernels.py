@@ -1,6 +1,13 @@
 import jax
 import jax.numpy as jnp
-import numpy as np
+
+import pnmol
+
+
+def _mesh_as_array(m):
+    if isinstance(m, pnmol.mesh.Mesh):
+        return m.points
+    return jnp.asarray(m)
 
 
 class Kernel:
@@ -26,8 +33,8 @@ class Kernel:
         Differentiable implementation of the kernel.
         Not vectorised (for now; for clarity reasons).
         """
-        x = jnp.asarray(x)
-        y = jnp.asarray(y)
+        x = _mesh_as_array(x)
+        y = _mesh_as_array(y)
         if as_matrix is True:
             x = x.reshape((-1, 1)) if x.ndim < 2 else x
             y = y.reshape((-1, 1)) if y.ndim < 2 else y
@@ -53,7 +60,7 @@ class Kernel:
             errormsg = f"Input shapes {x_set.shape} and {y_set.shape} not compatible with this kernel."
             raise TypeError(errormsg)
 
-        return np.array([[self.__call__(x, y) for y in y_set] for x in x_set])
+        return jnp.array([[self.__call__(x, y) for y in y_set] for x in x_set])
 
     def matrix_sqrt(self, x_set, y_set):
         """Square-root of the kernel matrix."""
@@ -74,7 +81,7 @@ class PolynomialKernel(Kernel):
     """
 
     def __init__(self, coef):
-        self.coef = np.asarray(coef)
+        self.coef = jnp.asarray(coef)
         super().__init__(fun=self._evaluate)
 
     def _evaluate(self, x, y):
@@ -107,9 +114,9 @@ class PolynomialKernel(Kernel):
 
     def _matrix_sqrt_1d(self, x_set, y_set):
         assert x_set.ndim == y_set.ndim == 1
-        coefs = np.sqrt(np.flip(self.coef[None, :]))
-        ax = coefs * x_set[:, None] ** np.arange(self.order)
-        ay = coefs * y_set[:, None] ** np.arange(self.order)
+        coefs = jnp.sqrt(jnp.flip(self.coef[None, :]))
+        ax = coefs * x_set[:, None] ** jnp.arange(self.order)
+        ay = coefs * y_set[:, None] ** jnp.arange(self.order)
         return ax, ay
 
     def _matrix_sqrt_2d(self, x_set, y_set):
@@ -119,18 +126,18 @@ class PolynomialKernel(Kernel):
         if self.coef.ndim != 2:
             raise ValueError("Coefficients for 2d polynomial need to be a matrix.")
 
-        coefs = np.sqrt((self.coef))
+        coefs = jnp.sqrt((self.coef))
         print(coefs ** 2)
-        # coefs = np.sqrt(np.flip(self.coef))
+        # coefs = jnp.sqrt(jnp.flip(self.coef))
 
         def single_row(pt1, pt2, d1=self.coef.shape[0], d2=self.coef.shape[1], c=coefs):
             """An entire row of the pseudo-Vandermonde matrix."""
             return (
-                c * np.outer((pt1 ** np.arange(d1)), pt2 ** np.arange(d2))
+                c * jnp.outer((pt1 ** jnp.arange(d1)), pt2 ** jnp.arange(d2))
             ).flatten()
 
-        ax = np.array([single_row(x[0], x[1]) for x in x_set])
-        ay = np.array([single_row(y[0], y[1]) for y in y_set])
+        ax = jnp.array([single_row(x[0], x[1]) for x in x_set])
+        ay = jnp.array([single_row(y[0], y[1]) for y in y_set])
         return ax, ay
 
     @property
@@ -138,7 +145,7 @@ class PolynomialKernel(Kernel):
         if self.coef.ndim == 1:
             return len(self.coef)
         if self.coef.ndim == 2:
-            return np.amax(self.coef.shape[0], self.coef.shape[1])
+            return jnp.amax(self.coef.shape[0], self.coef.shape[1])
 
 
 class GaussianKernel(Kernel):

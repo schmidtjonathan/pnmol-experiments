@@ -1,8 +1,7 @@
 """Discretise differential operators on a mesh, assuming an underlying function space."""
 
-import numpy as np
-import scipy.sparse
-import tqdm
+import jax
+import jax.numpy as jnp
 
 from pnmol import kernels
 
@@ -45,43 +44,51 @@ def discretize(diffop, mesh, kernel, stencil_size):
     L_row = []
     L_col = []
 
-    E_diag = np.zeros(M)
-    progressbar = tqdm.tqdm(interior_points)
+    E_diag = jnp.zeros(M)
+    for idx in range(interior_points.shape[0]):
 
-    for point in progressbar:
-
-        neighbors, neighbor_idcs = mesh.neighbours(point=point, num=stencil_size)
+        neighbors, neighbor_idcs = mesh.neighbours(
+            point=interior_points[idx], num=stencil_size
+        )
 
         gram_matrix = kernel(
             neighbors, neighbors, as_matrix=True
         )  # [stencil_size, stencil_size]
         diffop_at_point = L_kx(
-            point.reshape(1, -1), neighbors, as_matrix=True
+            jnp.asarray(interior_points[idx]).reshape(1, -1), neighbors, as_matrix=True
         ).squeeze()  # [stencil_size, ]
 
         # weights = diffop_at_point @ np.linalg.inv(gram_matrix)  # [stencil_size,]
-        weights = np.linalg.solve(gram_matrix, diffop_at_point)  # [stencil_size,]
+        weights = jnp.linalg.solve(gram_matrix, diffop_at_point)  # [stencil_size,]
         L_data.append(weights)
         L_row.append(
-            np.full(shape=stencil_size, fill_value=neighbor_idcs[0], dtype=int)
+            jnp.full(shape=stencil_size, fill_value=neighbor_idcs[0], dtype=int)
         )
         L_col.append(neighbor_idcs)
 
         E_term1 = LL_kx(
-            point.reshape(1, -1), point.reshape(1, -1), as_matrix=True
+            jnp.asarray(interior_points[idx]).reshape(1, -1),
+            jnp.asarray(interior_points[idx]).reshape(1, -1),
+            as_matrix=True,
         ).squeeze()
         E_term2 = (
-            weights @ L_kx(neighbors, point.reshape(1, -1), as_matrix=True).squeeze()
+            weights
+            @ L_kx(
+                neighbors,
+                jnp.asarray(interior_points[idx]).reshape(1, -1),
+                as_matrix=True,
+            ).squeeze()
         )
-        E_diag[neighbor_idcs[0]] = E_term1 - E_term2
+        E_diag = jax.ops.index_update(E_diag, neighbor_idcs[0], E_term1 - E_term2)
 
-        progressbar.set_description(str(np.array(point).round(3)))
+        # progressbar.set_description(str(jnp.array(interior_points[idx]).round(3)))
 
-    L_data = np.concatenate(L_data)
-    L_row = np.concatenate(L_row)
-    L_col = np.concatenate(L_col)
+    L_data = jnp.concatenate(L_data)
+    L_row = jnp.concatenate(L_row)
+    L_col = jnp.concatenate(L_col)
 
-    L = scipy.sparse.bsr_matrix((L_data, (L_row, L_col)), shape=(M, M))
-    E = scipy.sparse.diags(E_diag)
+    L = jnp.zeros((M, M))
+    L = jax.ops.index_update(L, (L_row, L_col), L_data)
+    E = jnp.diag(E_diag)
 
     return L, E
