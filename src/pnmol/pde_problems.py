@@ -9,7 +9,7 @@ from pnmol import differential_operator, discretize, kernels, mesh
 class DiscretizedPDE(
     namedtuple(
         "_DiscretizedPDE",
-        "f t0 tmax y0 df E",
+        "f spatial_grid t0 tmax y0 df",
         defaults=(None, None),
     )
 ):
@@ -56,4 +56,8 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     f = lambda t, x: L @ x
     df = lambda t, x: L
 
-    return DiscretizedPDE(f=f, t0=t0, tmax=tmax, y0=y0, df=df, E=E)
+    return (
+        DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df),
+        L,
+        E,
+    )
