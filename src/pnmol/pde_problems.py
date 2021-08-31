@@ -1,5 +1,6 @@
 from collections import namedtuple
 
+import jax
 import jax.numpy as jnp
 import scipy.stats
 
@@ -55,6 +56,44 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
 
     f = lambda t, x: L @ x
     df = lambda t, x: L
+
+    return (
+        DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df),
+        L,
+        E,
+    )
+
+
+def burgers_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
+    # Bounding box for spatial discretization grid
+    if bbox is None:
+        bbox = [-2.0, 0.0]
+    bbox = jnp.asarray(bbox)
+    assert bbox.ndim == 1
+
+    # Create spatial discretization grid
+    grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
+
+    # Spatial initial condition at t=0
+    if y0 is None:
+        y0 = jnp.array(scipy.stats.norm(-1.0, 0.05).pdf(grid.points.reshape(-1)))
+        y0 = y0 / y0.max()
+
+    # PNMOL discretization
+    lengthscale = dx * int(stencil_size / 2)
+    gauss_kernel = kernels.GaussianKernel(lengthscale)
+    laplace = differential_operator.laplace()
+    L, E = discretize.discretize(
+        diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
+    )
+
+    @jax.jit
+    def f(_, x):
+        return x * (L @ x)
+
+    @jax.jit
+    def df(_, x):
+        return jax.jacfwd(f, argnums=1)(_, x)
 
     return (
         DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df),
