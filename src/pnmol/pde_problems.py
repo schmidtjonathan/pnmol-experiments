@@ -54,8 +54,13 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
 
-    f = lambda t, x: L @ x
-    df = lambda t, x: L
+    @jax.jit
+    def f(_, x):
+        return L @ x
+
+    @jax.jit
+    def df(_, x):
+        return L
 
     return (
         DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df),
