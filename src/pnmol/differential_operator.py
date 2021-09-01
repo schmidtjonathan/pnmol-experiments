@@ -170,8 +170,8 @@ def gradient():
     """Gradient of a function."""
 
     def my_grad(fun, argnums=0):
-
-        return jax.grad(fun, argnums=argnums)
+        _assure_scalar_fn = lambda *args, **kwargs: fun(*args, **kwargs).squeeze()
+        return jax.grad(_assure_scalar_fn, argnums=argnums)
 
     return DifferentialOperator(my_grad)
 
