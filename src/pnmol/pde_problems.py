@@ -2,6 +2,7 @@ from collections import namedtuple
 
 import jax
 import jax.numpy as jnp
+import numpy as np
 import scipy.stats
 
 from pnmol import differential_operator, discretize, kernels, mesh
@@ -112,24 +113,89 @@ def burgers_1d(
 
     return DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df)
 
+
+def burgers_2d(
+    bbox=None,
+    dx=0.02,
+    stencil_size=3,
+    t0=0.0,
+    tmax=20.0,
+    u0=None,
+    v0=None,
+    diffusion_param=0.01,
+):
+    """Burgers' equation in 2D.
+
+    See e.g. https://nbviewer.jupyter.org/github/barbagroup/CFDPython/blob/master/lessons/10_Step_8.ipynb
+    """
+    # Bounding box for spatial discretization grid
+    if bbox is None:
+        bbox = [[0.0, 1.0], [0.0, 1.0]]
+    bbox = jnp.asarray(bbox)
+    assert bbox.ndim == 2
+
+    num_y = int((bbox[0, 1] - bbox[0, 0]) / dx) + 1
+    num_x = int((bbox[1, 1] - bbox[1, 0]) / dx) + 1
+
+    # Create spatial discretization grid
+    grid = mesh.RectangularMesh.from_bounding_boxes_2d(
+        bounding_boxes=bbox, nums=[num_y, num_x]
+    )
+
+    # grid_x = mesh.RectangularMesh.from_bounding_boxes_1d(
+    #     bounding_boxes=bbox[1], num=num_x
+    # )
+    # grid_y = mesh.RectangularMesh.from_bounding_boxes_1d(
+    #     bounding_boxes=bbox[0], num=num_y
+    # )
+
+    # Spatial initial condition at t=0
+    if u0 is None:
+        u0 = jnp.array(
+            scipy.stats.multivariate_normal(np.array([0.5, 0.5]), 0.03 * np.eye(2)).pdf(
+                grid.points.reshape(num_y, num_x, 2)
+            )
+        )
+        u0 = (u0 / u0.max()).reshape(-1)
+    if v0 is None:
+        v0 = jnp.array(
+            scipy.stats.multivariate_normal(np.array([0.5, 0.5]), 0.06 * np.eye(2)).pdf(
+                grid.points.reshape(num_y, num_x, 2)
+            )
+        )
+        v0 = (v0 / v0.max()).reshape(-1)
+
+    y0 = jnp.concatenate((u0, v0))
+
     # PNMOL discretization
     lengthscale = dx * int(stencil_size / 2)
     gauss_kernel = kernels.GaussianKernel(lengthscale)
     laplace = differential_operator.laplace()
-    L, E = discretize.discretize(
+    grad_y = differential_operator.gradient_by_dimension(output_coordinate=0)
+    grad_x = differential_operator.gradient_by_dimension(output_coordinate=1)
+    L_laplace, E_laplace = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
+    L_grad_x, E_grad_x = discretize.discretize(
+        diffop=grad_x, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
+    )
+    L_grad_y, E_grad_y = discretize.discretize(
+        diffop=grad_y, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
+    )
+
+    print(L_laplace.shape, L_grad_x.shape, L_grad_y.shape)
+    print(grid.points.shape)
+    print(y0.shape)
 
     @jax.jit
     def f(_, x):
-        return x * (L @ x)
+        u, v = jnp.split(x, 2)
+        u_new = diffusion_param * L_laplace @ u - u * L_grad_y @ u - v * L_grad_x @ u
+        v_new = diffusion_param * L_laplace @ v - u * L_grad_y @ v - v * L_grad_x @ v
+        return jnp.concatenate((u_new, v_new))
 
     @jax.jit
     def df(_, x):
         return jax.jacfwd(f, argnums=1)(_, x)
 
-    return (
-        DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df),
-        L,
-        E,
-    )
+    return DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df)
