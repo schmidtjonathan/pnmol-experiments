@@ -2,6 +2,8 @@
 
 """
 
+from . import differential_operator, discretize, kernels, mesh, pde_problems
+
 __version__ = "0.0.1"
 
 

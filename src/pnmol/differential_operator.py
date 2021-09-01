@@ -170,8 +170,18 @@ def gradient():
     """Gradient of a function."""
 
     def my_grad(fun, argnums=0):
+        _assure_scalar_fn = lambda *args, **kwargs: fun(*args, **kwargs).squeeze()
+        return jax.grad(_assure_scalar_fn, argnums=argnums)
 
-        return jax.grad(fun, argnums=argnums)
+    return DifferentialOperator(my_grad)
+
+
+def gradient_by_dimension(output_coordinate=0):
+    """Gradient of a vector-valued function w.r.t. a single output-dimension."""
+
+    def my_grad(fun, argnums=0):
+        jac = jax.jacrev(fun, argnums=argnums)
+        return lambda *args: jac(*args)[output_coordinate]
 
     return DifferentialOperator(my_grad)
 
