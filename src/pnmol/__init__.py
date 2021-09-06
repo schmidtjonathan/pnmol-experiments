@@ -2,7 +2,7 @@
 
 """
 
-from . import differential_operator, discretize, kernels, mesh, pde_problems
+from . import differential_operator, discretize, kernels, mesh, pde_problems, solver
 
 __version__ = "0.0.1"
 

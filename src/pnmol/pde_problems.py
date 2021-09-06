@@ -11,8 +11,8 @@ from pnmol import differential_operator, discretize, kernels, mesh
 class DiscretizedPDE(
     namedtuple(
         "_DiscretizedPDE",
-        "f spatial_grid t0 tmax y0 df",
-        defaults=(None, None),
+        "f spatial_grid t0 tmax y0 df L E",
+        defaults=(None, None, None),
     )
 ):
     """Initial value problems."""
@@ -63,10 +63,8 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     def df(_, x):
         return L
 
-    return (
-        DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df),
-        L,
-        E,
+    return DiscretizedPDE(
+        f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df, L=L, E=E
     )
 
 
