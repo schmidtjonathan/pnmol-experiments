@@ -125,7 +125,7 @@ class EK0R(tornadox.odefilter.ODEFilter):
 
     @staticmethod
     def estimate_error(H, Q, z):
-        S = H @ Q @ Q.T @ H.T
+        S = H @ Q @ H.T
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error_estimate = jnp.sqrt(jnp.diag(S)) * sigma
