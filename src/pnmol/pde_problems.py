@@ -48,8 +48,8 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
         y0 = y0 / y0.max()
 
     # PNMOL discretization
-    lengthscale = dx * int(stencil_size / 2)
-    gauss_kernel = kernels.GaussianKernel(lengthscale)
+    lengthscale = 1.0  #  dx * int(stencil_size / 2)
+    gauss_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=lengthscale)
     laplace = differential_operator.laplace()
     L, E = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size

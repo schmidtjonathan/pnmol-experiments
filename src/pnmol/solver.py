@@ -2,12 +2,10 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-import tornadox
+from tornadox import iwp, odefilter, rv, sqrt
 
 
-class EK0R(tornadox.odefilter.ODEFilter):
-    """Naive, reference EK1 implementation. Use this to test against."""
-
+class MeasurementCovarianceEK0(odefilter.ODEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
@@ -15,7 +13,7 @@ class EK0R(tornadox.odefilter.ODEFilter):
 
     def initialize(self, ivp):
 
-        self.iwp = tornadox.iwp.IntegratedWienerTransition(
+        self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=ivp.dimension,
         )
@@ -30,10 +28,8 @@ class EK0R(tornadox.odefilter.ODEFilter):
             num_derivatives=self.iwp.num_derivatives,
         )
         mean = extended_dy0  # .reshape((-1,), order="F")
-        y = tornadox.rv.MultivariateNormal(
-            mean, jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm)
-        )
-        return tornadox.odefilter.ODEFilterState(
+        y = rv.MultivariateNormal(mean, jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm))
+        return odefilter.ODEFilterState(
             ivp=ivp,
             t=ivp.t0,
             y=y,
@@ -44,8 +40,7 @@ class EK0R(tornadox.odefilter.ODEFilter):
     def attempt_step(self, state, dt):
         # Extract system matrices
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
-        A, SQ = self.iwp.preconditioned_discretize
-        Q = SQ @ SQ.T
+        A, Q = self.iwp.preconditioned_discretize
         t = state.t + dt
         n, d = self.num_derivatives + 1, state.ivp.dimension
 
@@ -58,14 +53,14 @@ class EK0R(tornadox.odefilter.ODEFilter):
         cov = P @ cov
         new_mean = P @ new_mean
         new_mean = new_mean.reshape((n, d), order="F")
-        new_rv = tornadox.rv.MultivariateNormal(new_mean, jnp.linalg.cholesky(cov))
+        new_rv = rv.MultivariateNormal(new_mean, jnp.linalg.cholesky(cov))
 
         y1 = jnp.abs(state.y.mean[0])
         y2 = jnp.abs(new_mean[0])
         reference_state = jnp.maximum(y1, y2)
 
         # Return new state
-        new_state = tornadox.odefilter.ODEFilterState(
+        new_state = odefilter.ODEFilterState(
             ivp=state.ivp,
             t=t,
             y=new_rv,
@@ -80,14 +75,15 @@ class EK0R(tornadox.odefilter.ODEFilter):
         H, z = self.evaluate_ode(
             t=t,
             f=state.ivp.f,
+            df=state.ivp.df,
             p=P,
             m_pred=m_pred,
             e0=self.P0,
             e1=self.P1,
         )
-        error_estimate, sigma = self.estimate_error(H=H, Q=Q, z=z)
-        C_pred = self.predict_cov(C=C, phi=A, Q=sigma * Q)
-        cov, Kgain = self.update(H=H, C_pred=C_pred, E=state.ivp.E)
+        error_estimate, sigma = self.estimate_error(h=H, q=Q, z=z, e=state.ivp.E)
+        C_pred = self.predict_cov(c=C, phi=A, q=sigma * Q)
+        cov, Kgain = self.update(H, C_pred, E=state.ivp.E)
         new_mean = m_pred - Kgain @ z
         return cov, error_estimate, new_mean
 
@@ -109,23 +105,30 @@ class EK0R(tornadox.odefilter.ODEFilter):
 
     @staticmethod
     @jax.jit
-    def predict_cov(C, phi, Q):
-        return phi @ C @ phi.T + Q
+    def predict_cov(c, phi, q):
+        return phi @ c @ phi.T + q
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(1,))
-    def evaluate_ode(t, f, p, m_pred, e0, e1):
+    @partial(jax.jit, static_argnums=(1, 2))
+    def evaluate_ode(t, f, df, p, m_pred, e0, e1):
         P0 = e0 @ p
         P1 = e1 @ p
         m_at = P0 @ m_pred
         fx = f(t, m_at)
-        H = P1
-        z = H @ m_pred - fx
+        Jx = df(t, m_at)
+        H = P1 - Jx @ P0
+        b = -fx + Jx @ m_at
+        z = H @ m_pred + b
         return H, z
 
     @staticmethod
-    def estimate_error(H, Q, z):
-        S = H @ Q @ H.T
+    def estimate_error(h, q, z, e):
+        S = h @ q @ h.T
+        print(S)
+        S = S + e
+        print(e)
+        print(S)
+        print("---")
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error_estimate = jnp.sqrt(jnp.diag(S)) * sigma
