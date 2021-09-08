@@ -2,6 +2,7 @@
 
 import jax
 import jax.numpy as jnp
+import tqdm
 
 from pnmol import kernels
 
@@ -37,25 +38,23 @@ def discretize(diffop, mesh, kernel, stencil_size):
 
     L_k = diffop(kernel, argnums=0)  # derivative function of kernel
     LL_k = diffop(L_k, argnums=1)
-    L_kx = kernels.Kernel(fun=L_k)
-    LL_kx = kernels.Kernel(fun=LL_k)
+    L_kx = kernels.LambdaKernel(fun=L_k)
+    LL_kx = kernels.LambdaKernel(fun=LL_k)
 
     L_data = []
     L_row = []
     L_col = []
 
     E_diag = jnp.zeros(M)
-    for idx in range(interior_points.shape[0]):
+    for point in tqdm.tqdm(interior_points):
 
-        neighbors, neighbor_idcs = mesh.neighbours(
-            point=interior_points[idx], num=stencil_size
-        )
+        neighbors, neighbor_idcs = mesh.neighbours(point=point, num=stencil_size)
 
         gram_matrix = kernel(
-            neighbors, neighbors, as_matrix=True
+            neighbors.points, neighbors.points
         )  # [stencil_size, stencil_size]
         diffop_at_point = L_kx(
-            jnp.asarray(interior_points[idx]).reshape(1, -1), neighbors, as_matrix=True
+            jnp.asarray(point).reshape(1, -1), neighbors.points
         ).squeeze()  # [stencil_size, ]
 
         # weights = diffop_at_point @ np.linalg.inv(gram_matrix)  # [stencil_size,]
@@ -67,21 +66,19 @@ def discretize(diffop, mesh, kernel, stencil_size):
         L_col.append(neighbor_idcs)
 
         E_term1 = LL_kx(
-            jnp.asarray(interior_points[idx]).reshape(1, -1),
-            jnp.asarray(interior_points[idx]).reshape(1, -1),
-            as_matrix=True,
+            jnp.asarray(point).reshape(1, -1),
+            jnp.asarray(point).reshape(1, -1),
         ).squeeze()
         E_term2 = (
             weights
             @ L_kx(
-                neighbors,
-                jnp.asarray(interior_points[idx]).reshape(1, -1),
-                as_matrix=True,
+                neighbors.points,
+                jnp.asarray(point).reshape(1, -1),
             ).squeeze()
         )
         E_diag = jax.ops.index_update(E_diag, neighbor_idcs[0], E_term1 - E_term2)
 
-        # progressbar.set_description(str(jnp.array(interior_points[idx]).round(3)))
+        # progressbar.set_description(str(jnp.array(point).round(3)))
 
     L_data = jnp.concatenate(L_data)
     L_row = jnp.concatenate(L_row)
