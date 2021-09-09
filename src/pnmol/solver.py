@@ -2,7 +2,9 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
-from tornadox import iwp, odefilter, rv, sqrt
+from tornadox import iwp, odefilter, rv
+
+from pnmol import sqrt
 
 
 class MeasurementCovarianceEK0(odefilter.ODEFilter):
