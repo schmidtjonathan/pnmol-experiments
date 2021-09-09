@@ -41,17 +41,20 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         )
 
     def attempt_step(self, state, dt, verbose=False):
-        # [Setup]
-        m, Cl = state.y.mean.reshape((-1,), order="F"), state.y.cov_sqrtm
-        A, Ql = self.iwp.non_preconditioned_discretize(dt)
+        P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
+        A, Ql = self.iwp.preconditioned_discretize
         n, d = self.num_derivatives + 1, state.ivp.dimension
+
+        # [Setup]
+        # Pull states into preconditioned state
+        m, Cl = Pinv @ state.y.mean.reshape((-1,), order="F"), Pinv @ state.y.cov_sqrtm
 
         # [Predict]
         mp = self.predict_mean(A, m)
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=state.ivp.f, e0=self.E0, e1=self.E1, m_at=mp, t=state.t, dt=dt
+            f=state.ivp.f, e0=self.E0 @ P, e1=self.E1 @ P, m_at=mp, t=state.t, dt=dt
         )
 
         sigma, error = self.estimate_error(ql=Ql, z=z, h=H)
@@ -61,6 +64,10 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         # [Update]
         Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=state.ivp.E)
         m_new = mp - K @ z
+
+        # Push back to non-preconditioned state
+        Cl_new = P @ Cl_new
+        m_new = P @ m_new
 
         m_new = m_new.reshape((n, d), order="F")
         y_new = jnp.abs(m_new[0])
