@@ -54,10 +54,10 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=state.ivp.f, e0=self.E0 @ P, e1=self.E1 @ P, m_at=mp, t=state.t, dt=dt
+            f=state.ivp.f, p0=self.E0 @ P, p1=self.E1 @ P, m_pred=mp, t=state.t + dt
         )
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=state.ivp.E)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
@@ -89,15 +89,15 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
 
     @staticmethod
     @partial(jax.jit, static_argnums=(0,))
-    def evaluate_ode(f, e0, e1, m_at, t, dt):
-        z = e1 @ m_at - f(t + dt, e0 @ m_at)
-        H = e1
+    def evaluate_ode(f, p0, p1, m_pred, t):
+        H = p1
+        z = H @ m_pred - f(t, p0 @ m_pred)
         return z, H
 
     @staticmethod
     @jax.jit
-    def estimate_error(ql, z, h):
-        S = h @ ql @ ql.T @ h.T  # + state.ivp.E
+    def estimate_error(ql, z, h, E):
+        S = h @ ql @ ql.T @ h.T + jnp.abs(E)
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error = jnp.sqrt(jnp.diag(S)) * sigma
