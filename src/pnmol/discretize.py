@@ -53,12 +53,15 @@ def discretize(diffop, mesh, kernel, stencil_size):
         gram_matrix = kernel(
             neighbors.points, neighbors.points
         )  # [stencil_size, stencil_size]
+        print(gram_matrix)
         diffop_at_point = L_kx(
-            jnp.asarray(point).reshape(1, -1), neighbors.points
+            jnp.asarray(point), neighbors.points
         ).squeeze()  # [stencil_size, ]
 
+        print(diffop_at_point)
         # weights = diffop_at_point @ np.linalg.inv(gram_matrix)  # [stencil_size,]
         weights = jnp.linalg.solve(gram_matrix, diffop_at_point)  # [stencil_size,]
+        print(weights)
         L_data.append(weights)
         L_row.append(
             jnp.full(shape=stencil_size, fill_value=neighbor_idcs[0], dtype=int)
@@ -66,14 +69,14 @@ def discretize(diffop, mesh, kernel, stencil_size):
         L_col.append(neighbor_idcs)
 
         E_term1 = LL_kx(
-            jnp.asarray(point).reshape(1, -1),
-            jnp.asarray(point).reshape(1, -1),
+            jnp.asarray(point),
+            jnp.asarray(point),
         ).squeeze()
         E_term2 = (
             weights
             @ L_kx(
                 neighbors.points,
-                jnp.asarray(point).reshape(1, -1),
+                jnp.asarray(point),
             ).squeeze()
         )
         E_diag = jax.ops.index_update(E_diag, neighbor_idcs[0], E_term1 - E_term2)
