@@ -129,12 +129,15 @@ def burgers_1d(
 
     # Spatial initial condition at t=0
     if y0 is None:
-        y0 = jnp.array(scipy.stats.norm(0.5, 0.02).pdf(grid.points.reshape(-1)))
+        mid_point = 0.5 * (bbox[1] - bbox[0])
+        y0 = jnp.exp(-100 * (grid.points.reshape(-1) - mid_point) ** 2)
         y0 = y0 / y0.max()
 
     # PNMOL discretization
     lengthscale = dx * int(stencil_size / 2)
-    gauss_kernel = kernels.GaussianKernel(lengthscale)
+    gauss_kernel = kernels.SquareExponentialKernel(
+        scale=lengthscale, lengthscale=lengthscale
+    )
     laplace = differential_operator.laplace()
     grad = differential_operator.gradient()
     L_laplace, E_laplace = discretize.discretize(
@@ -152,7 +155,16 @@ def burgers_1d(
     def df(_, x):
         return jax.jacfwd(f, argnums=1)(_, x)
 
-    return DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df)
+    return DiscretizedPDE(
+        f=f,
+        spatial_grid=grid,
+        t0=t0,
+        tmax=tmax,
+        y0=y0,
+        df=df,
+        L=(L_laplace, L_grad),
+        E=(E_laplace, E_grad),
+    )
 
 
 def burgers_2d(
