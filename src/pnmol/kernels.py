@@ -6,17 +6,8 @@ import jax
 import jax.numpy as jnp
 
 
-def pairwise(a, b, fun):
-    print(a.shape, b.shape)
-    a = jnp.atleast_2d(a)
-    b = jnp.atleast_2d(b)
-    a = jnp.expand_dims(a, 1)
-    b = jnp.expand_dims(b, 0)
-
-    print(a.shape, b.shape)
-    print(fun(a, b).shape)
-
-    return fun(a, b)
+def pairwise(func, a, b):
+    return jax.vmap(lambda x1: jax.vmap(lambda y1: func(x1, y1))(b))(a)
 
 
 class Kernel(ABC):
@@ -46,7 +37,6 @@ class Kernel(ABC):
 
     @partial(jax.jit, static_argnums=(0,))
     def __call__(self, X: jnp.ndarray, X_: jnp.ndarray):
-
         return self._evaluate(jnp.atleast_2d(X), jnp.atleast_2d(X_))
 
 
@@ -108,12 +98,10 @@ class SquareExponentialKernel(Kernel):
             squared_distances = (
                 jnp.reshape(X, (-1, 1)) - jnp.reshape(X_, (1, -1))
             ) ** 2
-            print("sd", squared_distances.shape)
         else:
-            diffs = pairwise(X, X_, operator.sub)
-            print("diffs", diffs.shape)
-            squared_distances = jnp.linalg.norm(diffs, axis=-1) ** 2
-            print("sd", squared_distances.shape)
+            diff = pairwise(operator.sub, X, X_)
+            squared_distances = jnp.linalg.norm(diff, axis=-1) ** 2
+
         log_K = -squared_distances / (2.0 * self._lengthscale ** 2)
         K = jnp.exp(log_K)
 
