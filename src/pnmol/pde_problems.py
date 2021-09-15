@@ -70,6 +70,49 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     )
 
 
+def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
+    # Bounding box for spatial discretization grid
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
+    assert bbox.ndim == 1
+
+    # Create spatial discretization grid
+    grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
+
+    # Spatial initial condition at t=0
+    if y0 is None:
+        mid = (bbox[1] - bbox[0]) * 0.5
+        y0 = jnp.pad(
+            jnp.exp(-100.0 * (grid.points.reshape(-1)[1:-1] - mid) ** 2),
+            pad_width=1,
+            mode="constant",
+            constant_values=0.0,
+        )
+        y0 = jnp.concatenate((y0, jnp.zeros_like(y0)))
+
+    # PNMOL discretization
+    lengthscale = 1.0  #  dx * int(stencil_size / 2)
+    gauss_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=lengthscale)
+    laplace = differential_operator.laplace()
+    L, E = discretize.discretize(
+        diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
+    )
+
+    @jax.jit
+    def f_wave_1d(_, x):
+        _x, _dx = jnp.split(x, 2)
+        new_ddx = L @ _x
+        new_dx = jnp.pad(_dx[1:-1], pad_width=1, mode="constant", constant_values=0.0)
+        return jnp.concatenate((new_dx, new_ddx))
+
+    df_wave_1d = jax.jit(jax.jacfwd(f_wave_1d, argnums=1))
+
+    return DiscretizedPDE(
+        f=f_wave_1d, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df_wave_1d, L=L, E=E
+    )
+
+
 def burgers_1d(
     bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None, diffusion_param=0.01
 ):
@@ -169,7 +212,7 @@ def burgers_2d(
 
     # PNMOL discretization
     lengthscale = dx * int(stencil_size / 2)
-    gauss_kernel = kernels.GaussianKernel(lengthscale)
+    gauss_kernel = kernels.SquareExponentialKernel(1.0, lengthscale)
     laplace = differential_operator.laplace()
     grad_y = differential_operator.gradient_by_dimension(output_coordinate=0)
     grad_x = differential_operator.gradient_by_dimension(output_coordinate=1)
@@ -198,4 +241,6 @@ def burgers_2d(
     def df(_, x):
         return jax.jacfwd(f, argnums=1)(_, x)
 
-    return DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df)
+    return DiscretizedPDE(
+        f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df, L=L_laplace, E=E_laplace
+    )
