@@ -24,31 +24,51 @@ class BlockDiagonal:
         return jax.scipy.linalg.block_diag(*self.array_list)
 
     def __matmul__(self, other):
-        if isinstance(other, jnp.ndarray) and other.ndim == 1:
-            split_array = jnp.split(
-                other,
-                jnp.cumsum(jnp.array([a.shape[1] for a in self._array_list]))[:-1],
-            )
+        if isinstance(other, jnp.ndarray):
+            split_indices_colwise = jnp.cumsum(
+                jnp.array([a.shape[1] for a in self._array_list])
+            )[:-1]
+            if other.ndim == 1:
+                split_array = jnp.split(other, split_indices_colwise)
+                individual_products = [
+                    self._array_list[i] @ split_array[i] for i in range(self.num_blocks)
+                ]
+                return jnp.concatenate(individual_products)
 
-            individual_products = [
-                self._array_list[i] @ split_array[i] for i in range(self.num_blocks)
-            ]
+            elif other.ndim == 2:
+                in_block_rows = jnp.split(other, split_indices_colwise, axis=0)
+                out_block_rows = [
+                    self._array_list[block_diag_index] @ r
+                    for block_diag_index, r in enumerate(in_block_rows)
+                ]
+                return jnp.concatenate(out_block_rows, axis=0)
 
-            return jnp.concatenate(individual_products)
+            else:
+                raise ValueError("BlockDiagonal matmul is not supported for n_dim > 2.")
 
         return NotImplemented
 
     def __rmatmul__(self, other):
-        if isinstance(other, jnp.ndarray) and other.ndim == 1:
-            split_array = jnp.split(
-                other,
-                jnp.cumsum(jnp.array([a.shape[0] for a in self._array_list]))[:-1],
-            )
+        if isinstance(other, jnp.ndarray):
+            split_indices_rowwise = jnp.cumsum(
+                jnp.array([a.shape[0] for a in self._array_list])
+            )[:-1]
+            if other.ndim == 1:
+                split_array = jnp.split(other, split_indices_rowwise)
+                individual_products = [
+                    split_array[i] @ self._array_list[i] for i in range(self.num_blocks)
+                ]
+                return jnp.concatenate(individual_products)
 
-            individual_products = [
-                split_array[i] @ self._array_list[i] for i in range(self.num_blocks)
-            ]
+            elif other.ndim == 2:
+                in_block_cols = jnp.split(other, split_indices_rowwise, axis=1)
+                out_block_cols = [
+                    c @ self._array_list[block_diag_index]
+                    for block_diag_index, c in enumerate(in_block_cols)
+                ]
+                return jnp.concatenate(out_block_cols, axis=1)
 
-            return jnp.concatenate(individual_products)
+            else:
+                raise ValueError("BlockDiagonal matmul is not supported for n_dim > 2.")
 
         return NotImplemented
