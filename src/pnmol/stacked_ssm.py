@@ -16,6 +16,13 @@ class BlockDiagonal:
         return len(self._array_list)
 
     @property
+    def shape(self):
+        return (
+            sum((a.shape[0] for a in self._array_list)),
+            sum((a.shape[1] for a in self._array_list)),
+        )
+
+    @property
     def T(self):
         transposed_array_list = [a.T for a in self._array_list]
         return BlockDiagonal(array_list=transposed_array_list)
