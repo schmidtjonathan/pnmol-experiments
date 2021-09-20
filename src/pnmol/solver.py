@@ -32,7 +32,9 @@ class LatentForceEK0(odefilter.ODEFilter):
             wiener_process_dimension=ivp.dimension,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=0, wiener_process_dimension=ivp.dimension
+            num_derivatives=0,
+            wiener_process_dimension=ivp.dimension,
+            scale_process_noise=0.0001,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
