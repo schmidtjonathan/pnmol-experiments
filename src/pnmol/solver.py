@@ -28,7 +28,7 @@ class LatentForceEK0(odefilter.ODEFilter):
         self.P0 = self.E0 = self.ssm.projection_matrix(0)
         self.E1 = self.ssm.projection_matrix(1)
 
-        extended_dy0, cov_sqrtm = self.init(
+        extended_dy0, state_cov_sqrtm = self.init(
             f=ivp.f,
             df=ivp.df,
             y0=ivp.y0,
@@ -37,13 +37,12 @@ class LatentForceEK0(odefilter.ODEFilter):
         )
         mean = jnp.concatenate((extended_dy0, jnp.zeros_like(extended_dy0[0:1, :])))
 
-        c = cov_sqrtm @ cov_sqrtm.T
-        cov = jax.scipy.linalg.block_diag(
-            jnp.kron(jnp.eye(ivp.dimension), c), jnp.abs(ivp.E)
+        cov_sqrtm = jax.scipy.linalg.block_diag(
+            jnp.kron(jnp.eye(ivp.dimension), state_cov_sqrtm), jnp.sqrt(jnp.abs(ivp.E))
         )
-        y = rv.MultivariateNormal(mean=mean, cov_sqrtm=jnp.linalg.cholesky(cov))
+        y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
 
-        assert mean.size == cov.shape[0] == cov.shape[1]
+        assert mean.size == cov_sqrtm.shape[0] == cov_sqrtm.shape[1]
 
         return odefilter.ODEFilterState(
             ivp=ivp,
@@ -106,12 +105,12 @@ class LatentForceEK0(odefilter.ODEFilter):
         return new_state, info_dict
 
     @staticmethod
-    # @jax.jit
+    @jax.jit
     def predict_mean(A, m):
         return A @ m
 
     @staticmethod
-    # @partial(jax.jit, static_argnums=(0,))
+    @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(f, p0, p1, m_pred, t):
         m_at = p0 @ m_pred
         state_at, eps_at = jnp.split(m_at, 2)
@@ -121,7 +120,7 @@ class LatentForceEK0(odefilter.ODEFilter):
         return z, H
 
     @staticmethod
-    # @jax.jit
+    @jax.jit
     def estimate_error(ql, z, h):
         S = h @ ql @ ql.T @ h.T
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]  # TODO <--- correct?
