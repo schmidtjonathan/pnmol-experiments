@@ -98,9 +98,20 @@ class StackedSSM:
             As.append(A)
             Qs.append(SQ @ SQ.T)
 
-        A = jax.scipy.linalg.block_diag(*As)
+        # A = jax.scipy.linalg.block_diag(*As)
         Q = jax.scipy.linalg.block_diag(*Qs)
-        return A, jnp.linalg.cholesky(Q)
+        return As, jnp.linalg.cholesky(Q)
+
+    def non_preconditioned_discretize(self, dt):
+        As, Qs = [], []
+        for p in self.processes:
+            A, SQ = p.non_preconditioned_discretize(dt)
+            As.append(A)
+            Qs.append(SQ @ SQ.T)
+
+        # A = jax.scipy.linalg.block_diag(*As)
+        Q = jax.scipy.linalg.block_diag(*Qs)
+        return As, jnp.linalg.cholesky(Q)
 
     def nordsieck_preconditioner(self, dt):
         Ps, P_invs = [], []
@@ -108,20 +119,17 @@ class StackedSSM:
             prec, prec_inv = p.nordsieck_preconditioner(dt)
             Ps.append(prec)
             P_invs.append(prec_inv)
-        P = jax.scipy.linalg.block_diag(*Ps)
-        P_inv = jax.scipy.linalg.block_diag(*P_invs)
-        return P, P_inv
+        # P = jax.scipy.linalg.block_diag(*Ps)
+        # P_inv = jax.scipy.linalg.block_diag(*P_invs)
+        return Ps, P_invs
 
     def projection_matrix(
         self, derivative_to_project_onto, process_to_project_onto=None
     ):
         if process_to_project_onto is None:
-            return jax.scipy.linalg.block_diag(
-                *[
-                    p.projection_matrix(derivative_to_project_onto)
-                    for p in self.processes
+            return [
+                p.projection_matrix(derivative_to_project_onto) for p in self.processes
                 ]
-            )
 
         assert isinstance(process_to_project_onto, int)
         proj_to_proc = self.projection_to_process(process_to_project_onto)
