@@ -93,7 +93,6 @@ class StackedSSM:
             As.append(A)
             Qs.append(SQ @ SQ.T)
 
-        # A = jax.scipy.linalg.block_diag(*As)
         Q = jax.scipy.linalg.block_diag(*Qs)
         return As, jnp.linalg.cholesky(Q)
 
@@ -104,7 +103,6 @@ class StackedSSM:
             As.append(A)
             Qs.append(SQ @ SQ.T)
 
-        # A = jax.scipy.linalg.block_diag(*As)
         Q = jax.scipy.linalg.block_diag(*Qs)
         return As, jnp.linalg.cholesky(Q)
 
@@ -114,8 +112,6 @@ class StackedSSM:
             prec, prec_inv = p.nordsieck_preconditioner(dt)
             Ps.append(prec)
             P_invs.append(prec_inv)
-        # P = jax.scipy.linalg.block_diag(*Ps)
-        # P_inv = jax.scipy.linalg.block_diag(*P_invs)
         return Ps, P_invs
 
     def projection_matrix(

@@ -23,7 +23,7 @@ class LatentForceEK0(odefilter.ODEFilter):
         self.E0 = None
         self.E1 = None
 
-        self.num_derivatives_eps = 0  # TODO provide interface
+        self.num_derivatives_eps = 2  # TODO provide interface
 
     def initialize(self, ivp):
 
@@ -32,27 +32,39 @@ class LatentForceEK0(odefilter.ODEFilter):
             wiener_process_dimension=ivp.dimension,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=0,
+            num_derivatives=self.num_derivatives_eps,
             wiener_process_dimension=ivp.dimension,
-            scale_process_noise=0.0001,
+            scale_process_noise=0.1,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
         self.P0 = self.E0 = self.ssm.projection_matrix(0)
         self.E1 = self.ssm.projection_matrix(1)
 
-        extended_dy0, state_cov_sqrtm = self.init(
+        extended_dy0, cov_sqrtm_state = self.init(
             f=ivp.f,
             df=ivp.df,
             y0=ivp.y0,
             t0=ivp.t0,
             num_derivatives=self.state_iwp.num_derivatives,
         )
-        mean = [extended_dy0, jnp.zeros_like(extended_dy0[0:1, :])]
+        mean = [extended_dy0, jnp.zeros((self.num_derivatives_eps + 1, ivp.dimension))]
+
+        cov_sqrtm_state = jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm_state)
+
+        # Initialize the covariance of the Error process
+        # with E (state) and zeros (derivatives)
+        left_cov_factor = jnp.zeros(
+            (self.num_derivatives_eps + 1, self.num_derivatives_eps + 1)
+        )
+        left_cov_factor = jax.ops.index_update(left_cov_factor, jnp.array([0, 0]), 1.0)
+        cov_sqrtm_eps = jnp.kron(left_cov_factor, jnp.sqrt(jnp.abs(ivp.E)))
 
         cov_sqrtm = jax.scipy.linalg.block_diag(
-            jnp.kron(jnp.eye(ivp.dimension), state_cov_sqrtm), jnp.sqrt(jnp.abs(ivp.E))
+            cov_sqrtm_state,
+            cov_sqrtm_eps,
         )
+
         y = StackedMultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
 
         assert sum(m.size for m in mean) == cov_sqrtm.shape[0] == cov_sqrtm.shape[1]
@@ -65,7 +77,7 @@ class LatentForceEK0(odefilter.ODEFilter):
             reference_state=None,
         )
 
-    def attempt_step(self, state, dt, verbose=False):
+    def attempt_step(self, state, dt):
         A, Ql = self.ssm.non_preconditioned_discretize(dt)
         n, d = self.num_derivatives + 1, state.ivp.dimension
         n_eps = self.num_derivatives_eps + 1
