@@ -16,7 +16,7 @@ class StackedMultivariateNormal(
         return self.cov_sqrtm @ self.cov_sqrtm.T
 
 
-class LatentForceEK0(odefilter.ODEFilter):
+class LatentForceEK1(odefilter.ODEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
@@ -87,14 +87,19 @@ class LatentForceEK0(odefilter.ODEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=state.ivp.f, p0=self.E0, p1=self.E1, m_pred=mp, t=state.t + dt
+            f=state.ivp.f,
+            df=state.ivp.df,
+            p0=self.E0,
+            p1=self.E1,
+            m_pred=mp,
+            t=state.t + dt,
         )
 
-        # sigma, error = self.estimate_error(ql=Ql, z=z, h=H)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H)
 
         Cl = state.y.cov_sqrtm
         block_diag_A = jax.scipy.linalg.block_diag(*A)
-        Clp = sqrt.propagate_cholesky_factor(block_diag_A @ Cl, Ql)  # sigma * Ql)
+        Clp = sqrt.propagate_cholesky_factor(block_diag_A @ Cl, sigma * Ql)
 
         # [Update]
         Cl_new, K, Sl = sqrt.update_sqrt(H, Clp)
@@ -111,7 +116,7 @@ class LatentForceEK0(odefilter.ODEFilter):
         new_state = odefilter.ODEFilterState(
             ivp=state.ivp,
             t=state.t + dt,
-            error_estimate=None,  # error,
+            error_estimate=error,
             reference_state=y_new,
             y=StackedMultivariateNormal(m_new, Cl_new),
         )
@@ -124,14 +129,18 @@ class LatentForceEK0(odefilter.ODEFilter):
         return [A[i] @ m[i].reshape((-1,), order="F") for i in range(len(A))]
 
     @staticmethod
-    @partial(jax.jit, static_argnums=(0,))
-    def evaluate_ode(f, p0, p1, m_pred, t):
+    @partial(jax.jit, static_argnums=(0, 1))
+    def evaluate_ode(f, df, p0, p1, m_pred, t):
         state_at = p0[0] @ m_pred[0]
-        d_state_at = p1[0] @ m_pred[0]
         eps_at = p0[1] @ m_pred[1]
         fx = f(t, state_at)
-        z = d_state_at - fx - eps_at
-        H = jnp.split(jax.scipy.linalg.block_diag(*p1), 2)[0]  # TODO: Correct?
+        Jx = df(t, state_at)
+        H_state = p1[0] - Jx @ p0[0]
+        H_eps = -p0[1]
+
+        H = jnp.concatenate((H_state, H_eps), -1)
+        b = Jx @ state_at - fx - eps_at
+        z = H @ jnp.concatenate(m_pred) + b
         return z, H
 
     @staticmethod
