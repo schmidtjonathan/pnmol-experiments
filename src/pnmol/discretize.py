@@ -34,7 +34,6 @@ def discretize(diffop, mesh, kernel, stencil_size):
     """
 
     M = len(mesh)
-    interior_points, _ = mesh.interior
 
     L_k = diffop(kernel, argnums=0)  # derivative function of kernel
     LL_k = diffop(L_k, argnums=1)
@@ -46,7 +45,7 @@ def discretize(diffop, mesh, kernel, stencil_size):
     L_col = []
 
     E_diag = jnp.zeros(M)
-    for point in tqdm.tqdm(mesh.points):
+    for i, point in enumerate(tqdm.tqdm(mesh.points)):
 
         neighbors, neighbor_idcs = mesh.neighbours(point=point, num=stencil_size)
 
@@ -60,9 +59,7 @@ def discretize(diffop, mesh, kernel, stencil_size):
         weights = jnp.linalg.solve(gram_matrix, diffop_at_point)  # [stencil_size,]
 
         L_data.append(weights)
-        L_row.append(
-            jnp.full(shape=stencil_size, fill_value=neighbor_idcs[0], dtype=int)
-        )
+        L_row.append(jnp.full(shape=stencil_size, fill_value=i, dtype=int))
         L_col.append(neighbor_idcs)
 
         E_term1 = LL_kx(
@@ -76,7 +73,8 @@ def discretize(diffop, mesh, kernel, stencil_size):
                 jnp.asarray(point),
             ).squeeze()
         )
-        print(E_term1, E_term2)
+
+        E_diag = jax.ops.index_update(E_diag, i, E_term1 - E_term2)
 
         E_diag = jax.ops.index_update(E_diag, neighbor_idcs[0], E_term1 - E_term2)
         # progressbar.set_description(str(jnp.array(point).round(3)))
@@ -85,8 +83,7 @@ def discretize(diffop, mesh, kernel, stencil_size):
     L_row = jnp.concatenate(L_row)
     L_col = jnp.concatenate(L_col)
 
-    L = jnp.zeros((M, M))
-    L = jax.ops.index_update(L, (L_row, L_col), L_data)
+    L = jax.ops.index_update(jnp.zeros((M, M)), (L_row, L_col), L_data)
     E = jnp.diag(E_diag)
     print(L)
     print(E)
