@@ -38,6 +38,11 @@ def heat_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     # Create spatial discretization grid
     grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
 
+    _, boundary_idcs = grid.boundary
+    boundary_idcs = jnp.where(boundary_idcs)[0]
+
+    to_boundary = jnp.concatenate([jnp.eye(1, len(grid), b) for b in boundary_idcs], 0)
+
     # Spatial initial condition at t=0
     if y0 is None:
         y0 = jnp.array(
@@ -68,16 +73,19 @@ def heat_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     def df_diagonal(_, x):
         return jnp.diagonal(L)
 
-    return DiscretizedPDE(
-        f=f,
-        spatial_grid=grid,
-        t0=t0,
-        tmax=tmax,
-        y0=y0,
-        df=df,
-        df_diagonal=df_diagonal,
-        L=L,
-        E=E,
+    return (
+        DiscretizedPDE(
+            f=f,
+            spatial_grid=grid,
+            t0=t0,
+            tmax=tmax,
+            y0=y0,
+            df=df,
+            df_diagonal=df_diagonal,
+            L=L,
+            E=E,
+        ),
+        to_boundary,
     )
 
 
@@ -90,6 +98,22 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
 
     # Create spatial discretization grid
     grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
+    _, boundary_idcs = grid.boundary
+    boundary_idcs = jnp.where(boundary_idcs)[0]
+
+    to_boundary_part = jnp.concatenate(
+        [jnp.eye(1, len(grid), b) for b in boundary_idcs], 0
+    )
+    to_boundary = jnp.concatenate(
+        [to_boundary_part, jnp.zeros_like(to_boundary_part)], -1
+    )
+    to_boundary = jnp.concatenate(
+        [
+            to_boundary,
+            jnp.concatenate([jnp.zeros_like(to_boundary_part), to_boundary_part], -1),
+        ],
+        0,
+    )
 
     # Spatial initial condition at t=0
     if y0 is None:
@@ -127,16 +151,19 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     def df_diagonal(_, x):
         return jnp.diagonal(L_extended)
 
-    return DiscretizedPDE(
-        f=f,
-        spatial_grid=grid,
-        t0=t0,
-        tmax=tmax,
-        y0=y0,
-        df=df,
-        df_diagonal=df_diagonal,
-        L=L_extended,
-        E=E_extended,
+    return (
+        DiscretizedPDE(
+            f=f,
+            spatial_grid=grid,
+            t0=t0,
+            tmax=tmax,
+            y0=y0,
+            df=df,
+            df_diagonal=df_diagonal,
+            L=L_extended,
+            E=E_extended,
+        ),
+        to_boundary,
     )
 
 
