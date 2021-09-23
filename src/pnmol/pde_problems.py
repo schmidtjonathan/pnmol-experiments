@@ -11,8 +11,8 @@ from pnmol import differential_operator, discretize, kernels, mesh
 class DiscretizedPDE(
     namedtuple(
         "_DiscretizedPDE",
-        "f spatial_grid t0 tmax y0 df",
-        defaults=(None, None),
+        "f spatial_grid t0 tmax y0 df df_diagonal L E",
+        defaults=(None, None, None),
     )
 ):
     """Initial value problems."""
@@ -28,7 +28,7 @@ class DiscretizedPDE(
         return self.t0, self.tmax
 
 
-def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
+def heat_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     # Bounding box for spatial discretization grid
     if bbox is None:
         bbox = [0.0, 1.0]
@@ -49,11 +49,12 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
 
     # PNMOL discretization
     lengthscale = dx * int(stencil_size / 2)
-    gauss_kernel = kernels.GaussianKernel(lengthscale)
+    gauss_kernel = kernels.SquareExponentialKernel(1.0, 1.0)
     laplace = differential_operator.laplace()
     L, E = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
+    L = 0.1 * L
 
     @jax.jit
     def f(_, x):
@@ -63,10 +64,20 @@ def heat_1d(bbox=None, dx=0.02, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     def df(_, x):
         return L
 
-    return (
-        DiscretizedPDE(f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df),
-        L,
-        E,
+    @jax.jit
+    def df_diagonal(_, x):
+        return jnp.diagonal(L)
+
+    return DiscretizedPDE(
+        f=f,
+        spatial_grid=grid,
+        t0=t0,
+        tmax=tmax,
+        y0=y0,
+        df=df,
+        df_diagonal=df_diagonal,
+        L=L,
+        E=E,
     )
 
 
@@ -99,17 +110,33 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
 
-    @jax.jit
-    def f_wave_1d(_, x):
-        _x, _dx = jnp.split(x, 2)
-        new_ddx = L @ _x
-        new_dx = jnp.pad(_dx[1:-1], pad_width=1, mode="constant", constant_values=0.0)
-        return jnp.concatenate((new_dx, new_ddx))
+    I_d = jnp.eye(len(grid))
+    zeros = jnp.zeros((len(grid), len(grid)))
+    L_extended = jnp.block([[zeros, I_d], [L, zeros]])
+    E_extended = jnp.block([[zeros, zeros], [zeros, E]])
 
-    df_wave_1d = jax.jit(jax.jacfwd(f_wave_1d, argnums=1))
+    @jax.jit
+    def f(_, x):
+        return L_extended @ x
+
+    @jax.jit
+    def df(_, x):
+        return L_extended
+
+    @jax.jit
+    def df_diagonal(_, x):
+        return jnp.diagonal(L_extended)
 
     return DiscretizedPDE(
-        f=f_wave_1d, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df_wave_1d, L=L, E=E
+        f=f,
+        spatial_grid=grid,
+        t0=t0,
+        tmax=tmax,
+        y0=y0,
+        df=df,
+        df_diagonal=df_diagonal,
+        L=L_extended,
+        E=E_extended,
     )
 
 
