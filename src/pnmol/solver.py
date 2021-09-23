@@ -24,7 +24,7 @@ class LatentForceEK1(odefilter.ODEFilter):
         self.E1 = None
         self.W = kwargs["W"]
 
-        self.num_derivatives_eps = 2  # TODO provide interface
+        self.num_derivatives_eps = self.num_derivatives
 
     def initialize(self, ivp):
 
@@ -50,7 +50,9 @@ class LatentForceEK1(odefilter.ODEFilter):
         )
         mean = [extended_dy0, jnp.zeros((self.num_derivatives_eps + 1, ivp.dimension))]
 
-        cov_sqrtm_eps = jnp.kron(jnp.sqrt(jnp.abs(ivp.E)), cov_sqrtm_state)
+        cov_sqrtm_eps = jnp.kron(
+            jnp.sqrt(ivp.E), 1.0 / 10000.0 * jnp.eye(cov_sqrtm_state.shape[0])
+        )
         cov_sqrtm_state = jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm_state)
 
         # print(cov_sqrtm_eps.shape, cov_sqrtm_state.shape)
@@ -91,13 +93,13 @@ class LatentForceEK1(odefilter.ODEFilter):
         )
 
         # meascov_sqrtm = jnp.sqrt(1e-1) * jnp.eye(d)
-        sigma, error = self.estimate_error(
-            ql=Ql, z=z, h=H  # , meascov=meascov_sqrtm @ meascov_sqrtm.T
-        )
+        # sigma, error = self.estimate_error(
+        #     ql=Ql, z=z, h=H  # , meascov=meascov_sqrtm @ meascov_sqrtm.T
+        # )
 
         Cl = state.y.cov_sqrtm
         block_diag_A = jax.scipy.linalg.block_diag(*A)
-        Clp = sqrt.propagate_cholesky_factor(block_diag_A @ Cl, sigma * Ql)
+        Clp = sqrt.propagate_cholesky_factor(block_diag_A @ Cl, Ql)
 
         # [Update]
         Cl_new, K, Sl = sqrt.update_sqrt(H, Clp)  # , meascov_sqrtm=meascov_sqrtm)
@@ -116,7 +118,7 @@ class LatentForceEK1(odefilter.ODEFilter):
 
         new_state = odefilter.ODEFilterState(
             t=state.t + dt,
-            error_estimate=error,
+            error_estimate=None,
             reference_state=reference_state,
             y=StackedMultivariateNormal(new_mean, Cl_new),
         )
@@ -147,7 +149,7 @@ class LatentForceEK1(odefilter.ODEFilter):
 
         zeros_bc = jnp.zeros((W.shape[0],))
 
-        b = jnp.concatenate([Jx @ state_at - fx - eps_at, zeros_bc])
+        b = jnp.concatenate([Jx @ state_at - fx, zeros_bc])
         print(H.shape, b.shape)
         z = H @ jnp.concatenate(m_pred) + b
         print(z.shape)
