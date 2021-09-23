@@ -28,7 +28,7 @@ class DiscretizedPDE(
         return self.t0, self.tmax
 
 
-def heat_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
+def heat_1d(bbox=None, dx=0.05, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     # Bounding box for spatial discretization grid
     if bbox is None:
         bbox = [0.0, 1.0]
@@ -48,7 +48,7 @@ def heat_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
         y0 = y0 / y0.max()
 
     # PNMOL discretization
-    lengthscale = dx * int(stencil_size / 2)
+    lengthscale = 1# dx * int(stencil_size / 2)
     gauss_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=lengthscale)
     laplace = differential_operator.laplace()
     L, E = discretize.discretize(

@@ -7,45 +7,102 @@ from tornadox import iwp, odefilter, rv
 from pnmol import sqrt
 
 
-class MeasurementCovarianceEK0(odefilter.ODEFilter):
+class MyODEFilter(odefilter.ODEFilter):
+
+
+    def perform_full_step(self, state, initial_dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
+        """Perform a full ODE solver step.
+
+        This includes the acceptance/rejection decision as governed by error estimation
+        and steprule.
+        """
+        dt = initial_dt
+        step_is_sufficiently_small = False
+        proposed_state = None
+        step_info = dict(
+            num_f_evaluations=0,
+            num_df_evaluations=0,
+            num_df_diagonal_evaluations=0,
+            num_attempted_steps=0,
+        )
+        while not step_is_sufficiently_small:
+
+            proposed_state, attempt_step_info = self.attempt_step(
+                state, dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E
+            )
+
+            # Gather some stats
+            step_info["num_attempted_steps"] += 1
+            if "num_f_evaluations" in attempt_step_info:
+                nfevals = attempt_step_info["num_f_evaluations"]
+                step_info["num_f_evaluations"] += nfevals
+            if "num_df_evaluations" in attempt_step_info:
+                ndfevals = attempt_step_info["num_df_evaluations"]
+                step_info["num_df_evaluations"] += ndfevals
+            if "num_df_diagonal_evaluations" in attempt_step_info:
+                ndfevals_diag = attempt_step_info["num_df_diagonal_evaluations"]
+                step_info["num_df_diagonal_evaluations"] += ndfevals_diag
+
+            # Acceptance/Rejection due to the step-rule
+            internal_norm = self.steprule.scale_error_estimate(
+                unscaled_error_estimate=dt * proposed_state.error_estimate
+                if proposed_state.error_estimate is not None
+                else None,
+                reference_state=proposed_state.reference_state,
+            )
+            step_is_sufficiently_small = self.steprule.is_accepted(internal_norm)
+            suggested_dt = self.steprule.suggest(
+                dt, internal_norm, local_convergence_rate=self.num_derivatives + 1
+            )
+            # Get a new step-size for the next step
+            if step_is_sufficiently_small:
+                dt = min(suggested_dt, tmax - proposed_state.t)
+            else:
+                dt = min(suggested_dt, tmax - state.t)
+
+            assert dt >= 0, f"Invalid step size: dt={dt}"
+
+        return proposed_state, dt, step_info
+
+
+class MeasurementCovarianceEK0(MyODEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
         self.E0 = None
         self.E1 = None
 
-    def initialize(self, ivp):
+    def initialize(self, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
 
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=ivp.dimension,
+            wiener_process_dimension=y0.shape[0],
         )
 
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
         self.E1 = self.iwp.projection_matrix(1)
 
         extended_dy0, cov_sqrtm = self.init(
-            f=ivp.f,
-            df=ivp.df,
-            y0=ivp.y0,
-            t0=ivp.t0,
+            f=f,
+            df=df,
+            y0=y0,
+            t0=t0,
             num_derivatives=self.iwp.num_derivatives,
         )
         y = rv.MultivariateNormal(
-            mean=extended_dy0, cov_sqrtm=jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm)
+            mean=extended_dy0, cov_sqrtm=jnp.kron(jnp.eye(y0.shape[0]), cov_sqrtm)
         )
         return odefilter.ODEFilterState(
-            ivp=ivp,
-            t=ivp.t0,
+            t=t0,
             y=y,
             error_estimate=None,
             reference_state=None,
         )
 
-    def attempt_step(self, state, dt, verbose=False):
+    def attempt_step(self, state, dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
-        n, d = self.num_derivatives + 1, state.ivp.dimension
+        n, d = self.num_derivatives + 1, y0.shape[0]
 
         # [Setup]
         # Pull states into preconditioned state
@@ -56,15 +113,15 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=state.ivp.f, p0=self.E0 @ P, p1=self.E1 @ P, m_pred=mp, t=state.t + dt
+            f=f, p0=self.E0 @ P, p1=self.E1 @ P, m_pred=mp, t=state.t + dt
         )
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=state.ivp.E)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=state.ivp.E)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -75,7 +132,6 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         y_new = jnp.abs(m_new[0])
 
         new_state = odefilter.ODEFilterState(
-            ivp=state.ivp,
             t=state.t + dt,
             error_estimate=error,
             reference_state=y_new,
@@ -108,45 +164,44 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         return sigma, error
 
 
-class MeasurementCovarianceEK1(odefilter.ODEFilter):
+class MeasurementCovarianceEK1(MyODEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
         self.E0 = None
         self.E1 = None
 
-    def initialize(self, ivp):
+    def initialize(self, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
 
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=ivp.dimension,
+            wiener_process_dimension=y0.shape[0],
         )
 
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
         self.E1 = self.iwp.projection_matrix(1)
 
         extended_dy0, cov_sqrtm = self.init(
-            f=ivp.f,
-            df=ivp.df,
-            y0=ivp.y0,
-            t0=ivp.t0,
+            f=f,
+            df=df,
+            y0=y0,
+            t0=t0,
             num_derivatives=self.iwp.num_derivatives,
         )
         y = rv.MultivariateNormal(
-            mean=extended_dy0, cov_sqrtm=jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm)
+            mean=extended_dy0, cov_sqrtm=jnp.kron(jnp.eye(y0.shape[0]), cov_sqrtm)
         )
         return odefilter.ODEFilterState(
-            ivp=ivp,
-            t=ivp.t0,
+            t=t0,
             y=y,
             error_estimate=None,
             reference_state=None,
         )
 
-    def attempt_step(self, state, dt, verbose=False):
+    def attempt_step(self, state, dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
-        n, d = self.num_derivatives + 1, state.ivp.dimension
+        n, d = self.num_derivatives + 1, y0.shape[0]
 
         # [Setup]
         # Pull states into preconditioned state
@@ -157,20 +212,20 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=state.ivp.f,
-            df=state.ivp.df,
+            f=f,
+            df=df,
             p0=self.E0 @ P,
             p1=self.E1 @ P,
             m_pred=mp,
             t=state.t + dt,
         )
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=state.ivp.E)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=state.ivp.E)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -181,7 +236,6 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
         y_new = jnp.abs(m_new[0])
 
         new_state = odefilter.ODEFilterState(
-            ivp=state.ivp,
             t=state.t + dt,
             error_estimate=error,
             reference_state=y_new,

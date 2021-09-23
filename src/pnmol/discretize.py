@@ -73,7 +73,6 @@ def discretize(diffop, mesh, kernel, stencil_size):
                 jnp.asarray(point),
             ).squeeze()
         )
-
         E_diag = jax.ops.index_update(E_diag, i, E_term1 - E_term2)
 
         E_diag = jax.ops.index_update(E_diag, neighbor_idcs[0], E_term1 - E_term2)
@@ -85,7 +84,4 @@ def discretize(diffop, mesh, kernel, stencil_size):
 
     L = jax.ops.index_update(jnp.zeros((M, M)), (L_row, L_col), L_data)
     E = jnp.diag(E_diag)
-    print(L)
-    print(E)
-
     return L, E
