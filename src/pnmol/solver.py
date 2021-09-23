@@ -8,9 +8,9 @@ from pnmol import sqrt
 
 
 class MyODEFilter(odefilter.ODEFilter):
-
-
-    def perform_full_step(self, state, initial_dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
+    def perform_full_step(
+        self, state, initial_dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E
+    ):
         """Perform a full ODE solver step.
 
         This includes the acceptance/rejection decision as governed by error estimation
@@ -99,7 +99,9 @@ class MeasurementCovarianceEK0(MyODEFilter):
             reference_state=None,
         )
 
-    def attempt_step(self, state, dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
+    def attempt_step(
+        self, state, dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E
+    ):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
         n, d = self.num_derivatives + 1, y0.shape[0]
@@ -198,7 +200,9 @@ class MeasurementCovarianceEK1(MyODEFilter):
             reference_state=None,
         )
 
-    def attempt_step(self, state, dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E):
+    def attempt_step(
+        self, state, dt, f, spatial_grid, t0, tmax, y0, df, df_diagonal, L, E
+    ):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
         n, d = self.num_derivatives + 1, y0.shape[0]
