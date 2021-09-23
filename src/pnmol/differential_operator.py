@@ -197,7 +197,7 @@ def laplace():
         def inner(*args):
             return grad(fun, argnums=argnums)(*args)
 
-        return div(inner)
+        return div(inner, argnums=argnums)
 
     return DifferentialOperator(my_laplace)
 
