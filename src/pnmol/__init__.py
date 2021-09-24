@@ -2,7 +2,18 @@
 
 """
 
-from . import differential_operator, discretize, kernels, mesh, pde_problems
+from . import (
+    differential_operator,
+    discretize,
+    init,
+    iwp,
+    kernels,
+    mesh,
+    pde_problems,
+    rv,
+    sqrt,
+    step,
+)
 
 __version__ = "0.0.1"
 
