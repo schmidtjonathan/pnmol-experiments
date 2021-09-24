@@ -105,6 +105,7 @@ class MeasurementCovarianceEK0(MyODEFilter):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
         n, d = self.num_derivatives + 1, y0.shape[0]
+        B = spatial_grid.boundary_projection_matrix
 
         # [Setup]
         # Pull states into preconditioned state
@@ -115,15 +116,16 @@ class MeasurementCovarianceEK0(MyODEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=f, p0=self.E0 @ P, p1=self.E1 @ P, m_pred=mp, t=state.t + dt
+            f=f, p0=self.E0 @ P, p1=self.E1 @ P, m_pred=mp, t=state.t + dt, B=B
         )
+        E_with_bc = jax.scipy.linalg.block_diag(E, jnp.zeros((2, 2)))
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E_with_bc)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E_with_bc)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -149,11 +151,13 @@ class MeasurementCovarianceEK0(MyODEFilter):
 
     @staticmethod
     @partial(jax.jit, static_argnums=(0,))
-    def evaluate_ode(f, p0, p1, m_pred, t):
+    def evaluate_ode(f, p0, p1, m_pred, t, B):
         m_at = p0 @ m_pred
         fx = f(t, m_at)
-        H = p1
-        z = H @ m_pred - fx
+
+        H = jnp.vstack((p1, B @ p0))
+        shift = jnp.hstack((fx, jnp.zeros(B.shape[0])))
+        z = H @ m_pred - shift
         return z, H
 
     @staticmethod
@@ -206,6 +210,7 @@ class MeasurementCovarianceEK1(MyODEFilter):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
         n, d = self.num_derivatives + 1, y0.shape[0]
+        B = spatial_grid.boundary_projection_matrix
 
         # [Setup]
         # Pull states into preconditioned state
@@ -222,14 +227,16 @@ class MeasurementCovarianceEK1(MyODEFilter):
             p1=self.E1 @ P,
             m_pred=mp,
             t=state.t + dt,
+            B=B,
         )
+        E_with_bc = jax.scipy.linalg.block_diag(E, jnp.zeros((2, 2)))
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E_with_bc)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E_with_bc)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -255,14 +262,18 @@ class MeasurementCovarianceEK1(MyODEFilter):
 
     @staticmethod
     @partial(jax.jit, static_argnums=(0, 1))
-    def evaluate_ode(f, df, p0, p1, m_pred, t):
+    def evaluate_ode(f, df, p0, p1, m_pred, t, B):
         m_at = p0 @ m_pred
         fx = f(t, m_at)
         Jx = df(t, m_at)
         b = Jx @ m_at - fx
 
-        H = p1 - Jx @ p0
-        z = H @ m_pred + b
+        H_ode = p1 - Jx @ p0
+        H = jnp.vstack((H_ode, B @ p0))
+
+        shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
+
+        z = H @ m_pred + shift
         return z, H
 
     @staticmethod
