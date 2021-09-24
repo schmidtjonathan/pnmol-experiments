@@ -3,10 +3,8 @@
 import dataclasses
 from abc import ABC, abstractmethod
 from collections import namedtuple
-from functools import partial
 from typing import Dict, Iterable, Union
 
-import jax
 import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm

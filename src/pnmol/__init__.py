@@ -12,6 +12,7 @@ from . import (
     odefilter,
     pde_problems,
     rv,
+    solver,
     sqrt,
     step,
 )

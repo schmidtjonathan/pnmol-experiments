@@ -31,7 +31,7 @@ batched_sqrtm_to_cholesky = jax.vmap(sqrtm_to_cholesky, in_axes=0, out_axes=0)
 
 
 @jax.jit
-def update_sqrt(transition_matrix, cov_cholesky, meascov_sqrtm=None):
+def update_sqrt(transition_matrix, cov_cholesky, meascov_sqrtm):
     """Compute the update step with noise-free linear observation models in square-root form.
 
     Parameters
@@ -51,12 +51,10 @@ def update_sqrt(transition_matrix, cov_cholesky, meascov_sqrtm=None):
         Cholesky factor of the innovation covariance matrix. Shape (d_out, d_out).
     """
     output_dim, input_dim = transition_matrix.shape
-    if meascov_sqrtm is None:
-        bottomleft = jnp.zeros((output_dim, input_dim))
-    else:
-        bottomleft = jnp.block(
-            [meascov_sqrtm, jnp.zeros((output_dim, input_dim - output_dim))]
-        )
+
+    bottomleft = jnp.block(
+        [jnp.sqrt(meascov_sqrtm), jnp.zeros((output_dim, input_dim - output_dim))]
+    )
     bottomright = jnp.zeros((input_dim, input_dim))
 
     blockmat = jnp.block(
