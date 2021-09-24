@@ -34,12 +34,17 @@ xgrid = discretized_pde.spatial_grid.points.squeeze()
 tgrid = sol.t
 
 T, X = jnp.meshgrid(xgrid, tgrid)
+
+
 def plot_contour(ax, *args, **kwargs):
     """Contour lines with fill color and sharp edges."""
     ax.contour(*args, **kwargs)
     ax.contourf(*args, **kwargs)
 
-fig, (ax1, ax2) = plt.subplots(ncols=2, dpi=100, figsize=(8,3), sharex=True, sharey=True, constrained_layout=True)
+
+fig, (ax1, ax2) = plt.subplots(
+    ncols=2, dpi=100, figsize=(8, 3), sharex=True, sharey=True, constrained_layout=True
+)
 plot_contour(ax1, X, T, means, cmap="gist_rainbow", alpha=0.45, linewidths=0.8)
 plot_contour(ax2, X, T, stds, cmap="gist_rainbow", alpha=0.45, linewidths=0.8)
 
