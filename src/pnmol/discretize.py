@@ -5,6 +5,7 @@ import jax.numpy as jnp
 import tqdm
 
 from pnmol import kernels
+from functools import partial
 
 
 def discretize(diffop, mesh, kernel, stencil_size):
@@ -23,7 +24,7 @@ def discretize(diffop, mesh, kernel, stencil_size):
     kernel
         Representative kernel object for an underlying reproducing kernel Hilbert
         space (RKHS). Recover classical finite differences
-    num_neighbors
+    stencil_size
         Number of local neighbours to use for localised discretization.
         Optional. Default is ``None``, which implies that all points are used.
 
@@ -40,48 +41,41 @@ def discretize(diffop, mesh, kernel, stencil_size):
     L_kx = kernels.LambdaKernel(fun=L_k)
     LL_kx = kernels.LambdaKernel(fun=LL_k)
 
-    L_data = []
-    L_row = []
-    L_col = []
+    fd_coeff_fun = partial(
+        fd_coeff, grid=mesh, stencil_size=stencil_size, k=kernel, L_k=L_kx, LL_k=LL_kx
+    )
 
-    E_diag = jnp.zeros(M)
+    L_data, L_row, L_col, E_data = [], [], [], []
+
     for i, point in enumerate(tqdm.tqdm(mesh.points)):
 
-        neighbors, neighbor_idcs = mesh.neighbours(point=point, num=stencil_size)
-
-        gram_matrix = kernel(
-            neighbors.points, neighbors.points
-        )  # [stencil_size, stencil_size]
-        diffop_at_point = L_kx(
-            jnp.asarray(point), neighbors.points
-        ).squeeze()  # [stencil_size, ]
-
-        weights = jnp.linalg.solve(gram_matrix, diffop_at_point)  # [stencil_size,]
+        weights, uncertainty, neighbor_idcs = fd_coeff_fun(x=point)
 
         L_data.append(weights)
         L_row.append(jnp.full(shape=stencil_size, fill_value=i, dtype=int))
         L_col.append(neighbor_idcs)
-
-        E_term1 = LL_kx(
-            jnp.asarray(point),
-            jnp.asarray(point),
-        ).squeeze()
-        E_term2 = (
-            weights
-            @ L_kx(
-                neighbors.points,
-                jnp.asarray(point),
-            ).squeeze()
-        )
-        E_diag = jax.ops.index_update(E_diag, i, E_term1 - E_term2)
-
-        E_diag = jax.ops.index_update(E_diag, neighbor_idcs[0], E_term1 - E_term2)
-        # progressbar.set_description(str(jnp.array(point).round(3)))
+        E_data.append(uncertainty)
 
     L_data = jnp.concatenate(L_data)
     L_row = jnp.concatenate(L_row)
     L_col = jnp.concatenate(L_col)
+    E_data = jnp.concatenate(E_data)
 
     L = jax.ops.index_update(jnp.zeros((M, M)), (L_row, L_col), L_data)
-    E = jnp.diag(E_diag)
+    E = jnp.diag(E_data)
     return L, E
+
+
+def fd_coeff(x, grid, stencil_size, k, L_k, LL_k):
+    """Compute kernel-based finite difference coefficients."""
+
+    neighbors, neighbor_indices = grid.neighbours(point=x, num=stencil_size)
+
+    X = neighbors.points
+    gram_matrix = k(X, X)
+    diffop_at_point = L_k(x, X).reshape((-1,))
+
+    weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
+    uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
+
+    return weights, uncertainty, neighbor_indices
