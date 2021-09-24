@@ -13,7 +13,7 @@ class LatentForceEK1(odefilter.ODEFilter):
         self.P0 = None
         self.E0 = None
         self.E1 = None
-        self.W = kwargs["W"]
+        self.B = kwargs["B"]
 
     def initialize(self, ivp):
 
@@ -40,7 +40,7 @@ class LatentForceEK1(odefilter.ODEFilter):
         mean = jnp.concatenate([extended_dy0, jnp.zeros_like(extended_dy0)], -1)
 
         cov_sqrtm_state = jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(jnp.sqrt(ivp.E), jnp.eye(self.num_derivatives))
+        cov_sqrtm_eps = jnp.kron(jnp.sqrt(ivp.E), jnp.eye(self.num_derivatives + 1))
 
         cov_sqrtm = jax.scipy.linalg.block_diag(
             cov_sqrtm_state,
@@ -77,7 +77,7 @@ class LatentForceEK1(odefilter.ODEFilter):
             p1=self.E1,
             m_pred=mp,
             t=state.t + dt,
-            W=self.W,
+            B=self.B,
         )
 
         # meascov_sqrtm = jnp.sqrt(1e-1) * jnp.eye(d)
@@ -113,7 +113,7 @@ class LatentForceEK1(odefilter.ODEFilter):
         return A @ m
 
     @staticmethod
-    @jax.jit
+    @partial(jax.jit, static_argnums=1)
     def extract_blocks_from_block_diag(block_diag_mat, num_blocks):
         """ATTENTION: ASSUMES EQUAL-SIZED SQUARE BLOCKS!"""
         block_rows = jnp.split(block_diag_mat, num_blocks, axis=0)
@@ -128,7 +128,7 @@ class LatentForceEK1(odefilter.ODEFilter):
 
     @staticmethod
     @partial(jax.jit, static_argnums=(0, 1))
-    def evaluate_ode(f, df, p0, p1, m_pred, t, W):
+    def evaluate_ode(f, df, p0, p1, m_pred, t, B):
 
         m_at = p0 @ m_pred  # Project to first derivatives
         state_at, eps_at = jnp.split(m_at, 2)  # Split up into ODE state and error
@@ -145,16 +145,14 @@ class LatentForceEK1(odefilter.ODEFilter):
 
         H_state = E1_state - Jx @ E0_state
         H_eps = -E0_eps
-        H_boundaries = W @ E0_state
+        H_boundaries = B @ E0_state
         H_zeros = jnp.zeros_like(H_boundaries)
         H = jnp.block([[H_state, H_eps], [H_boundaries, H_zeros]])
 
-        zeros_bc = jnp.zeros((W.shape[0],))
+        zeros_bc = jnp.zeros((B.shape[0],))
 
         b = jnp.concatenate([Jx @ state_at - fx, zeros_bc])
-        print(H.shape, b.shape)
-        z = H @ jnp.concatenate(m_pred) + b
-        print(z.shape)
+        z = H @ m_pred + b
         return z, H
 
     @staticmethod

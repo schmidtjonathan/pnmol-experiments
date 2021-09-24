@@ -123,9 +123,12 @@ class StackedSSM:
         self, derivative_to_project_onto, process_to_project_onto=None
     ):
         if process_to_project_onto is None:
-            return [
-                p.projection_matrix(derivative_to_project_onto) for p in self.processes
-            ]
+            return jax.scipy.linalg.block_diag(
+                *[
+                    p.projection_matrix(derivative_to_project_onto)
+                    for p in self.processes
+                ]
+            )
 
         assert isinstance(process_to_project_onto, int)
         proj_to_proc = self.projection_to_process(process_to_project_onto)
