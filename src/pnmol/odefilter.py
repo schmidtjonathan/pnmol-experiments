@@ -194,7 +194,7 @@ class ODEFilter(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def attempt_step(self, state, dt, f, t0, tmax, y0, df, df_diagonal):
+    def attempt_step(self, state, dt, discretized_pde):
         raise NotImplementedError
 
 
