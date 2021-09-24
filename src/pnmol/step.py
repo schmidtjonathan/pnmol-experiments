@@ -30,6 +30,8 @@ class ConstantSteps(StepRule):
 
     def __init__(self, dt):
         self.dt = dt
+        self.min_step = 1e-15
+        self.max_step = 1e15
 
     def __repr__(self):
         return f"{self.__class__.__name__}(dt={self.dt})"

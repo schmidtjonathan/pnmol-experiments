@@ -8,7 +8,6 @@ from . import (
     init,
     iwp,
     kernels,
-    linops,
     mesh,
     odefilter,
     pde_problems,

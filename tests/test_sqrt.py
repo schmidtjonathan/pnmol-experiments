@@ -30,12 +30,6 @@ def SC(iwp):
     return iwp.preconditioned_discretize_1d[1]
 
 
-@pytest.fixture
-def batch_size():
-    """Batch size > 1. Test batched transitions."""
-    return 5
-
-
 @pytest.mark.parametrize("measurement_style", ["full", "partial"])
 def test_propagate_cholesky_factor(H_and_SQ, SC, measurement_style):
     """Assert that sqrt propagation coincides with non-sqrt propagation."""
@@ -46,41 +40,6 @@ def test_propagate_cholesky_factor(H_and_SQ, SC, measurement_style):
     cov = H @ SC @ SC.T @ H.T + SQ @ SQ.T
     assert jnp.allclose(chol @ chol.T, cov)
     assert jnp.allclose(jnp.tril(chol), chol)
-
-
-@pytest.mark.parametrize("measurement_style", ["full", "partial"])
-def test_batched_propagate_cholesky_factors(
-    H_and_SQ, SC, measurement_style, batch_size
-):
-    """Batched propagation coincides with non-batched propagation."""
-
-    H, SQ = H_and_SQ
-    H = pnmol.linops.BlockDiagonal(jnp.stack([H] * batch_size))
-    SQ = pnmol.linops.BlockDiagonal(jnp.stack([SQ] * batch_size))
-    SC = pnmol.linops.BlockDiagonal(jnp.stack([SC] * batch_size))
-
-    chol = pnmol.sqrt.batched_propagate_cholesky_factor(
-        (H @ SC).array_stack, SQ.array_stack
-    )
-    chol_as_bd = pnmol.linops.BlockDiagonal(chol)
-    reference = pnmol.sqrt.propagate_cholesky_factor((H @ SC).todense(), SQ.todense())
-    assert jnp.allclose(chol_as_bd.todense(), reference)
-
-
-@pytest.mark.parametrize("measurement_style", ["full", "partial"])
-def test_batched_sqrtm_to_cholesky(H_and_SQ, SC, measurement_style, batch_size):
-    """Sqrtm-to-cholesky is the same for batched and non-batched."""
-    H, SQ = H_and_SQ
-    d = H.shape[0]
-    H = pnmol.linops.BlockDiagonal(jnp.stack([H] * batch_size))
-    SC = pnmol.linops.BlockDiagonal(jnp.stack([SC] * batch_size))
-
-    chol = pnmol.sqrt.batched_sqrtm_to_cholesky((H @ SC).T.array_stack)
-    chol_as_bd = pnmol.linops.BlockDiagonal(chol)
-
-    reference = pnmol.sqrt.sqrtm_to_cholesky((H @ SC).T.todense())
-    assert jnp.allclose(chol_as_bd.todense(), reference)
-    assert chol_as_bd.array_stack.shape == (batch_size, d, d)
 
 
 @pytest.mark.parametrize("measurement_style", ["full", "partial"])
@@ -112,38 +71,3 @@ def test_update_sqrt(H_and_SQ, SC, measurement_style):
     # Test S
     assert jnp.allclose(innov_chol @ innov_chol.T, S)
     assert jnp.allclose(innov_chol, jnp.tril(innov_chol))
-
-
-@pytest.mark.parametrize("measurement_style", ["full", "partial"])
-def test_batched_update_sqrt(H_and_SQ, SC, measurement_style, batch_size):
-    """Batched updated coincides with non-batched update."""
-    H, _ = H_and_SQ
-    d_out, d_in = H.shape
-    H = pnmol.linops.BlockDiagonal(jnp.stack([H] * batch_size))
-    SC = pnmol.linops.BlockDiagonal(jnp.stack([SC] * batch_size))
-
-    chol, K, S = pnmol.sqrt.batched_update_sqrt(
-        H.array_stack,
-        SC.array_stack,
-    )
-    assert isinstance(chol, jnp.ndarray)
-    assert isinstance(K, jnp.ndarray)
-    assert isinstance(S, jnp.ndarray)
-    assert K.shape == (batch_size, d_in, d_out)
-    assert chol.shape == (batch_size, d_in, d_in)
-    assert S.shape == (batch_size, d_out, d_out)
-
-    ref_chol, ref_K, ref_S = pnmol.sqrt.update_sqrt(H.todense(), SC.todense())
-    chol_as_bd = pnmol.linops.BlockDiagonal(chol)
-    K_as_bd = pnmol.linops.BlockDiagonal(K)
-    S_as_bd = pnmol.linops.BlockDiagonal(S)
-
-    # K can be compared elementwise, S and chol not (see below).
-    assert jnp.allclose(K_as_bd.todense(), ref_K)
-
-    # The Cholesky-factor of positive semi-definite matrices is only unique
-    # up to column operations (e.g. column reordering), i.e. there could be slightly
-    # different Cholesky factors in batched and non-batched versions.
-    # Therefore, we only check that the results are valid Cholesky factors themselves
-    assert jnp.allclose((S_as_bd @ S_as_bd.T).todense(), ref_S @ ref_S.T)
-    assert jnp.allclose((chol_as_bd @ chol_as_bd.T).todense(), ref_chol @ ref_chol.T)

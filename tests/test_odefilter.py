@@ -36,7 +36,7 @@ class EulerAsODEFilter(pnmol.odefilter.ODEFilter):
 
 @pytest.fixture
 def ivp():
-    ivp = pnmol.pde_problems.heat_1d(t0=0.0, tmax=1.5)
+    ivp = pnmol.pde_problems.heat_1d(t0=0.0, tmax=1.53)
     return ivp
 
 

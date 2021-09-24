@@ -104,10 +104,14 @@ class ODEFilter(ABC):
 
             state, dt, step_info = self.perform_full_step(state, dt, discretized_pde)
 
-            if dt < self.steprule.min_step:
-                raise ValueError("Step-size smaller than minimum step-size")
-            if dt > self.steprule.max_step:
-                raise ValueError("Step-size larger than maximum step-size")
+            # if dt < self.steprule.min_step:
+            #     raise ValueError(
+            #         f"Step-size ({dt}) smaller than minimum step-size ({self.steprule.min_step})"
+            #     )
+            # if dt > self.steprule.max_step:
+            #     raise ValueError(
+            #         f"Step-size ({dt}) larger than maximum step-size ({self.steprule.max_step})"
+            #     )
 
             info["num_steps"] += 1
             info["num_f_evaluations"] += step_info["num_f_evaluations"]
