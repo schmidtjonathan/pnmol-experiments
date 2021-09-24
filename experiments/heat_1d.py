@@ -62,4 +62,3 @@ ax2.grid(which="major", color="k", alpha=0.25, linestyle="dotted")
 if SAVE:
     plt.savefig("means_and_stds.pdf")
 plt.show()
-

@@ -9,10 +9,10 @@ from . import (
     iwp,
     kernels,
     mesh,
-    solver,
     odefilter,
     pde_problems,
     rv,
+    solver,
     sqrt,
     step,
 )

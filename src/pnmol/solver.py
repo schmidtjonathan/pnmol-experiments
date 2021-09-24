@@ -3,8 +3,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from pnmol import sqrt, odefilter, iwp, rv
-
+from pnmol import iwp, odefilter, rv, sqrt
 
 
 class MeasurementCovarianceEK0(odefilter.ODEFilter):
@@ -32,7 +31,8 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
             num_derivatives=self.iwp.num_derivatives,
         )
         y = rv.MultivariateNormal(
-            mean=extended_dy0, cov_sqrtm=jnp.kron(jnp.eye(discretized_pde.y0.shape[0]), cov_sqrtm)
+            mean=extended_dy0,
+            cov_sqrtm=jnp.kron(jnp.eye(discretized_pde.y0.shape[0]), cov_sqrtm),
         )
         return odefilter.ODEFilterState(
             t=discretized_pde.t0,
@@ -41,9 +41,7 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
             reference_state=None,
         )
 
-    def attempt_step(
-        self, state, dt, discretized_pde
-    ):
+    def attempt_step(self, state, dt, discretized_pde):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
         n, d = self.num_derivatives + 1, discretized_pde.y0.shape[0]
@@ -58,7 +56,12 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=discretized_pde.f, p0=self.E0 @ P, p1=self.E1 @ P, m_pred=mp, t=state.t + dt, B=B
+            f=discretized_pde.f,
+            p0=self.E0 @ P,
+            p1=self.E1 @ P,
+            m_pred=mp,
+            t=state.t + dt,
+            B=B,
         )
         E_with_bc = jax.scipy.linalg.block_diag(discretized_pde.E, jnp.zeros((2, 2)))
 
@@ -119,7 +122,7 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
         self.E0 = None
         self.E1 = None
 
-    def initialize(self,discretized_pde):
+    def initialize(self, discretized_pde):
 
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
@@ -137,7 +140,8 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
             num_derivatives=self.iwp.num_derivatives,
         )
         y = rv.MultivariateNormal(
-            mean=extended_dy0, cov_sqrtm=jnp.kron(jnp.eye(discretized_pde.y0.shape[0]), cov_sqrtm)
+            mean=extended_dy0,
+            cov_sqrtm=jnp.kron(jnp.eye(discretized_pde.y0.shape[0]), cov_sqrtm),
         )
         return odefilter.ODEFilterState(
             t=discretized_pde.t0,
@@ -146,9 +150,7 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
             reference_state=None,
         )
 
-    def attempt_step(
-        self, state, dt, discretized_pde
-    ):
+    def attempt_step(self, state, dt, discretized_pde):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
         n, d = self.num_derivatives + 1, discretized_pde.y0.shape[0]

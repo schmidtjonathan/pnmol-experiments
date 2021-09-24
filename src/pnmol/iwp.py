@@ -1,5 +1,5 @@
 from collections import namedtuple
-from functools import partial, cached_property
+from functools import cached_property, partial
 
 import jax
 import jax.numpy as jnp
