@@ -59,7 +59,7 @@ def discretize(diffop, mesh, kernel, stencil_size):
     L_data = jnp.concatenate(L_data)
     L_row = jnp.concatenate(L_row)
     L_col = jnp.concatenate(L_col)
-    E_data = jnp.concatenate(E_data)
+    E_data = jnp.stack(E_data)
 
     L = jax.ops.index_update(jnp.zeros((M, M)), (L_row, L_col), L_data)
     E = jnp.diag(E_data)
