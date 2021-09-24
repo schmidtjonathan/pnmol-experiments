@@ -12,7 +12,7 @@ from pnmol import differential_operator, discretize, kernels, mesh
 class DiscretizedPDE(
     namedtuple(
         "_DiscretizedPDE",
-        "f spatial_grid t0 tmax y0 df df_diagonal L E",
+        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
         defaults=(None, None, None),
     )
 ):
@@ -66,11 +66,6 @@ def heat_1d(
     # Create spatial discretization grid
     grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
 
-    _, boundary_idcs = grid.boundary
-    boundary_idcs = jnp.where(boundary_idcs)[0]
-
-    to_boundary = jnp.concatenate([jnp.eye(1, len(grid), b) for b in boundary_idcs], 0)
-
     # Spatial initial condition at t=0
     x = grid.points.reshape((-1,))
     if y0 is None:
@@ -79,9 +74,11 @@ def heat_1d(
     # PNMOL discretization
     square_exp_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
     laplace = differential_operator.laplace()
-    L, E = discretize.discretize(
+    L, E_sqrtm = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=square_exp_kernel, stencil_size=stencil_size
     )
+    Kxx = square_exp_kernel(grid.points, grid.points)
+    sqrtm_Kxx = jnp.linalg.cholesky(Kxx + 1e-10 * jnp.eye(Kxx.shape[0]))
 
     @jax.jit
     def f(_, x):
@@ -95,19 +92,17 @@ def heat_1d(
     def df_diagonal(_, x):
         return diffusion_rate * jnp.diagonal(L)
 
-    return (
-        DiscretizedPDE(
-            f=f,
-            spatial_grid=grid,
-            t0=t0,
-            tmax=tmax,
-            y0=y0,
-            df=df,
-            df_diagonal=df_diagonal,
-            L=L,
-            E=E,
-        ),
-        to_boundary,
+    return DiscretizedPDE(
+        f=f,
+        spatial_grid=grid,
+        t0=t0,
+        tmax=tmax,
+        y0=y0,
+        df=df,
+        df_diagonal=df_diagonal,
+        L=L,
+        E_sqrtm=E_sqrtm,
+        Kxx_sqrtm=sqrtm_Kxx,
     )
 
 
@@ -152,14 +147,14 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     # PNMOL discretization
     gauss_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
     laplace = differential_operator.laplace()
-    L, E = discretize.discretize(
+    L, E_sqrtm = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
 
     I_d = jnp.eye(len(grid))
     zeros = jnp.zeros((len(grid), len(grid)))
     L_extended = jnp.block([[zeros, I_d], [L, zeros]])
-    E_extended = jnp.block([[zeros, zeros], [zeros, E]])
+    E_sqrtm_extended = jnp.block([[zeros, zeros], [zeros, E_sqrtm]])
 
     @jax.jit
     def f(_, x):
@@ -183,7 +178,7 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
             df=df,
             df_diagonal=df_diagonal,
             L=L_extended,
-            E=E_extended,
+            E_sqrtm=E_sqrtm_extended,
         ),
         to_boundary,
     )

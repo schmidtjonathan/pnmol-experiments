@@ -64,7 +64,7 @@ def discretize(diffop, mesh, kernel, stencil_size):
 
     L = jax.ops.index_update(jnp.zeros((M, M)), (L_row, L_col), L_data)
     E = jnp.diag(E_data)
-    return L, E
+    return L, jnp.sqrt(jnp.abs(E))
 
 
 def fd_coeff(x, grid, stencil_size, k, L_k, LL_k):
@@ -73,7 +73,7 @@ def fd_coeff(x, grid, stencil_size, k, L_k, LL_k):
     neighbors, neighbor_indices = grid.neighbours(point=x, num=stencil_size)
 
     X = neighbors.points
-    gram_matrix = k(X, X)
+    gram_matrix = k(X, X) + 1e-12 * jnp.eye(len(X))
     diffop_at_point = L_k(x, X).reshape((-1,))
 
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
