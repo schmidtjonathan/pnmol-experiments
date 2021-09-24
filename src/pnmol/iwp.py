@@ -8,7 +8,7 @@ import scipy.special
 
 
 class IntegratedWienerTransition(
-    namedtuple("_IWP", "wiener_process_dimension num_derivatives")
+    namedtuple("_IWP", "wiener_process_dimension num_derivatives wp_diffusion_sqrtm")
 ):
     @cached_property
     def preconditioned_discretize_1d(self):
@@ -47,7 +47,7 @@ class IntegratedWienerTransition(
             A_1d,
         )
         L_Q = jnp.kron(
-            id_factor,
+            self.wp_diffusion_sqrtm,
             L_Q1d,
         )
         return A, L_Q

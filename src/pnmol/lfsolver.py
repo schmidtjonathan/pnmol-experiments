@@ -13,17 +13,18 @@ class LatentForceEK1(odefilter.ODEFilter):
         self.P0 = None
         self.E0 = None
         self.E1 = None
-        self.B = kwargs["B"]
 
     def initialize(self, ivp):
 
         self.state_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=ivp.dimension,
+            wp_diffusion_sqrtm=ivp.Kxx_sqrtm,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=ivp.dimension,
+            wp_diffusion_sqrtm=ivp.E_sqrtm,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
@@ -39,8 +40,8 @@ class LatentForceEK1(odefilter.ODEFilter):
         )
         mean = jnp.concatenate([extended_dy0, jnp.zeros_like(extended_dy0)], -1)
 
-        cov_sqrtm_state = jnp.kron(jnp.eye(ivp.dimension), cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(jnp.sqrt(ivp.E), jnp.eye(self.num_derivatives + 1))
+        cov_sqrtm_state = jnp.kron(ivp.Kxx_sqrtm, cov_sqrtm_state)
+        cov_sqrtm_eps = jnp.kron(ivp.E_sqrtm, 1e-10 * jnp.eye(self.num_derivatives + 1))
 
         cov_sqrtm = jax.scipy.linalg.block_diag(
             cov_sqrtm_state,
@@ -77,19 +78,16 @@ class LatentForceEK1(odefilter.ODEFilter):
             p1=self.E1,
             m_pred=mp,
             t=state.t + dt,
-            B=self.B,
+            B=discretized_pde.spatial_grid.boundary_projection_matrix,
         )
-
-        # meascov_sqrtm = jnp.sqrt(1e-1) * jnp.eye(d)
-        # sigma, error = self.estimate_error(
-        #     ql=Ql, z=z, h=H  # , meascov=meascov_sqrtm @ meascov_sqrtm.T
-        # )
 
         Cl = state.y.cov_sqrtm
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp)  # , meascov_sqrtm=meascov_sqrtm)
+        Cl_new, K, Sl = sqrt.update_sqrt(
+            H, Clp, meascov_sqrtm=jnp.zeros((H.shape[0], H.shape[0]))
+        )
         flat_m_new = mp - K @ z
 
         flat_state_m_new, flat_eps_m_new = jnp.split(flat_m_new, 2)
@@ -154,14 +152,3 @@ class LatentForceEK1(odefilter.ODEFilter):
         b = jnp.concatenate([Jx @ state_at - fx, zeros_bc])
         z = H @ m_pred + b
         return z, H
-
-    @staticmethod
-    @jax.jit
-    def estimate_error(ql, z, h, meascov=None):
-        S = h @ ql @ ql.T @ h.T
-        if meascov is not None:
-            S = S + meascov
-        sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]  # TODO <--- correct?
-        sigma = jnp.sqrt(sigma_squared)
-        error = jnp.sqrt(jnp.diag(S)) * sigma
-        return sigma, error

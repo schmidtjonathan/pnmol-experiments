@@ -91,22 +91,22 @@ class StackedSSM:
         for p in self.processes:
             A, SQ = p.preconditioned_discretize
             As.append(A)
-            Qs.append(SQ @ SQ.T)
+            Qs.append(SQ)
 
         A = jax.scipy.linalg.block_diag(*As)
         Q = jax.scipy.linalg.block_diag(*Qs)
-        return A, jnp.linalg.cholesky(Q)
+        return A, Q
 
     def non_preconditioned_discretize(self, dt):
         As, Qs = [], []
         for p in self.processes:
             A, SQ = p.non_preconditioned_discretize(dt)
             As.append(A)
-            Qs.append(SQ @ SQ.T)
+            Qs.append(SQ)
 
         A = jax.scipy.linalg.block_diag(*As)
         Q = jax.scipy.linalg.block_diag(*Qs)
-        return A, jnp.linalg.cholesky(Q)
+        return A, Q
 
     def nordsieck_preconditioner(self, dt):
         Ps, P_invs = [], []
