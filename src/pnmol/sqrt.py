@@ -53,7 +53,7 @@ def update_sqrt(transition_matrix, cov_cholesky, E):
     output_dim, input_dim = transition_matrix.shape
 
     bottomleft = jnp.block(
-        [jnp.sqrt(jnp.abs(E)), jnp.zeros((output_dim, input_dim - output_dim))]
+        [jnp.sqrt(E), jnp.zeros((output_dim, input_dim - output_dim))]
     )
     bottomright = jnp.zeros((input_dim, input_dim))
 
