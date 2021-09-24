@@ -21,7 +21,7 @@ class StepRule(abc.ABC):
     def scale_error_estimate(self, unscaled_error_estimate, reference_state):
         raise NotImplementedError
 
-    def first_dt(self, ivp):
+    def first_dt(self, discretized_pde):
         raise NotImplementedError
 
 
@@ -47,7 +47,7 @@ class ConstantSteps(StepRule):
         # Return None to make sure this quantity is not used further below
         return None
 
-    def first_dt(self, ivp):
+    def first_dt(self, discretized_pde):
         return self.dt
 
 
@@ -102,8 +102,10 @@ class AdaptiveSteps(StepRule):
         dim = len(ratio) if ratio.ndim > 0 else 1
         return jnp.linalg.norm(ratio) / jnp.sqrt(dim)
 
-    def first_dt(self, ivp):
-        return propose_first_dt(ivp.f, ivp.t0, ivp.y0)
+    def first_dt(self, discretized_pde):
+        return propose_first_dt(
+            discretized_pde.f, discretized_pde.t0, discretized_pde.y0
+        )
 
 
 @partial(jax.jit, static_argnums=0)

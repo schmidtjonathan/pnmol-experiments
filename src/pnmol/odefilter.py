@@ -70,11 +70,11 @@ class ODEFilter(ABC):
             pass
         return state, info
 
-    def solution_generator(self, ivp, stop_at=None, progressbar=False):
+    def solution_generator(self, discretized_pde, stop_at=None, progressbar=False):
         """Generate ODE solver steps."""
 
         time_stopper = self._process_event_inputs(stop_at_locations=stop_at)
-        state = self.initialize(ivp)
+        state = self.initialize(discretized_pde)
         info = dict(
             num_f_evaluations=0,
             num_df_evaluations=0,
@@ -84,14 +84,14 @@ class ODEFilter(ABC):
         )
         yield state, info
 
-        dt = self.steprule.first_dt(ivp)
+        dt = self.steprule.first_dt(discretized_pde)
 
         progressbar_steps = 100
         progressbar_update_threshold = progressbar_update_increment = (
-            ivp.tmax / progressbar_steps
+            discretized_pde.tmax / progressbar_steps
         )
         pbar = tqdm(total=progressbar_steps) if progressbar else None
-        while state.t < ivp.tmax:
+        while state.t < discretized_pde.tmax:
 
             if pbar is not None:
                 while state.t + dt >= progressbar_update_threshold:
@@ -102,7 +102,7 @@ class ODEFilter(ABC):
             if time_stopper is not None:
                 dt = time_stopper.adjust_dt_to_time_stops(state.t, dt)
 
-            state, dt, step_info = self.perform_full_step(state, dt, ivp)
+            state, dt, step_info = self.perform_full_step(state, dt, discretized_pde)
 
             if dt < self.steprule.min_step:
                 raise ValueError("Step-size smaller than minimum step-size")
@@ -131,7 +131,7 @@ class ODEFilter(ABC):
             time_stopper = None
         return time_stopper
 
-    def perform_full_step(self, state, initial_dt, ivp):
+    def perform_full_step(self, state, initial_dt, discretized_pde):
         """Perform a full ODE solver step.
 
         This includes the acceptance/rejection decision as governed by error estimation
@@ -148,7 +148,9 @@ class ODEFilter(ABC):
         )
         while not step_is_sufficiently_small:
 
-            proposed_state, attempt_step_info = self.attempt_step(state, dt, ivp)
+            proposed_state, attempt_step_info = self.attempt_step(
+                state, dt, discretized_pde
+            )
 
             # Gather some stats
             step_info["num_attempted_steps"] += 1
@@ -175,16 +177,16 @@ class ODEFilter(ABC):
             )
             # Get a new step-size for the next step
             if step_is_sufficiently_small:
-                dt = min(suggested_dt, ivp.tmax - proposed_state.t)
+                dt = min(suggested_dt, discretized_pde.tmax - proposed_state.t)
             else:
-                dt = min(suggested_dt, ivp.tmax - state.t)
+                dt = min(suggested_dt, discretized_pde.tmax - state.t)
 
             assert dt >= 0, f"Invalid step size: dt={dt}"
 
         return proposed_state, dt, step_info
 
     @abstractmethod
-    def initialize(self, ivp):
+    def initialize(self, discretized_pde):
         raise NotImplementedError
 
     @abstractmethod
