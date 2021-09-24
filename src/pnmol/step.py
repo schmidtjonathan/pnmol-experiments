@@ -47,8 +47,7 @@ class ConstantSteps(StepRule):
         # Return None to make sure this quantity is not used further below
         return None
 
-    @partial(jax.jit, static_argnums=(0, 1, 5, 6))
-    def first_dt(self, f, t0, tmax, y0, df, df_diagonal):
+    def first_dt(self, ivp):
         return self.dt
 
 
@@ -103,9 +102,8 @@ class AdaptiveSteps(StepRule):
         dim = len(ratio) if ratio.ndim > 0 else 1
         return jnp.linalg.norm(ratio) / jnp.sqrt(dim)
 
-    @partial(jax.jit, static_argnums=(0, 1, 5, 6))
-    def first_dt(self, f, t0, tmax, y0, df, df_diagonal):
-        return propose_first_dt(f, t0, y0)
+    def first_dt(self, ivp):
+        return propose_first_dt(ivp.f, ivp.t0, ivp.y0)
 
 
 @partial(jax.jit, static_argnums=0)
