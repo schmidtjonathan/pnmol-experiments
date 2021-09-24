@@ -1,5 +1,5 @@
 from collections import namedtuple
-from functools import partial
+from functools import cached_property, partial
 
 import jax
 import jax.numpy as jnp
@@ -10,11 +10,7 @@ import scipy.special
 class IntegratedWienerTransition(
     namedtuple("_IWP", "wiener_process_dimension num_derivatives")
 ):
-
-    # jax.jit does not handle cached_property well, but it internally caches some values,
-    # which is the reason for the property + jax.jit stuff
-    @property
-    @partial(jax.jit, static_argnums=0)
+    @cached_property
     def preconditioned_discretize_1d(self):
         """Preconditioned system matrices for one dimension.
 
@@ -33,10 +29,7 @@ class IntegratedWienerTransition(
         Q_1d = jnp.flip(jnp.array(scipy.linalg.hilbert(self.num_derivatives + 1)))
         return A_1d, jnp.linalg.cholesky(Q_1d)
 
-    # jax.jit does not handle cached_property well, but it internally caches some values,
-    # which is the reason for the property + jax.jit stuff
-    @property
-    @partial(jax.jit, static_argnums=0)
+    @cached_property
     def preconditioned_discretize(self):
         """Preconditioned system matrices.
 
@@ -59,7 +52,6 @@ class IntegratedWienerTransition(
         )
         return A, L_Q
 
-    @partial(jax.jit, static_argnums=0)
     def nordsieck_preconditioner_1d_raw(self, dt):
         powers = jnp.arange(self.num_derivatives, -1, -1)
         scales = jnp.array(scipy.special.factorial(powers))
@@ -69,7 +61,6 @@ class IntegratedWienerTransition(
         scaling_vector_inv = (jnp.abs(dt) ** (-powers)) * scales
         return scaling_vector, scaling_vector_inv
 
-    @partial(jax.jit, static_argnums=0)
     def nordsieck_preconditioner_1d(self, dt):
         """Create matrix for 1-D Nordsieck preconditioner and its inverse.
 
@@ -85,7 +76,6 @@ class IntegratedWienerTransition(
         nordsieck_procond_inv_1d = jnp.diag(scaling_vector_inv)
         return nordsieck_precond_1d, nordsieck_procond_inv_1d
 
-    @partial(jax.jit, static_argnums=0)
     def nordsieck_preconditioner(self, dt):
         """Create matrix for Nordsieck preconditioner and its inverse.
 
@@ -106,7 +96,6 @@ class IntegratedWienerTransition(
             jnp.kron(id_factor, nordsieck_procond_inv_1d),
         )
 
-    @partial(jax.jit, static_argnums=0)
     def non_preconditioned_discretize(self, dt):
         """Non-preconditioned system matrices. Mainly for testing and debugging.
 

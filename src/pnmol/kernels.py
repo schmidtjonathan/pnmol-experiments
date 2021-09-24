@@ -1,8 +1,13 @@
+import operator
 from abc import ABC, abstractmethod
 from functools import partial
 
 import jax
 import jax.numpy as jnp
+
+
+def pairwise(func, a, b):
+    return jax.vmap(lambda x1: jax.vmap(lambda y1: func(x1, y1))(b))(a)
 
 
 class Kernel(ABC):
@@ -31,14 +36,8 @@ class Kernel(ABC):
         pass
 
     @partial(jax.jit, static_argnums=(0,))
-    def __call__(self, X: jnp.ndarray, X_: jnp.ndarray, return_gradient: bool = False):
-        if len(X.shape) >= 2:
-            assert len(X.shape) == 2 and (1 in X.shape)
-
-        if len(X_.shape) >= 2:
-            assert len(X_.shape) == 2 and (1 in X_.shape)
-
-        return self._evaluate(X.reshape(-1), X_.reshape(-1))
+    def __call__(self, X: jnp.ndarray, X_: jnp.ndarray):
+        return self._evaluate(jnp.atleast_2d(X), jnp.atleast_2d(X_))
 
 
 class LambdaKernel(Kernel):
@@ -60,7 +59,7 @@ class LambdaKernel(Kernel):
     @partial(jax.jit, static_argnums=(0,))
     def _evaluate(self, X: jnp.ndarray, X_: jnp.ndarray):
         return jnp.array(
-            [[self._fun(jnp.array([x]), jnp.array([y])) for y in X_] for x in X]
+            [[self._fun(jnp.atleast_1d(x), jnp.atleast_1d(y)) for y in X_] for x in X]
         )
 
     def __str__(self):
@@ -95,7 +94,14 @@ class SquareExponentialKernel(Kernel):
 
     @partial(jax.jit, static_argnums=(0,))
     def _evaluate(self, X: jnp.ndarray, X_: jnp.ndarray):
-        squared_distances = (X[:, jnp.newaxis] - X_[jnp.newaxis, :]) ** 2
+        if X.shape[-1] == X_.shape[-1] == 1:
+            squared_distances = (
+                jnp.reshape(X, (-1, 1)) - jnp.reshape(X_, (1, -1))
+            ) ** 2
+        else:
+            diff = pairwise(operator.sub, X, X_)
+            squared_distances = jnp.linalg.norm(diff, axis=-1) ** 2
+
         log_K = -squared_distances / (2.0 * self._lengthscale ** 2)
         K = jnp.exp(log_K)
 
