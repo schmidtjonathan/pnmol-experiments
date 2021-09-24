@@ -58,7 +58,9 @@ def heat_1d(
     bbox=None, dx=0.05, stencil_size=3, t0=0.0, tmax=20.0, y0=None, diffusion_rate=0.1
 ):
     # Bounding box for spatial discretization grid
-    bbox = jnp.asarray(bbox or [0.0, 1.0])
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
     assert bbox.ndim == 1
 
     # Create spatial discretization grid
@@ -66,7 +68,8 @@ def heat_1d(
 
     # Spatial initial condition at t=0
     x = grid.points.reshape((-1,))
-    y0 = y0 or gaussian_bell_1d(x) * sin_bell_1d(x)
+    if y0 is None:
+        y0 = gaussian_bell_1d(x) * sin_bell_1d(x)
 
     # PNMOL discretization
     square_exp_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
@@ -103,7 +106,9 @@ def heat_1d(
 def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
 
     # Bounding box for spatial discretization grid
-    bbox = jnp.asarray(bbox or [0.0, 1.0])
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
     assert bbox.ndim == 1
 
     # Create spatial discretization grid

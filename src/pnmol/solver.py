@@ -108,7 +108,7 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
     @staticmethod
     @jax.jit
     def estimate_error(ql, z, h, E):
-        S = h @ ql @ ql.T @ h.T + jnp.abs(E)
+        S = h @ ql @ ql.T @ h.T + E
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error = jnp.sqrt(jnp.diag(S)) * sigma
@@ -223,7 +223,7 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
     @staticmethod
     @jax.jit
     def estimate_error(ql, z, h, E):
-        S = h @ ql @ ql.T @ h.T + jnp.abs(E)
+        S = h @ ql @ ql.T @ h.T + E
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error = jnp.sqrt(jnp.diag(S)) * sigma
