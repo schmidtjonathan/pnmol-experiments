@@ -6,6 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 import scipy.spatial
 
+from functools import cached_property
 
 class Mesh(abc.ABC):
     """Scattered points."""
@@ -138,7 +139,7 @@ class RectangularMesh(Mesh):
         neighbours = self.points[indices]
         return RectangularMesh(neighbours, bounding_boxes=self.bounding_boxes), indices
 
-    @property
+    @cached_property
     def boundary(self):
         is_boundary = jnp.logical_or(
             self.points[:, 0] == self.bounding_boxes[0, 0],
@@ -153,7 +154,7 @@ class RectangularMesh(Mesh):
             is_boundary = jnp.logical_or(is_boundary, this_dim)
         return self.points[is_boundary], is_boundary
 
-    @property
+    @cached_property
     def interior(self):
         is_boundary = jnp.logical_and(
             self.points[:, 0] != self.bounding_boxes[0, 0],
@@ -168,7 +169,7 @@ class RectangularMesh(Mesh):
             is_boundary = jnp.logical_and(is_boundary, this_dim)
         return self.points[is_boundary], is_boundary
 
-    @property
+    @cached_property
     def boundary_projection_matrix(self):
         E = jnp.eye(self.points.shape[0])
         _, indices = self.boundary
