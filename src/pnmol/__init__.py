@@ -5,11 +5,16 @@
 from . import (
     differential_operator,
     discretize,
+    init,
+    iwp,
     kernels,
     mesh,
-    pde_problems,
     solver,
+    odefilter,
+    pde_problems,
+    rv,
     sqrt,
+    step,
 )
 
 __version__ = "0.0.1"
