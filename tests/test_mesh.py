@@ -92,7 +92,7 @@ class TestRectangularMesh(unittest.TestCase):
 
     def test_boundary_projection_1d(self):
         grid = mesh.RectangularMesh.from_bounding_boxes_1d(
-            bounding_boxes=[0., 1.], step=0.1
+            bounding_boxes=[0.0, 1.0], step=0.1
         )
         B = grid.boundary_projection_matrix
 
@@ -102,7 +102,7 @@ class TestRectangularMesh(unittest.TestCase):
 
     def test_boundary_projection_2d(self):
         grid = mesh.RectangularMesh.from_bounding_boxes_2d(
-            bounding_boxes=[[0., 0.], [1., 1.]], steps=(0.1,0.1)
+            bounding_boxes=[[0.0, 0.0], [1.0, 1.0]], steps=(0.1, 0.1)
         )
         B = grid.boundary_projection_matrix
 
@@ -110,7 +110,6 @@ class TestRectangularMesh(unittest.TestCase):
         for (exp, rec) in zip(B @ grid.points, boundary_points):
             for e, r in zip(exp, rec):
                 self.assertEqual(e, r)
-
 
 
 if __name__ == "__main__":
