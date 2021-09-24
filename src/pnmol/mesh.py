@@ -66,6 +66,9 @@ class Mesh(abc.ABC):
     def fill_distance(self):
         return jnp.amin(scipy.spatial.distance_matrix(self.points, self.points))
 
+    @property
+    def boundary_projection_matrix(self):
+        raise NotImplementedError
 
 class RectangularMesh(Mesh):
     """Rectangular mesh."""
@@ -77,8 +80,8 @@ class RectangularMesh(Mesh):
             self.bounding_boxes = read_bounding_boxes(points)
         super().__init__(points)
 
-    @staticmethod
-    def from_bounding_boxes_1d(bounding_boxes, step=None, num=None):
+    @classmethod
+    def from_bounding_boxes_1d(cls, bounding_boxes, step=None, num=None):
 
         bounding_boxes = jnp.asarray(bounding_boxes)
 
@@ -92,10 +95,10 @@ class RectangularMesh(Mesh):
             start=bounding_boxes[0], stop=bounding_boxes[1], num=num, endpoint=True
         )
 
-        return RectangularMesh(X.reshape(-1, 1))
+        return cls(X.reshape(-1, 1))
 
-    @staticmethod
-    def from_bounding_boxes_2d(bounding_boxes, steps=None, nums=None):
+    @classmethod
+    def from_bounding_boxes_2d(cls, bounding_boxes, steps=None, nums=None):
 
         bounding_boxes = jnp.asarray(bounding_boxes)
 
@@ -124,7 +127,7 @@ class RectangularMesh(Mesh):
         )
         X_mesh, Y_mesh = jnp.meshgrid(X, Y)
 
-        return RectangularMesh(jnp.array(list(zip(X_mesh.flatten(), Y_mesh.flatten()))))
+        return cls(jnp.array(list(zip(X_mesh.flatten(), Y_mesh.flatten()))))
 
     def neighbours(self, point, num):
         if num <= 0:
@@ -164,6 +167,12 @@ class RectangularMesh(Mesh):
             )
             is_boundary = jnp.logical_and(is_boundary, this_dim)
         return self.points[is_boundary], is_boundary
+
+    @property
+    def boundary_projection_matrix(self):
+        E = jnp.eye(self.points.shape[0])
+        _, indices = self.boundary
+        return E[indices, :]
 
 
 def read_bounding_boxes(points):
