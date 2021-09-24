@@ -73,15 +73,6 @@ class ODEFilter(ABC):
     def solution_generator(self, ivp, stop_at=None, progressbar=False):
         """Generate ODE solver steps."""
 
-        # Choose the compiled or non-compiled perform_full_step implementation.
-        # For small problems (d << 1000), compiling accelerates things drastically;
-        # for LARGE problems (d >> 1000), it seems to slow things
-        # down---at least, at the moment.
-        #
-        # This is only an intermediate functionality:
-        # I plan on replacing the "compile_step" flag with a new solve() interface soon,
-        # that is, as soon as the WHOLE solve can be compiled. (This takes a few more changes.)
-
         time_stopper = self._process_event_inputs(stop_at_locations=stop_at)
         state = self.initialize(ivp)
         info = dict(
@@ -113,13 +104,10 @@ class ODEFilter(ABC):
 
             state, dt, step_info = self.perform_full_step(state, dt, ivp)
 
-            # Todo: the following safety net has been removed for jitting reasons.
-            # Todo: If we run into issues here, we have to add something back. (The code is left for doc purposes)
-            #
-            # if dt < self.steprule.min_step:
-            #     raise ValueError("Step-size smaller than minimum step-size")
-            # if dt > self.steprule.max_step:
-            #     raise ValueError("Step-size larger than maximum step-size")
+            if dt < self.steprule.min_step:
+                raise ValueError("Step-size smaller than minimum step-size")
+            if dt > self.steprule.max_step:
+                raise ValueError("Step-size larger than maximum step-size")
 
             info["num_steps"] += 1
             info["num_f_evaluations"] += step_info["num_f_evaluations"]
