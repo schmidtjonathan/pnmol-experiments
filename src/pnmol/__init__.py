@@ -9,6 +9,7 @@ from . import (
     iwp,
     kalman,
     kernels,
+    lfsolver,
     mesh,
     odefilter,
     pde_problems,
