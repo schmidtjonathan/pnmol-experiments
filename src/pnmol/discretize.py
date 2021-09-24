@@ -1,11 +1,12 @@
 """Discretise differential operators on a mesh, assuming an underlying function space."""
 
+from functools import partial
+
 import jax
 import jax.numpy as jnp
 import tqdm
 
 from pnmol import kernels
-from functools import partial
 
 
 def discretize(diffop, mesh, kernel, stencil_size):

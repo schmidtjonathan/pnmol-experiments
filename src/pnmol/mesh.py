@@ -1,12 +1,12 @@
 """Mesh containers."""
 
 import abc
+from functools import cached_property
 
 import jax.numpy as jnp
 import numpy as np
 import scipy.spatial
 
-from functools import cached_property
 
 class Mesh(abc.ABC):
     """Scattered points."""
@@ -70,6 +70,7 @@ class Mesh(abc.ABC):
     @property
     def boundary_projection_matrix(self):
         raise NotImplementedError
+
 
 class RectangularMesh(Mesh):
     """Rectangular mesh."""

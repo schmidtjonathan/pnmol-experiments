@@ -32,7 +32,7 @@ def heat_1d(
     bbox=None, dx=0.05, stencil_size=3, t0=0.0, tmax=20.0, y0=None, diffusion_rate=0.1
 ):
     # Bounding box for spatial discretization grid
-    bbox = jnp.asarray(bbox or [0., 1.])
+    bbox = jnp.asarray(bbox or [0.0, 1.0])
     assert bbox.ndim == 1
 
     # Create spatial discretization grid
@@ -43,7 +43,7 @@ def heat_1d(
     y0 = y0 or gaussian_bell_1d(x) * sin_bell_1d(x)
 
     # PNMOL discretization
-    square_exp_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.)
+    square_exp_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
     laplace = differential_operator.laplace()
     L, E = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=square_exp_kernel, stencil_size=stencil_size
@@ -77,7 +77,7 @@ def heat_1d(
 def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
 
     # Bounding box for spatial discretization grid
-    bbox = jnp.asarray(bbox or [0., 1.])
+    bbox = jnp.asarray(bbox or [0.0, 1.0])
     assert bbox.ndim == 1
 
     # Create spatial discretization grid
@@ -276,18 +276,18 @@ def burgers_2d(
     )
 
 
-
-
 # A bunch of initial condition defaults
 # They all adhere to Dirichlet conditions.
 
+
 def gaussian_bell_1d_centered(x, bbox):
     midpoint = bbox[1] - bbox[0]
-    return jnp.exp(-(x - midpoint) ** 2)
+    return jnp.exp(-((x - midpoint) ** 2))
+
 
 def gaussian_bell_1d(x):
-    return jnp.exp(-x ** 2)
+    return jnp.exp(-(x ** 2))
+
 
 def sin_bell_1d(x):
-    return jnp.sin(jnp.pi*x)
-
+    return jnp.sin(jnp.pi * x)
