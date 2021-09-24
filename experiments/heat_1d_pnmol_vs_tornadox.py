@@ -14,14 +14,7 @@ def solve_pde_pnmol(pde, steprule, nu, progressbar):
     ek1 = pnmol.solver.MeasurementCovarianceEK1(num_derivatives=nu, steprule=steprule)
     sol = ek1.solve(pde, progressbar=progressbar)
     E0 = ek1.iwp.projection_matrix(0)
-    return read_mean_and_std_pnmol(sol, E0), sol.t
-
-
-def read_mean_and_std_pnmol(sol, E0):
-    means = sol.mean[:, 0]
-    cov = sol.cov_sqrtm @ jnp.transpose(sol.cov_sqrtm, axes=(0, 2, 1))
-    stds = jnp.sqrt(jnp.diagonal(cov, axis1=1, axis2=2) @ E0.T)
-    return means, stds
+    return read_mean_and_std(sol, E0), sol.t
 
 
 def solve_pde_tornadox(pde, steprule, nu, progressbar):
@@ -29,16 +22,17 @@ def solve_pde_tornadox(pde, steprule, nu, progressbar):
     ek1 = tornadox.ek1.ReferenceEK1(num_derivatives=nu, steprule=steprule)
     sol = ek1.solve(ivp, progressbar=progressbar)
     E0 = ek1.iwp.projection_matrix(0)
-    return read_mean_and_std_tornadox(sol, E0), sol.t
-
-
-def read_mean_and_std_tornadox(sol, E0):
-    means = sol.mean[:, 0]
-    cov = sol.cov_sqrtm @ jnp.transpose(sol.cov_sqrtm, axes=(0, 2, 1))
-    stds = jnp.sqrt(jnp.diagonal(cov, axis1=1, axis2=2) @ E0.T)
+    means, stds = read_mean_and_std(sol, E0)
 
     means = jnp.pad(means, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
     stds = jnp.pad(stds, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
+    return (means, stds), sol.t
+
+
+def read_mean_and_std(sol, E0):
+    means = sol.mean[:, 0]
+    cov = sol.cov_sqrtm @ jnp.transpose(sol.cov_sqrtm, axes=(0, 2, 1))
+    stds = jnp.sqrt(jnp.diagonal(cov, axis1=1, axis2=2) @ E0.T)
     return means, stds
 
 
@@ -65,8 +59,10 @@ def infer_vrange_std(res):
     return jnp.amin(stds), jnp.amax(stds)
 
 
+# Need this later
 xgrid = discretized_pde.spatial_grid.points.squeeze()
 
+# Create 2x2 grid
 fig, axes = plt.subplots(
     ncols=2,
     nrows=2,
@@ -77,6 +73,10 @@ fig, axes = plt.subplots(
     constrained_layout=True,
 )
 
+# Plot the means and stds
+#
+# Reversed so the "last" colormap is the first row (PNMOL),
+# which is set to be the figures colorbar below.
 vmin_std, vmax_std = infer_vrange_std(res_pnmol)
 for row_axes, res in zip(reversed(axes), reversed([res_pnmol, res_tornadox])):
     ax1, ax2 = row_axes
@@ -107,15 +107,30 @@ for row_axes, res in zip(reversed(axes), reversed([res_pnmol, res_tornadox])):
         vmax=vmax_std,
     )
 
+# Create a colorbar based on the PNMOL output (which is why we reversed the loop above)
+fig.colorbar(
+    colors,
+    ax=axes[:, 1].ravel().tolist(),
+    ticks=(vmin_std, 0.5 * (vmin_std + vmax_std), vmax_std),
+)
+
+# Column titles
 top_row_axis = axes[0]
 ax1, ax2 = top_row_axis
 ax1.set_title(r"$\bf a.$ " + "Means", loc="left")
 ax2.set_title(r"$\bf b.$ " + "Standard deviations", loc="left")
 
+# x-labels
 bottom_row_axis = axes[1]
 for ax in bottom_row_axis:
     ax.set_xlabel("Time, $t$")
 
+# y-labels
+left_column_axis = axes[:, 0]
+for ax, label in zip(left_column_axis, ["PNMOL", "MOL"]):
+    ax.set_ylabel("Space, $x$ " + f"({label})")
+
+# Common settings for all plots
 for ax in axes.flatten():
     ax.set_xticks(tgrid)
     ax.set_yticks(xgrid)
@@ -123,21 +138,7 @@ for ax in axes.flatten():
     ax.set_yticklabels(())
     ax.grid(which="major", color="k", alpha=0.25, linestyle="dotted")
 
-left_column_axis = axes[:, 0]
-for ax, label in zip(left_column_axis, ["PNMOL", "MOL"]):
-    ax.set_ylabel("Space, $x$ " + f"({label})")
-
-
-fig.colorbar(
-    colors,
-    ax=axes[:, 1].ravel().tolist(),
-    ticks=(vmin_std, 0.5 * (vmin_std + vmax_std), vmax_std),
-)
-
-
-# ax1.grid(which="major", color="k", alpha=0.25, linestyle="dotted")
-# ax2.grid(which="major", color="k", alpha=0.25, linestyle="dotted")
-#
+# Save the figure if desired and plot
 if SAVE:
     plt.savefig("means_and_stds.pdf")
 plt.show()
