@@ -70,7 +70,7 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E_with_bc)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=jnp.sqrt(E_with_bc))
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
