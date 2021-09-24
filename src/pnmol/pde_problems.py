@@ -4,6 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 import scipy.stats
+import tornadox
 
 from pnmol import differential_operator, discretize, kernels, mesh
 
@@ -26,6 +27,31 @@ class DiscretizedPDE(
     @property
     def t_span(self):
         return self.t0, self.tmax
+
+    def to_tornadox_ivp_1d(self):
+        @jax.jit
+        def new_f(t, x):
+
+            # Pad x into zeros (dirichlet cond.)
+            padded_x = jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
+
+            # Evaluate self.f
+            new_x = self.f(t, padded_x)
+
+            # Return the interior again
+            return new_x[1:-1]
+
+        new_df = jax.jit(jax.jacfwd(new_f, argnums=1))
+        new_df_diagonal = None
+
+        return tornadox.ivp.InitialValueProblem(
+            f=new_f,
+            t0=self.t0,
+            tmax=self.tmax,
+            y0=self.y0[1:-1],
+            df=new_df,
+            df_diagonal=new_df_diagonal,
+        )
 
 
 def heat_1d(
