@@ -18,6 +18,7 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=discretized_pde.y0.shape[0],
+            wp_diffusion_sqrtm=discretized_pde.Kxx_sqrtm,
         )
 
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
@@ -129,6 +130,7 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=discretized_pde.y0.shape[0],
+            wp_diffusion_sqrtm=discretized_pde.Kxx_sqrtm,
         )
 
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
@@ -175,16 +177,16 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
             t=state.t + dt,
             B=B,
         )
-        E_with_bc = jax.scipy.linalg.block_diag(
+        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(
             discretized_pde.E_sqrtm, jnp.zeros((2, 2))
         )
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E_sqrtm=E_with_bc)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=E_with_bc_sqrtm)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
