@@ -73,7 +73,7 @@ def fd_coeff(x, grid, stencil_size, k, L_k, LL_k):
     neighbors, neighbor_indices = grid.neighbours(point=x, num=stencil_size)
 
     X = neighbors.points
-    gram_matrix = k(X, X) + 1e-12 * jnp.eye(len(X))
+    gram_matrix = k(X, X)
     diffop_at_point = L_k(x, X).reshape((-1,))
 
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
