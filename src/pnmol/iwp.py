@@ -135,19 +135,3 @@ class IntegratedWienerTransition(
     @property
     def state_dimension(self):
         return self.wiener_process_dimension * (self.num_derivatives + 1)
-
-    # Reordering functionality
-
-    @partial(jax.jit, static_argnums=0)
-    def reorder_state_from_derivative_to_coordinate(self, state):
-        d, dim = self.wiener_process_dimension, self.state_dimension
-        stride = lambda i: jnp.arange(start=i, stop=dim, step=d).reshape((-1, 1))
-        indices = jnp.vstack([stride(i) for i in range(d)])[:, 0]
-        return state[indices]
-
-    @partial(jax.jit, static_argnums=0)
-    def reorder_state_from_coordinate_to_derivative(self, state):
-        n, dim = self.num_derivatives, self.state_dimension
-        stride = lambda i: jnp.arange(start=i, stop=dim, step=(n + 1)).reshape((-1, 1))
-        indices = jnp.vstack([stride(i) for i in range(n + 1)])[:, 0]
-        return state[indices]

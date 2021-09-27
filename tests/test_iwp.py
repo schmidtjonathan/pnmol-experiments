@@ -7,7 +7,7 @@ import pnmol
 @pytest.fixture
 def iwp():
     return pnmol.iwp.IntegratedWienerTransition(
-        wiener_process_dimension=1, num_derivatives=2
+        wiener_process_dimension=1, num_derivatives=2, wp_diffusion_sqrtm=jnp.eye(1)
     )
 
 
@@ -112,22 +112,3 @@ def test_projection_matrix_shape(projection_matrix, iwp):
 
 def test_projection_matrix_num_nonzeros(projection_matrix, iwp):
     assert (projection_matrix == 1).sum() == iwp.wiener_process_dimension
-
-
-def test_reorder_states():
-    # Transition handles reordering
-    iwp = pnmol.iwp.IntegratedWienerTransition(
-        num_derivatives=1, wiener_process_dimension=3
-    )
-
-    # 11 ~ derivative of 1, 22 ~ derivative of 2
-    arr = jnp.array([1, 2, 3, 11, 22, 33])
-
-    new_arr = iwp.reorder_state_from_derivative_to_coordinate(arr)
-    expected = jnp.array([1, 11, 2, 22, 3, 33])
-    for r, e in zip(new_arr, expected):
-        assert r == e
-
-    old_arr = iwp.reorder_state_from_coordinate_to_derivative(new_arr)
-    for r, e in zip(old_arr, arr):
-        assert r == e
