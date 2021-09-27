@@ -11,10 +11,16 @@ K3a = kernels.Matern52()
 K3b = kernels.Matern52(input_scale=0.1, output_scale=2.0)
 K4a = kernels.Polynomial()
 K4b = kernels.Polynomial(order=4, const=1.2345)
+K5a = kernels.WhiteNoise()
+K5b = kernels.WhiteNoise(amplitude=1.234)
 
 # Decorator to use for the tests.
-ALL_KERNELS = pytest.mark.parametrize("kernel", [K1a, K1b, K2, K3a, K3b, K4a, K4b])
-ALL_KERNELS_BUT_MATERN = pytest.mark.parametrize("kernel", [K1a, K1b, K2, K4a, K4b])
+ALL_KERNELS = pytest.mark.parametrize(
+    "kernel", [K1a, K1b, K2, K3a, K3b, K4a, K4b, K5a, K5b]
+)
+ALL_KERNELS_BUT_MATERN = pytest.mark.parametrize(
+    "kernel", [K1a, K1b, K2, K4a, K4b, K5a, K5b]
+)
 
 
 @pytest.fixture
@@ -73,3 +79,9 @@ class TestEvaluateShape:
         x, y = jnp.array(2.0), jnp.array(3.0)
         Kxy = kernel(x, y)
         assert Kxy.shape == ()
+
+
+def test_white_noise_diagonal(X, Y):
+    k = kernels.WhiteNoise()
+    Kxy = k(X, Y.T)
+    assert jnp.allclose(Kxy, jnp.diag(jnp.diag(Kxy)))

@@ -9,7 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 
-from pnmol import init, step
+from pnmol import init, kernels, step
 
 ODEFilterState = namedtuple("_ODEFilterState", "t y error_estimate reference_state")
 
@@ -25,7 +25,14 @@ class ODESolution:
 class ODEFilter(ABC):
     """Interface for filtering-based ODE solvers in ProbNum."""
 
-    def __init__(self, *, steprule=None, num_derivatives=4, initialization=None):
+    def __init__(
+        self,
+        *,
+        steprule=None,
+        num_derivatives=4,
+        initialization=None,
+        spatial_kernel=None,
+    ):
 
         # Step-size selection
         self.steprule = steprule or step.AdaptiveSteps()
@@ -38,6 +45,10 @@ class ODEFilter(ABC):
 
         # Initialization strategy
         self.init = initialization or init.RungeKutta()
+
+        # Spatial covariance kernel
+        # Default is a white-noise kernel, which corresponds to an I_dxd diffusion.
+        self.spatial_kernel = spatial_kernel or kernels.WhiteNoise()
 
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, initialization={self.init})"

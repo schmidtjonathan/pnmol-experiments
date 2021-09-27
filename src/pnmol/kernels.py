@@ -129,3 +129,16 @@ class Polynomial(Kernel):
     @partial(jax.jit, static_argnums=(0,))
     def pairwise(self, x, y):
         return (x.dot(y) + self.const) ** self.order
+
+
+class WhiteNoise(Kernel):
+    def __init__(self, amplitude=1.0):
+        self._amplitude = amplitude
+
+    @property
+    def amplitude(self):
+        return self._amplitude
+
+    @partial(jax.jit, static_argnums=(0,))
+    def pairwise(self, x, y):
+        return 1.0 * jnp.all(x == y)
