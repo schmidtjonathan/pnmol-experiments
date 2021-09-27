@@ -65,6 +65,7 @@ def heat_1d(
     cov_damping_fd=0.0,
     cov_damping_diffusion=1e-4,
     kernel=None,
+    progressbar=False,
 ):
     # Bounding box for spatial discretization grid
     if bbox is None:
@@ -92,6 +93,7 @@ def heat_1d(
         kernel=kernel,
         stencil_size=stencil_size,
         cov_damping=cov_damping_fd,
+        progressbar=progressbar,
     )
     Kxx = kernel(grid.points, grid.points.T)
     Kxx_sqrtm = jnp.linalg.cholesky(Kxx + cov_damping_diffusion * jnp.eye(Kxx.shape[0]))

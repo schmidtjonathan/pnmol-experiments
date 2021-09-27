@@ -8,14 +8,14 @@ pde_problems = pytest.mark.parametrize("pde", [pnmol.pde_problems.heat_1d])
 
 
 @pde_problems
-def test_problem(solver, pde):
+def test_problem(pde):
 
     discretized_pde = pde(t0=0.0, tmax=10.0)
     L = discretized_pde.L
-    E = discretized_pde.E
-    assert L.shape == E.shape
+    E_sqrtm = discretized_pde.E_sqrtm
+    assert L.shape == E_sqrtm.shape
     # Assert that E is diagonal
-    assert jnp.count_nonzero(E - jnp.diag(jnp.diagonal(E))) == 0
+    assert jnp.count_nonzero(E_sqrtm - jnp.diag(jnp.diagonal(E_sqrtm))) == 0
     sol = solve_ivp(
         discretized_pde.f,
         t_span=discretized_pde.t_span,
