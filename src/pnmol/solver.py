@@ -24,12 +24,14 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
         self.E1 = self.iwp.projection_matrix(1)
 
+        # This is kind of wrong still... RK init should get the proper diffusion.
         extended_dy0, cov_sqrtm = self.init(
             f=discretized_pde.f,
             df=discretized_pde.df,
             y0=discretized_pde.y0,
             t0=discretized_pde.t0,
             num_derivatives=self.iwp.num_derivatives,
+            wp_diffusion_sqrtm=jnp.eye(discretized_pde.y0.shape[0]),
         )
         y = rv.MultivariateNormal(
             mean=extended_dy0,
@@ -64,16 +66,16 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
             t=state.t + dt,
             B=B,
         )
-        E_with_bc = jax.scipy.linalg.block_diag(
+        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(
             discretized_pde.E_sqrtm, jnp.zeros((2, 2))
         )
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E_sqrtm=E_with_bc)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E_sqrtm=sigma * E_with_bc_sqrtm)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -136,16 +138,18 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
         self.E1 = self.iwp.projection_matrix(1)
 
+        # This is kind of wrong still... RK init should get the proper diffusion.
         extended_dy0, cov_sqrtm = self.init(
             f=discretized_pde.f,
             df=discretized_pde.df,
             y0=discretized_pde.y0,
             t0=discretized_pde.t0,
             num_derivatives=self.iwp.num_derivatives,
+            wp_diffusion_sqrtm=jnp.eye(discretized_pde.y0.shape[0]),
         )
         y = rv.MultivariateNormal(
             mean=extended_dy0,
-            cov_sqrtm=jnp.kron(jnp.eye(discretized_pde.y0.shape[0]), cov_sqrtm),
+            cov_sqrtm=jnp.kron(discretized_pde.Kxx_sqrtm, cov_sqrtm),
         )
         return odefilter.ODEFilterState(
             t=discretized_pde.t0,
@@ -186,7 +190,7 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=E_with_bc_sqrtm)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=sigma * E_with_bc_sqrtm)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -220,9 +224,7 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
 
         H_ode = p1 - Jx @ p0
         H = jnp.vstack((H_ode, B @ p0))
-
         shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
-
         z = H @ m_pred + shift
         return z, H
 
