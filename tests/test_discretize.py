@@ -28,7 +28,7 @@ def diffop():
 
 @pytest.fixture
 def k():
-    return kernels.Polynomial()
+    return kernels.Polynomial(const=1.0)
 
 
 @pytest.fixture
@@ -41,29 +41,89 @@ def LL_k(L_k, diffop):
     return kernels.Lambda(diffop(L_k.pairwise, argnums=1))
 
 
-@pytest.fixture
-def x0(grid_1d):
-    return grid_1d[0]
-
-
 class TestFDCoefficients:
-    @staticmethod
-    @pytest.fixture
-    def fd_coeff(x0, grid_1d, k, L_k, LL_k, dx):
-        return discretize.fd_coeff(
-            x=x0, grid=grid_1d, stencil_size=3, k=k, L_k=L_k, LL_k=LL_k, cov_damping=0.0
-        )
+    """Check coefficients for polynomial kernels against known FD coefficients.
 
-    @staticmethod
-    def test_polynomial_weights_1_2_1(fd_coeff, dx):
-        weights_normalized = fd_coeff[0] * dx ** 2
-        assert jnp.allclose(weights_normalized, jnp.array([1.0, -2.0, 1.0]))
+    https://en.wikipedia.org/wiki/Finite_difference_coefficient
+    """
 
-    @staticmethod
-    def test_polynomial_uncertainty_zero(fd_coeff):
+    class TestCentral:
+        @staticmethod
+        @pytest.fixture
+        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
+            x0 = grid_1d[1]
+            return discretize.fd_coeff(
+                x=x0,
+                grid=grid_1d,
+                stencil_size=3,
+                k=k,
+                L_k=L_k,
+                LL_k=LL_k,
+                cov_damping=0.0,
+            )
 
-        uncertainty = fd_coeff[1]
-        assert jnp.allclose(uncertainty, jnp.array(0.0))
+        @staticmethod
+        def test_weights(fd_coeff, dx):
+            weights_normalized = fd_coeff[0] * dx ** 2
+            assert jnp.allclose(weights_normalized, jnp.array([-2.0, 1.0, 1.0]))
+
+        @staticmethod
+        def test_uncertainty_zero(fd_coeff):
+            uncertainty = fd_coeff[1]
+            assert jnp.allclose(uncertainty, jnp.array(0.0))
+
+    class TestForward:
+        @staticmethod
+        @pytest.fixture
+        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
+            x0 = grid_1d[0]
+            return discretize.fd_coeff(
+                x=x0,
+                grid=grid_1d,
+                stencil_size=3,
+                k=k,
+                L_k=L_k,
+                LL_k=LL_k,
+                cov_damping=0.0,
+            )
+
+        @staticmethod
+        def test_weights(fd_coeff, dx):
+            weights_normalized = fd_coeff[0] * dx ** 2
+            weights_expected = jnp.array([1.0, -2.0, 1.0])
+            assert jnp.allclose(weights_normalized, weights_expected)
+
+        @staticmethod
+        def test_uncertainty_zero(fd_coeff):
+            uncertainty = fd_coeff[1]
+            assert jnp.allclose(uncertainty, jnp.array(0.0))
+
+    class TestBackward:
+        @staticmethod
+        @pytest.fixture
+        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
+            x0 = grid_1d[-1]
+            return discretize.fd_coeff(
+                x=x0,
+                grid=grid_1d,
+                stencil_size=3,
+                k=k,
+                L_k=L_k,
+                LL_k=LL_k,
+                cov_damping=0.0,
+            )
+
+        @staticmethod
+        def test_weights(fd_coeff, dx):
+            weights_computed = fd_coeff[0]
+            weights_normalized = weights_computed * dx ** 2
+            weights_expected = jnp.array([1.0, -2.0, 1.0])
+            assert jnp.allclose(weights_normalized, weights_expected)
+
+        @staticmethod
+        def test_uncertainty_zero(fd_coeff):
+            uncertainty = fd_coeff[1]
+            assert jnp.allclose(uncertainty, jnp.array(0.0))
 
 
 class TestDiscretise:
