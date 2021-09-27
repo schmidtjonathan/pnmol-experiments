@@ -37,7 +37,7 @@ class ODEFilter(ABC):
         self.iwp = None
 
         # Initialization strategy
-        self.init = initialization or init.TaylorMode()
+        self.init = initialization or init.RungeKutta()
 
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, initialization={self.init})"
