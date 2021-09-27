@@ -11,14 +11,14 @@ from pnmol import iwp, kalman, sqrt
 
 class InitializationRoutine(abc.ABC):
     @abc.abstractmethod
-    def __call__(self, f, df, y0, t0, num_derivatives):
+    def __call__(self, f, df, y0, t0, num_derivatives, wp_diffusion_sqrtm):
         raise NotImplementedError
 
 
 class TaylorMode(InitializationRoutine):
 
     # Adapter to make it work with ODEFilters
-    def __call__(self, f, df, y0, t0, num_derivatives):
+    def __call__(self, f, df, y0, t0, num_derivatives, wp_diffusion_sqrtm=None):
         m0 = TaylorMode.taylor_mode(
             fun=f, y0=y0, t0=t0, num_derivatives=num_derivatives
         )
@@ -111,7 +111,7 @@ class RungeKutta(InitializationRoutine):
     def __repr__(self):
         return f"{self.__class__.__name__}(dt={self.dt}, method={self.method})"
 
-    def __call__(self, f, df, y0, t0, num_derivatives):
+    def __call__(self, f, df, y0, t0, num_derivatives, wp_diffusion_sqrtm):
         num_steps = num_derivatives + 1
         ts, ys = self.rk_data(
             f=f, t0=t0, dt=self.dt, num_steps=num_steps, y0=y0, method=self.method
@@ -119,7 +119,7 @@ class RungeKutta(InitializationRoutine):
         m, sc = self.stack_initvals(
             f=f, df=df, y0=y0, t0=t0, num_derivatives=num_derivatives
         )
-        return RungeKutta.rk_init_improve(m=m, sc=sc, t0=t0, ts=ts, ys=ys)
+        return RungeKutta.rk_init_improve(m=m, sc=sc, t0=t0, ts=ts, ys=ys, wp_diffusion_sqrtm=wp_diffusion_sqrtm)
 
     @staticmethod
     def rk_data(f, t0, dt, num_steps, y0, method):
@@ -142,7 +142,7 @@ class RungeKutta(InitializationRoutine):
     # Jitting this is possibly, but debatable -- it is not very fast due to the for-loop logic underneath.
     # I think for now we leave it to a "user" -> us :)
     @staticmethod
-    def rk_init_improve(m, sc, t0, ts, ys):
+    def rk_init_improve(m, sc, t0, ts, ys, wp_diffusion_sqrtm):
         """Improve an initial mean estimate by fitting it to a number of RK steps."""
 
         d = m.shape[1]
@@ -150,7 +150,7 @@ class RungeKutta(InitializationRoutine):
 
         # Prior
         prior_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=num_derivatives, wiener_process_dimension=d // 2
+            num_derivatives=num_derivatives, wiener_process_dimension=d // 2, wp_diffusion_sqrtm=wp_diffusion_sqrtm
         )
         phi_1d, sq_1d = prior_iwp.preconditioned_discretize_1d
 
@@ -257,7 +257,7 @@ class Stack(InitializationRoutine):
     def __init__(self, use_df=True):
         self.use_df = use_df
 
-    def __call__(self, f, df, y0, t0, num_derivatives):
+    def __call__(self, f, df, y0, t0, num_derivatives, wp_diffusion_sqrtm=None):
         if self.use_df:
             return Stack.initial_state_jac(
                 f=f, df=df, y0=y0, t0=t0, num_derivatives=num_derivatives

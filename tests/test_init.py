@@ -31,10 +31,10 @@ class TestInitializationInterface:
     @all_init_routines
     def test_init_routine(routine, ivp):
         num_derivatives = 3
-        m0, sc0 = routine(
-            f=ivp.f, df=ivp.df, y0=ivp.y0, t0=ivp.t0, num_derivatives=num_derivatives
-        )
         n, d = num_derivatives + 1, ivp.y0.shape[0]
+        m0, sc0 = routine(
+            f=ivp.f, df=ivp.df, y0=ivp.y0, t0=ivp.t0, num_derivatives=num_derivatives, wp_diffusion_sqrtm=jnp.eye(d)
+        )
         assert m0.shape == (n, d)
         assert sc0.shape == (n, n)
 
@@ -240,6 +240,7 @@ class TestRungeKutta:
             t0=t0,
             ts=ts,
             ys=ys,
+            wp_diffusion_sqrtm=jnp.eye(m.shape[0])
         )
 
     @staticmethod
