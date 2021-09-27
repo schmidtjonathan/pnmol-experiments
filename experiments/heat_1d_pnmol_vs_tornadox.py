@@ -22,7 +22,9 @@ def solve_pde_pnmol(pde, dt, nu, progressbar):
 def solve_pde_tornadox(pde, dt, nu, progressbar):
     steprule = tornadox.step.ConstantSteps(dt)
     ivp = pde.to_tornadox_ivp_1d()
-    ek1 = tornadox.ek1.ReferenceEK1(num_derivatives=nu, steprule=steprule, initialization=tornadox.init.RungeKutta())
+    ek1 = tornadox.ek1.ReferenceEK1(
+        num_derivatives=nu, steprule=steprule, initialization=tornadox.init.RungeKutta()
+    )
     sol = ek1.solve(ivp, progressbar=progressbar)
     E0 = ek1.iwp.projection_matrix(0)
     means, stds = read_mean_and_std(sol, E0)

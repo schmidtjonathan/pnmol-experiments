@@ -119,7 +119,9 @@ class RungeKutta(InitializationRoutine):
         m, sc = self.stack_initvals(
             f=f, df=df, y0=y0, t0=t0, num_derivatives=num_derivatives
         )
-        return RungeKutta.rk_init_improve(m=m, sc=sc, t0=t0, ts=ts, ys=ys, wp_diffusion_sqrtm=wp_diffusion_sqrtm)
+        return RungeKutta.rk_init_improve(
+            m=m, sc=sc, t0=t0, ts=ts, ys=ys, wp_diffusion_sqrtm=wp_diffusion_sqrtm
+        )
 
     @staticmethod
     def rk_data(f, t0, dt, num_steps, y0, method):
@@ -150,7 +152,9 @@ class RungeKutta(InitializationRoutine):
 
         # Prior
         prior_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=num_derivatives, wiener_process_dimension=d // 2, wp_diffusion_sqrtm=wp_diffusion_sqrtm
+            num_derivatives=num_derivatives,
+            wiener_process_dimension=d // 2,
+            wp_diffusion_sqrtm=wp_diffusion_sqrtm,
         )
         phi_1d, sq_1d = prior_iwp.preconditioned_discretize_1d
 
