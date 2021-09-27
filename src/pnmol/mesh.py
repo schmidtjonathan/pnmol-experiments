@@ -109,20 +109,20 @@ class RectangularMesh(Mesh):
 
         if steps is not None:
             step_y, step_x = steps
-            num_y = int((bounding_boxes[0, 1] - bounding_boxes[0, 0]) / step_y) + 1
-            num_x = int((bounding_boxes[1, 1] - bounding_boxes[1, 0]) / step_x) + 1
+            num_y = int((bounding_boxes[1, 0] - bounding_boxes[0, 0]) / step_y) + 1
+            num_x = int((bounding_boxes[1, 1] - bounding_boxes[0, 1]) / step_x) + 1
 
         if nums is not None:
             num_y, num_x = nums
 
         Y = jnp.linspace(
             start=bounding_boxes[0, 0],
-            stop=bounding_boxes[0, 1],
+            stop=bounding_boxes[1, 0],
             num=num_y,
             endpoint=True,
         )
         X = jnp.linspace(
-            start=bounding_boxes[1, 0],
+            start=bounding_boxes[0, 1],
             stop=bounding_boxes[1, 1],
             num=num_x,
             endpoint=True,

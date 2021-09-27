@@ -256,12 +256,12 @@ def burgers_2d(
     """
     # Bounding box for spatial discretization grid
     if bbox is None:
-        bbox = [[0.0, 1.0], [0.0, 1.0]]
+        bbox = [[0.0, 0.0], [1.0, 1.0]]
     bbox = jnp.asarray(bbox)
     assert bbox.ndim == 2
 
-    num_y = int((bbox[0, 1] - bbox[0, 0]) / dx) + 1
-    num_x = int((bbox[1, 1] - bbox[1, 0]) / dx) + 1
+    num_y = int((bbox[1, 0] - bbox[0, 0]) / dx) + 1
+    num_x = int((bbox[1, 1] - bbox[0, 1]) / dx) + 1
 
     # Create spatial discretization grid
     grid = mesh.RectangularMesh.from_bounding_boxes_2d(
