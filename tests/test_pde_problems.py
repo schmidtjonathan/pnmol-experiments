@@ -8,7 +8,7 @@ pde_problems = pytest.mark.parametrize("pde", [pnmol.pde_problems.heat_1d])
 
 
 @pde_problems
-def test_heat_1d(pde):
+def test_problem(solver, pde):
 
     discretized_pde = pde(t0=0.0, tmax=10.0)
     L = discretized_pde.L

@@ -7,13 +7,16 @@ from . import (
     discretize,
     init,
     iwp,
+    kalman,
     kernels,
+    lfsolver,
     mesh,
     odefilter,
     pde_problems,
     rv,
     solver,
     sqrt,
+    stacked_ssm,
     step,
 )
 

@@ -63,14 +63,16 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
             t=state.t + dt,
             B=B,
         )
-        E_with_bc = jax.scipy.linalg.block_diag(discretized_pde.E, jnp.zeros((2, 2)))
+        E_with_bc = jax.scipy.linalg.block_diag(
+            discretized_pde.E_sqrtm, jnp.zeros((2, 2))
+        )
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E_with_bc)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E_with_bc)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E_sqrtm=E_with_bc)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -107,8 +109,8 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
 
     @staticmethod
     @jax.jit
-    def estimate_error(ql, z, h, E):
-        S = h @ ql @ ql.T @ h.T + E
+    def estimate_error(ql, z, h, E_sqrtm):
+        S = h @ ql @ ql.T @ h.T + E_sqrtm @ E_sqrtm.T
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error = jnp.sqrt(jnp.diag(S)) * sigma
@@ -173,14 +175,16 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
             t=state.t + dt,
             B=B,
         )
-        E_with_bc = jax.scipy.linalg.block_diag(discretized_pde.E, jnp.zeros((2, 2)))
+        E_with_bc = jax.scipy.linalg.block_diag(
+            discretized_pde.E_sqrtm, jnp.zeros((2, 2))
+        )
 
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E=E_with_bc)
+        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc)
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E=E_with_bc)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, E_sqrtm=E_with_bc)
         m_new = mp - K @ z
 
         # Push back to non-preconditioned state
@@ -222,8 +226,8 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
 
     @staticmethod
     @jax.jit
-    def estimate_error(ql, z, h, E):
-        S = h @ ql @ ql.T @ h.T + E
+    def estimate_error(ql, z, h, E_sqrtm):
+        S = h @ ql @ ql.T @ h.T + E_sqrtm @ E_sqrtm.T
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error = jnp.sqrt(jnp.diag(S)) * sigma
