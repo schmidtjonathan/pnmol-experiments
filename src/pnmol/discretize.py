@@ -39,10 +39,10 @@ def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0):
 
     M = len(mesh)
 
-    L_k = diffop(kernel, argnums=0)  # derivative function of kernel
+    L_k = diffop(kernel._evaluate_scalar, argnums=0)  # derivative function of kernel
     LL_k = diffop(L_k, argnums=1)
-    L_kx = kernels.LambdaKernel(fun=L_k)
-    LL_kx = kernels.LambdaKernel(fun=LL_k)
+    L_kx = kernels.Lambda(fun=L_k)
+    LL_kx = kernels.Lambda(fun=LL_k)
 
     fd_coeff_fun = partial(
         fd_coeff, grid=mesh, stencil_size=stencil_size, k=kernel, L_k=L_kx, LL_k=LL_kx
@@ -77,10 +77,8 @@ def fd_coeff(x, grid, stencil_size, k, L_k, LL_k, cov_damping):
     neighbors, neighbor_indices = grid.neighbours(point=x, num=stencil_size)
 
     X = neighbors.points
-    gram_matrix = k(X, X) + cov_damping * jnp.eye(X.shape[0])
-    diffop_at_point = L_k(x, X).reshape((-1,))
-
+    gram_matrix = k(X, X.T) + cov_damping * jnp.eye(X.shape[0])
+    diffop_at_point = L_k(x[None, :], X.T).reshape((-1,))
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
     uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
-
     return weights, uncertainty, neighbor_indices
