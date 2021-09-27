@@ -81,4 +81,15 @@ def fd_coeff(x, grid, stencil_size, k, L_k, LL_k, cov_damping):
     diffop_at_point = L_k(x[None, :], X.T).reshape((-1,))
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
     uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
+
+    assert not jnp.any(jnp.isnan(weights)), (
+        weights,
+        diffop_at_point,
+        gram_matrix,
+        jnp.linalg.eigvals(gram_matrix),
+        x,
+        X,
+    )
+    assert not jnp.any(jnp.isnan(uncertainty))
+
     return weights, uncertainty, neighbor_indices
