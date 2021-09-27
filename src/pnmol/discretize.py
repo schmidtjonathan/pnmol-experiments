@@ -9,7 +9,7 @@ import tqdm
 from pnmol import kernels
 
 
-def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0):
+def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0, progressbar=False):
     """
     Discretize a differential operator.
 
@@ -50,7 +50,11 @@ def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0):
 
     L_data, L_row, L_col, E_data = [], [], [], []
 
-    for i, point in enumerate(tqdm.tqdm(mesh.points)):
+    if progressbar:
+        range_loop = enumerate(tqdm.tqdm(mesh.points))
+    else:
+        range_loop = enumerate(mesh.points)
+    for i, point in range_loop:
 
         weights, uncertainty, neighbor_idcs = fd_coeff_fun(
             x=point, cov_damping=cov_damping
