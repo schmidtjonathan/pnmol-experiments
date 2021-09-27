@@ -12,7 +12,7 @@ K3b = kernels.Matern52(input_scale=0.1, output_scale=2.0)
 K4a = kernels.Polynomial()
 K4b = kernels.Polynomial(order=4, const=1.2345)
 K5a = kernels.WhiteNoise()
-K5b = kernels.WhiteNoise(amplitude=1.234)
+K5b = kernels.WhiteNoise(output_scale=1.234)
 
 # Decorator to use for the tests.
 ALL_KERNELS = pytest.mark.parametrize(

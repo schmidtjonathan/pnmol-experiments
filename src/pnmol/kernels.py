@@ -132,13 +132,13 @@ class Polynomial(Kernel):
 
 
 class WhiteNoise(Kernel):
-    def __init__(self, amplitude=1.0):
-        self._amplitude = amplitude
+    def __init__(self, output_scale=1.0):
+        self._output_scale = output_scale
 
     @property
-    def amplitude(self):
-        return self._amplitude
+    def output_scale(self):
+        return self._output_scale
 
     @partial(jax.jit, static_argnums=(0,))
     def pairwise(self, x, y):
-        return 1.0 * jnp.all(x == y)
+        return self.output_scale ** 2 * jnp.all(x == y)
