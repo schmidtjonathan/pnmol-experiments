@@ -327,10 +327,6 @@ def burgers_2d(
         diffop=grad_y, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
 
-    print(L_laplace.shape, L_grad_x.shape, L_grad_y.shape)
-    print(grid.points.shape)
-    print(y0.shape)
-
     @jax.jit
     def f(_, x):
         u, v = jnp.split(x, 2)

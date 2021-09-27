@@ -15,7 +15,6 @@ def solve_pde_pnmol(pde, dt, nu, progressbar, kernel):
     # Solve the discretised PDE
     ek1 = pnmol.solver.MeasurementCovarianceEK1(num_derivatives=nu, steprule=steprule)
     sol = ek1.solve(pde, progressbar=progressbar)
-    print(sol.mean[1, :, 1:-1])
 
     E0 = ek1.iwp.projection_matrix(0)
     return read_mean_and_std(sol, E0), sol.t
@@ -28,8 +27,6 @@ def solve_pde_tornadox(pde, dt, nu, progressbar):
         num_derivatives=nu, steprule=steprule, initialization=tornadox.init.RungeKutta()
     )
     sol = ek1.solve(ivp, progressbar=progressbar)
-    print(sol.mean[1])
-    print()
     E0 = ek1.iwp.projection_matrix(0)
     means, stds = read_mean_and_std(sol, E0)
 
