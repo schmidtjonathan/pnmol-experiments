@@ -55,7 +55,7 @@ class DiscretizedPDE(
 
 
 def heat_1d(
-    bbox=None, dx=0.05, stencil_size=3, t0=0.0, tmax=20.0, y0=None, diffusion_rate=0.1
+    bbox=None, dx=0.05, stencil_size=3, t0=0.0, tmax=20.0, y0=None, diffusion_rate=0.1, cov_damping_fd=0., cov_damping_diffusion=1e-4,
 ):
     # Bounding box for spatial discretization grid
     if bbox is None:
@@ -75,10 +75,10 @@ def heat_1d(
     square_exp_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
     laplace = differential_operator.laplace()
     L, E_sqrtm = discretize.discretize(
-        diffop=laplace, mesh=grid, kernel=square_exp_kernel, stencil_size=stencil_size
+        diffop=laplace, mesh=grid, kernel=square_exp_kernel, stencil_size=stencil_size, cov_damping=cov_damping_fd
     )
     Kxx = square_exp_kernel(grid.points, grid.points)
-    sqrtm_Kxx = jnp.linalg.cholesky(Kxx + 1e-10 * jnp.eye(Kxx.shape[0]))
+    Kxx_sqrtm = jnp.linalg.cholesky(Kxx + cov_damping_diffusion * jnp.eye(Kxx.shape[0]))
 
     @jax.jit
     def f(_, x):
@@ -102,7 +102,7 @@ def heat_1d(
         df_diagonal=df_diagonal,
         L=L,
         E_sqrtm=E_sqrtm,
-        Kxx_sqrtm=sqrtm_Kxx,
+        Kxx_sqrtm=Kxx_sqrtm,
     )
 
 
