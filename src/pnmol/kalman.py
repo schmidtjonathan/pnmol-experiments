@@ -21,7 +21,7 @@ def filter_step(m, sc, phi, sq, h, b, data):
     sgain = jax.scipy.linalg.cho_solve((sc_pred, True), cross.T).T
 
     # Update
-    sc, kgain, _ = sqrt.update_sqrt(h, sc_pred)
+    sc, kgain, _ = sqrt.update_sqrt_no_meascov(h, sc_pred)
     z = h @ m_pred + b
     m = m_pred - kgain @ (z - data)
 
