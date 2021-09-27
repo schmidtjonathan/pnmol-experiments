@@ -39,10 +39,10 @@ def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0):
 
     M = len(mesh)
 
-    L_k = diffop(kernel._evaluate_scalar, argnums=0)  # derivative function of kernel
-    LL_k = diffop(L_k, argnums=1)
-    L_kx = kernels.Lambda(fun=L_k)
-    LL_kx = kernels.Lambda(fun=LL_k)
+    L_kx = kernels.Lambda(
+        diffop(kernel.pairwise, argnums=0)
+    )  # derivative function of kernel
+    LL_kx = kernels.Lambda(diffop(L_kx.pairwise, argnums=1))
 
     fd_coeff_fun = partial(
         fd_coeff, grid=mesh, stencil_size=stencil_size, k=kernel, L_k=L_kx, LL_k=LL_kx
