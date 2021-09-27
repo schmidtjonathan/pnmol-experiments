@@ -85,3 +85,12 @@ def test_white_noise_diagonal(X, Y):
     k = kernels.WhiteNoise()
     Kxy = k(X, Y.T)
     assert jnp.allclose(Kxy, jnp.diag(jnp.diag(Kxy)))
+
+
+@ALL_KERNELS
+def test_add_white_noise(kernel, X, Y):
+    white = kernels.WhiteNoise(output_scale=3.123)
+    k = kernel + white
+    Kxy = k(X, Y.T)
+    Kxy_expected = kernel(X, Y.T) + white(X, Y.T)
+    assert jnp.allclose(Kxy, Kxy_expected)

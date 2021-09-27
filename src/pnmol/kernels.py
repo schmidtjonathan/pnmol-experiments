@@ -41,6 +41,13 @@ class Kernel(ABC):
     def __str__(self):
         return f"{self.__class__.__name__}()"
 
+    def __add__(self, other):
+        @jax.jit
+        def pairwise_new(x, y):
+            return self.pairwise(x, y) + other.pairwise(x, y)
+
+        return Lambda(fun=pairwise_new)
+
 
 class Lambda(Kernel):
     def __init__(self, fun):
