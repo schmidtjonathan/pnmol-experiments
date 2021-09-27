@@ -9,7 +9,7 @@ import tqdm
 from pnmol import kernels
 
 
-def discretize(diffop, mesh, kernel, stencil_size):
+def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.):
     """
     Discretize a differential operator.
 
@@ -28,6 +28,8 @@ def discretize(diffop, mesh, kernel, stencil_size):
     stencil_size
         Number of local neighbours to use for localised discretization.
         Optional. Default is ``None``, which implies that all points are used.
+    cov_damping
+        Damping value to be added to the diagonal of each kernel Gram matrix.
 
     Returns
     -------
@@ -50,7 +52,7 @@ def discretize(diffop, mesh, kernel, stencil_size):
 
     for i, point in enumerate(tqdm.tqdm(mesh.points)):
 
-        weights, uncertainty, neighbor_idcs = fd_coeff_fun(x=point)
+        weights, uncertainty, neighbor_idcs = fd_coeff_fun(x=point, cov_damping=cov_damping)
 
         L_data.append(weights)
         L_row.append(jnp.full(shape=stencil_size, fill_value=i, dtype=int))
@@ -67,13 +69,13 @@ def discretize(diffop, mesh, kernel, stencil_size):
     return L, jnp.sqrt(jnp.abs(E))
 
 
-def fd_coeff(x, grid, stencil_size, k, L_k, LL_k):
+def fd_coeff(x, grid, stencil_size, k, L_k, LL_k, cov_damping):
     """Compute kernel-based finite difference coefficients."""
 
     neighbors, neighbor_indices = grid.neighbours(point=x, num=stencil_size)
 
     X = neighbors.points
-    gram_matrix = k(X, X)
+    gram_matrix = k(X, X) + cov_damping * jnp.eye(X.shape[0])
     diffop_at_point = L_k(x, X).reshape((-1,))
 
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
