@@ -9,14 +9,8 @@ import tornadox
 from pnmol import differential_operator, discretize, kernels, mesh
 
 
-class DiscretizedPDE(
-    namedtuple(
-        "_DiscretizedPDE",
-        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
-        defaults=(None, None, None),
-    )
-):
-    """Initial value problems."""
+class PDEProblemMixin:
+    """Properties and functionalities for general PDE problems."""
 
     @property
     def dimension(self):
@@ -52,6 +46,46 @@ class DiscretizedPDE(
             df=new_df,
             df_diagonal=new_df_diagonal,
         )
+
+
+class LinearPDEProblem(
+    namedtuple(
+        "_LinearPDEProblem",
+        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
+    ),
+    PDEProblemMixin,
+):
+    pass
+
+
+class SemiLinearPDEProblem(
+    namedtuple(
+        "_SemiLinearPDEProblem",
+        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
+    ),
+    PDEProblemMixin,
+):
+    pass
+
+
+class QuasiLinearPDEProblem(
+    namedtuple(
+        "_QuasiLinearPDEProblem",
+        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
+    ),
+    PDEProblemMixin,
+):
+    pass
+
+
+class NonlinearPDEProblem(
+    namedtuple(
+        "_NonlinearPDEProblem",
+        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
+    ),
+    PDEProblemMixin,
+):
+    pass
 
 
 def heat_1d(
@@ -110,7 +144,7 @@ def heat_1d(
     def df_diagonal(_, x):
         return diffusion_rate * jnp.diagonal(L)
 
-    return DiscretizedPDE(
+    return LinearPDEProblem(
         f=f,
         spatial_grid=grid,
         t0=t0,
@@ -124,7 +158,17 @@ def heat_1d(
     )
 
 
-def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
+def wave_1d(
+    bbox=None,
+    dx=0.01,
+    stencil_size=3,
+    t0=0.0,
+    tmax=20.0,
+    y0=None,
+    diffusion_rate=0.1,
+    cov_damping_fd=0.0,
+    cov_damping_diffusion=1e-4,
+):
 
     # Bounding box for spatial discretization grid
     if bbox is None:
@@ -134,45 +178,30 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
 
     # Create spatial discretization grid
     grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
-    _, boundary_idcs = grid.boundary
-    boundary_idcs = jnp.where(boundary_idcs)[0]
-
-    to_boundary_part = jnp.concatenate(
-        [jnp.eye(1, len(grid), b) for b in boundary_idcs], 0
-    )
-    to_boundary = jnp.concatenate(
-        [to_boundary_part, jnp.zeros_like(to_boundary_part)], -1
-    )
-    to_boundary = jnp.concatenate(
-        [
-            to_boundary,
-            jnp.concatenate([jnp.zeros_like(to_boundary_part), to_boundary_part], -1),
-        ],
-        0,
-    )
 
     # Spatial initial condition at t=0
+    x = grid.points.reshape((-1,))
     if y0 is None:
-        mid = (bbox[1] - bbox[0]) * 0.5
-        y0 = jnp.pad(
-            jnp.exp(-100.0 * (grid.points.reshape(-1)[1:-1] - mid) ** 2),
-            pad_width=1,
-            mode="constant",
-            constant_values=0.0,
-        )
-        y0 = jnp.concatenate((y0, jnp.zeros_like(y0)))
+        y0 = gaussian_bell_1d(x) * sin_bell_1d(x)
 
     # PNMOL discretization
-    gauss_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
+    square_exp_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
     laplace = differential_operator.laplace()
     L, E_sqrtm = discretize.discretize(
-        diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
+        diffop=laplace,
+        mesh=grid,
+        kernel=square_exp_kernel,
+        stencil_size=stencil_size,
+        cov_damping=cov_damping_fd,
     )
 
     I_d = jnp.eye(len(grid))
     zeros = jnp.zeros((len(grid), len(grid)))
-    L_extended = jnp.block([[zeros, I_d], [L, zeros]])
+    L_extended = jnp.block([[zeros, I_d], [diffusion_rate * L, zeros]])
     E_sqrtm_extended = jnp.block([[zeros, zeros], [zeros, E_sqrtm]])
+
+    Kxx = square_exp_kernel(grid.points, grid.points)
+    Kxx_sqrtm = jnp.linalg.cholesky(Kxx + cov_damping_diffusion * jnp.eye(Kxx.shape[0]))
 
     @jax.jit
     def f(_, x):
@@ -186,19 +215,17 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
     def df_diagonal(_, x):
         return jnp.diagonal(L_extended)
 
-    return (
-        DiscretizedPDE(
-            f=f,
-            spatial_grid=grid,
-            t0=t0,
-            tmax=tmax,
-            y0=y0,
-            df=df,
-            df_diagonal=df_diagonal,
-            L=L_extended,
-            E_sqrtm=E_sqrtm_extended,
-        ),
-        to_boundary,
+    return LinearPDEProblem(
+        f=f,
+        spatial_grid=grid,
+        t0=t0,
+        tmax=tmax,
+        y0=y0,
+        df=df,
+        df_diagonal=df_diagonal,
+        L=L_extended,
+        E_sqrtm=E_sqrtm_extended,
+        Kxx_sqrtm=Kxx_sqrtm,
     )
 
 
@@ -208,6 +235,8 @@ def burgers_1d(
     """Burgers' Equation in 1D.
 
     According to the first equation in https://en.wikipedia.org/wiki/Burgers'_equation
+
+    TODO: This has to be reworked and fitted to the interface when appropriate.
     """
     # Bounding box for spatial discretization grid
     if bbox is None:
@@ -219,23 +248,22 @@ def burgers_1d(
     grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
 
     # Spatial initial condition at t=0
+    x = grid.points.reshape((-1,))
     if y0 is None:
-        mid_point = 0.5 * (bbox[1] - bbox[0])
-        y0 = jnp.exp(-100 * (grid.points.reshape(-1) - mid_point) ** 2)
-        y0 = y0 / y0.max()
+        y0 = gaussian_bell_1d(x) * sin_bell_1d(x)
 
     # PNMOL discretization
     lengthscale = dx * int(stencil_size / 2)
-    gauss_kernel = kernels.SquareExponentialKernel(
+    square_exp_kernel = kernels.SquareExponentialKernel(
         scale=lengthscale, lengthscale=lengthscale
     )
     laplace = differential_operator.laplace()
     grad = differential_operator.gradient()
     L_laplace, E_laplace = discretize.discretize(
-        diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
+        diffop=laplace, mesh=grid, kernel=square_exp_kernel, stencil_size=stencil_size
     )
     L_grad, E_grad = discretize.discretize(
-        diffop=grad, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
+        diffop=grad, mesh=grid, kernel=square_exp_kernel, stencil_size=stencil_size
     )
 
     @jax.jit
@@ -246,7 +274,7 @@ def burgers_1d(
     def df(_, x):
         return jax.jacfwd(f, argnums=1)(_, x)
 
-    return DiscretizedPDE(
+    return QuasiLinearPDEProblem(
         f=f,
         spatial_grid=grid,
         t0=t0,
@@ -271,6 +299,8 @@ def burgers_2d(
     """Burgers' equation in 2D.
 
     See e.g. https://nbviewer.jupyter.org/github/barbagroup/CFDPython/blob/master/lessons/10_Step_8.ipynb
+
+    TODO: This has to be reworked and fitted to the interface when appropriate.
     """
     # Bounding box for spatial discretization grid
     if bbox is None:
@@ -338,7 +368,7 @@ def burgers_2d(
     def df(_, x):
         return jax.jacfwd(f, argnums=1)(_, x)
 
-    return DiscretizedPDE(
+    return QuasiLinearPDEProblem(
         f=f, spatial_grid=grid, t0=t0, tmax=tmax, y0=y0, df=df, L=L_laplace, E=E_laplace
     )
 
