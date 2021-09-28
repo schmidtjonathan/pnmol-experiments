@@ -122,7 +122,7 @@ class _MeasurementCovarianceEK1Base(odefilter.ODEFilter):
 
 class LinearMeasurementCovarianceEK1(_MeasurementCovarianceEK1Base):
     @staticmethod
-    @partial(jax.jit, static_argnums=(0,))
+    # @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(discretized_pde, p0, p1, m_pred, t):
         B = discretized_pde.spatial_grid.boundary_projection_matrix
         L = discretized_pde.L
