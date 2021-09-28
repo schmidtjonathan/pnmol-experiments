@@ -64,6 +64,8 @@ def heat_1d(
     diffusion_rate=0.1,
     cov_damping_fd=0.0,
     cov_damping_diffusion=1e-4,
+    kernel=None,
+    progressbar=False,
 ):
     # Bounding box for spatial discretization grid
     if bbox is None:
@@ -79,17 +81,21 @@ def heat_1d(
     if y0 is None:
         y0 = gaussian_bell_1d(x) * sin_bell_1d(x)
 
+    # Default kernels
+    if kernel is None:
+        kernel = kernels.SquareExponential()
+
     # PNMOL discretization
-    square_exp_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
     laplace = differential_operator.laplace()
     L, E_sqrtm = discretize.discretize(
         diffop=laplace,
         mesh=grid,
-        kernel=square_exp_kernel,
+        kernel=kernel,
         stencil_size=stencil_size,
         cov_damping=cov_damping_fd,
+        progressbar=progressbar,
     )
-    Kxx = square_exp_kernel(grid.points, grid.points)
+    Kxx = kernel(grid.points, grid.points.T)
     Kxx_sqrtm = jnp.linalg.cholesky(Kxx + cov_damping_diffusion * jnp.eye(Kxx.shape[0]))
 
     @jax.jit
@@ -320,10 +326,6 @@ def burgers_2d(
     L_grad_y, E_grad_y = discretize.discretize(
         diffop=grad_y, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
-
-    print(L_laplace.shape, L_grad_x.shape, L_grad_y.shape)
-    print(grid.points.shape)
-    print(y0.shape)
 
     @jax.jit
     def f(_, x):

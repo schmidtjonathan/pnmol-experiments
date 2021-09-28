@@ -9,12 +9,13 @@ import pnmol
 SAVE = True
 
 
-def solve_pde_pnmol(pde, dt, nu, progressbar):
+def solve_pde_pnmol(pde, dt, nu, progressbar, kernel):
     steprule = pnmol.step.ConstantSteps(dt)
 
     # Solve the discretised PDE
     ek1 = pnmol.solver.MeasurementCovarianceEK1(num_derivatives=nu, steprule=steprule)
     sol = ek1.solve(pde, progressbar=progressbar)
+
     E0 = ek1.iwp.projection_matrix(0)
     return read_mean_and_std(sol, E0), sol.t
 
@@ -41,12 +42,20 @@ def read_mean_and_std(sol, E0):
     return means, stds
 
 
+kernel = pnmol.kernels.Polynomial()
 discretized_pde = pnmol.pde_problems.heat_1d(
-    tmax=5.0, dx=0.05, stencil_size=10, diffusion_rate=0.05
+    tmax=5.0,
+    dx=0.1,
+    stencil_size=3,
+    diffusion_rate=0.05,
+    kernel=kernel,
+    cov_damping_fd=0.0,
+    cov_damping_diffusion=1.0,
 )
+
 dt = 0.1
 nu = 2
-res_pnmol = solve_pde_pnmol(discretized_pde, dt, nu, True)
+res_pnmol = solve_pde_pnmol(discretized_pde, dt, nu, True, kernel)
 res_tornadox = solve_pde_tornadox(discretized_pde, dt, nu, True)
 
 

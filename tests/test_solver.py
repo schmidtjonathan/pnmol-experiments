@@ -4,33 +4,32 @@ import tornadox
 
 import pnmol
 
-
-@pytest.fixture
-def num_derivatives():
-    return 3
-
-
-@pytest.fixture
-def steps():
-    return tornadox.step.AdaptiveSteps(abstol=1e-3, reltol=1e-3)
+S1 = pnmol.solver.MeasurementCovarianceEK0
+S2 = pnmol.solver.MeasurementCovarianceEK1
+ALL_SOLVERS = pytest.mark.parametrize("solver", [S1, S2])
 
 
-@pytest.fixture
-def solver(steps, num_derivatives):
-    return pnmol.solver.LatentForceEK0(num_derivatives=num_derivatives, steprule=steps)
+@ALL_SOLVERS
+def test_solve(solver):
+    """The Heat equation is solved without creating NaNs."""
+    dt = 0.1
+    nu = 2
+    steprule = pnmol.step.ConstantSteps(dt)
 
+    heat = pnmol.pde_problems.heat_1d(
+        tmax=1.0,
+        dx=0.2,
+        stencil_size=3,
+        diffusion_rate=0.05,
+        kernel=pnmol.kernels.Polynomial(),
+        cov_damping_fd=0.0,
+        cov_damping_diffusion=1.0,
+    )
 
-pde_problems = pytest.mark.parametrize("pde", [pnmol.pde_problems.heat_1d])
-
-
-@pde_problems
-def test_solver(solver, pde):
-
-    discretized_pde = pde(t0=0.0, tmax=1.0)
-    L, E = discretized_pde.L, discretized_pde.E
-    assert L.shape == E.shape
-    # Assert that E is diagonal
-    assert jnp.count_nonzero(E - jnp.diag(jnp.diagonal(E))) == 0
-    sol = solver.solve(ivp=discretized_pde)
-
-    assert len(sol.t) == len(sol.mean) == len(sol.cov)
+    # Solve the discretised PDE
+    solver = pnmol.solver.MeasurementCovarianceEK1(
+        num_derivatives=nu, steprule=steprule
+    )
+    out = solver.solve(heat)
+    assert not jnp.any(jnp.isnan(out.mean))
+    assert not jnp.any(jnp.isnan(out.cov_sqrtm))

@@ -10,7 +10,9 @@ import pnmol
 def iwp():
     """Steal system matrices from an IWP transition."""
     return pnmol.iwp.IntegratedWienerTransition(
-        wiener_process_dimension=1, num_derivatives=1
+        wiener_process_dimension=1,
+        num_derivatives=1,
+        wp_diffusion_sqrtm=jnp.eye(1),
     )
 
 
@@ -46,9 +48,9 @@ def test_propagate_cholesky_factor(H_and_SQ, SC, measurement_style):
 def test_update_sqrt(H_and_SQ, SC, measurement_style):
     """Sqrt-update coincides with non-square-root update."""
 
-    H, _ = H_and_SQ
+    H, SQ = H_and_SQ
 
-    SC_new, kalman_gain, innov_chol = pnmol.sqrt.update_sqrt(H, SC)
+    SC_new, kalman_gain, innov_chol = pnmol.sqrt.update_sqrt(H, SC, meascov_sqrtm=SQ)
     assert isinstance(SC_new, jnp.ndarray)
     assert isinstance(kalman_gain, jnp.ndarray)
     assert isinstance(innov_chol, jnp.ndarray)
@@ -57,7 +59,7 @@ def test_update_sqrt(H_and_SQ, SC, measurement_style):
     assert innov_chol.shape == (H.shape[0], H.shape[0])
 
     # expected:
-    S = H @ SC @ SC.T @ H.T
+    S = H @ SC @ SC.T @ H.T + SQ @ SQ.T
     K = SC @ SC.T @ H.T @ jnp.linalg.inv(S)
     C = SC @ SC.T - K @ S @ K.T
 

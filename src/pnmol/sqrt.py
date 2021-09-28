@@ -73,6 +73,28 @@ def update_sqrt(transition_matrix, cov_cholesky, meascov_sqrtm):
     return R3.T, gain, R1.T
 
 
+@jax.jit
+def update_sqrt_no_meascov(transition_matrix, cov_cholesky):
+    output_dim, input_dim = transition_matrix.shape
+    zeros_bottomleft = jnp.zeros((output_dim, input_dim))
+    zeros_bottomright = jnp.zeros((input_dim, input_dim))
+
+    blockmat = jnp.block(
+        [
+            [cov_cholesky.T @ transition_matrix.T, cov_cholesky.T],
+            [zeros_bottomleft.T, zeros_bottomright.T],
+        ]
+    )
+    big_triu = jax.scipy.linalg.qr(blockmat, mode="r", pivoting=False)
+    R3 = big_triu[
+        output_dim : (output_dim + input_dim), output_dim : (output_dim + input_dim)
+    ]
+    R1 = big_triu[:output_dim, :output_dim]
+    R2 = big_triu[:output_dim, output_dim:]
+    gain = jax.scipy.linalg.solve_triangular(R1, R2, lower=False).T
+    return R3.T, gain, R1.T
+
+
 # Todo: replace with a jax.vmap somehow
 # The difficulty are the multiple outputs.
 # Without the innov chol, cov_chol and kgain could be stacked together, vmapped, and extracted cleverly

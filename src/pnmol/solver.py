@@ -14,11 +14,13 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
         self.E1 = None
 
     def initialize(self, discretized_pde):
+        X = discretized_pde.spatial_grid.points
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=discretized_pde.y0.shape[0],
-            wp_diffusion_sqrtm=discretized_pde.Kxx_sqrtm,
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
 
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
@@ -31,11 +33,11 @@ class MeasurementCovarianceEK0(odefilter.ODEFilter):
             y0=discretized_pde.y0,
             t0=discretized_pde.t0,
             num_derivatives=self.iwp.num_derivatives,
-            wp_diffusion_sqrtm=jnp.eye(discretized_pde.y0.shape[0]),
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         y = rv.MultivariateNormal(
             mean=extended_dy0,
-            cov_sqrtm=jnp.kron(jnp.eye(discretized_pde.y0.shape[0]), cov_sqrtm),
+            cov_sqrtm=jnp.kron(diffusion_state_sqrtm, cov_sqrtm),
         )
         return odefilter.ODEFilterState(
             t=discretized_pde.t0,
@@ -129,27 +131,35 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
 
     def initialize(self, discretized_pde):
 
+        X = discretized_pde.spatial_grid.points
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=discretized_pde.y0.shape[0],
-            wp_diffusion_sqrtm=discretized_pde.Kxx_sqrtm,
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
-
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
         self.E1 = self.iwp.projection_matrix(1)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
+        ivp = discretized_pde.to_tornadox_ivp_1d()
         extended_dy0, cov_sqrtm = self.init(
-            f=discretized_pde.f,
-            df=discretized_pde.df,
-            y0=discretized_pde.y0,
-            t0=discretized_pde.t0,
+            f=ivp.f,
+            df=ivp.df,
+            y0=ivp.y0,
+            t0=ivp.t0,
             num_derivatives=self.iwp.num_derivatives,
-            wp_diffusion_sqrtm=jnp.eye(discretized_pde.y0.shape[0]),
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
+        dy0_padded = jnp.pad(
+            extended_dy0, pad_width=1, mode="constant", constant_values=0.0
+        )
+        dy0_full = dy0_padded[1:-1]
+
         y = rv.MultivariateNormal(
-            mean=extended_dy0,
-            cov_sqrtm=jnp.kron(discretized_pde.Kxx_sqrtm, cov_sqrtm),
+            mean=dy0_full,
+            cov_sqrtm=jnp.kron(diffusion_state_sqrtm, cov_sqrtm),
         )
         return odefilter.ODEFilterState(
             t=discretized_pde.t0,
