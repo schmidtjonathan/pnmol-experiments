@@ -1,3 +1,4 @@
+import abc
 from collections import namedtuple
 
 import jax
@@ -22,6 +23,48 @@ class PDEProblemMixin:
     def t_span(self):
         return self.t0, self.tmax
 
+
+class LinearPDEProblem(
+    namedtuple(
+        "_LinearPDEProblem",
+        "spatial_grid t0 tmax y0 L E_sqrtm Kxx_sqrtm",
+    ),
+    PDEProblemMixin,
+):
+    def to_tornadox_ivp_1d(self):
+        @jax.jit
+        def new_f(t, x):
+
+            # Pad x into zeros (dirichlet cond.)
+            padded_x = jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
+
+            # Evaluate self.f
+            new_x = self.L @ padded_x
+
+            # Return the interior again
+            return new_x[1:-1]
+
+        @jax.jit
+        def new_df(t, x):
+            return self.L
+
+        return tornadox.ivp.InitialValueProblem(
+            f=new_f,
+            t0=self.t0,
+            tmax=self.tmax,
+            y0=self.y0[1:-1],
+            df=new_df,
+            df_diagonal=None,
+        )
+
+
+class SemiLinearPDEProblem(
+    namedtuple(
+        "_SemiLinearPDEProblem",
+        "spatial_grid t0 tmax y0 f df L E_sqrtm Kxx_sqrtm",
+    ),
+    PDEProblemMixin,
+):
     def to_tornadox_ivp_1d(self):
         @jax.jit
         def new_f(t, x):
@@ -36,7 +79,6 @@ class PDEProblemMixin:
             return new_x[1:-1]
 
         new_df = jax.jit(jax.jacfwd(new_f, argnums=1))
-        new_df_diagonal = None
 
         return tornadox.ivp.InitialValueProblem(
             f=new_f,
@@ -44,48 +86,72 @@ class PDEProblemMixin:
             tmax=self.tmax,
             y0=self.y0[1:-1],
             df=new_df,
-            df_diagonal=new_df_diagonal,
+            df_diagonal=None,
         )
-
-
-class LinearPDEProblem(
-    namedtuple(
-        "_LinearPDEProblem",
-        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
-    ),
-    PDEProblemMixin,
-):
-    pass
-
-
-class SemiLinearPDEProblem(
-    namedtuple(
-        "_SemiLinearPDEProblem",
-        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
-    ),
-    PDEProblemMixin,
-):
-    pass
 
 
 class QuasiLinearPDEProblem(
     namedtuple(
         "_QuasiLinearPDEProblem",
-        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
+        "spatial_grid t0 tmax y0 f df L E_sqrtm Kxx_sqrtm",
     ),
     PDEProblemMixin,
 ):
-    pass
+    def to_tornadox_ivp_1d(self):
+        @jax.jit
+        def new_f(t, x):
+
+            # Pad x into zeros (dirichlet cond.)
+            padded_x = jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
+
+            # Evaluate self.f
+            new_x = self.f(t, padded_x)
+
+            # Return the interior again
+            return new_x[1:-1]
+
+        new_df = jax.jit(jax.jacfwd(new_f, argnums=1))
+
+        return tornadox.ivp.InitialValueProblem(
+            f=new_f,
+            t0=self.t0,
+            tmax=self.tmax,
+            y0=self.y0[1:-1],
+            df=new_df,
+            df_diagonal=None,
+        )
 
 
 class NonlinearPDEProblem(
     namedtuple(
         "_NonlinearPDEProblem",
-        "f spatial_grid t0 tmax y0 df df_diagonal L E_sqrtm Kxx_sqrtm",
+        "spatial_grid t0 tmax y0 f df L E_sqrtm Kxx_sqrtm",
     ),
     PDEProblemMixin,
 ):
-    pass
+    def to_tornadox_ivp_1d(self):
+        @jax.jit
+        def new_f(t, x):
+
+            # Pad x into zeros (dirichlet cond.)
+            padded_x = jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
+
+            # Evaluate self.f
+            new_x = self.f(t, padded_x)
+
+            # Return the interior again
+            return new_x[1:-1]
+
+        new_df = jax.jit(jax.jacfwd(new_f, argnums=1))
+
+        return tornadox.ivp.InitialValueProblem(
+            f=new_f,
+            t0=self.t0,
+            tmax=self.tmax,
+            y0=self.y0[1:-1],
+            df=new_df,
+            df_diagonal=None,
+        )
 
 
 def heat_1d(
@@ -200,7 +266,7 @@ def wave_1d(
     L_extended = jnp.block([[zeros, I_d], [diffusion_rate * L, zeros]])
     E_sqrtm_extended = jnp.block([[zeros, zeros], [zeros, E_sqrtm]])
 
-    Kxx = square_exp_kernel(grid.points, grid.points)
+    Kxx = square_exp_kernel(grid.points, grid.points.T)
     Kxx_sqrtm = jnp.linalg.cholesky(Kxx + cov_damping_diffusion * jnp.eye(Kxx.shape[0]))
 
     @jax.jit
