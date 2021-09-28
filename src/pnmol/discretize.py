@@ -48,10 +48,7 @@ def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0, progressbar=
 
     L_data, L_row, L_col, E_data = [], [], [], []
 
-    if progressbar:
-        range_loop = enumerate(tqdm.tqdm(mesh.points))
-    else:
-        range_loop = enumerate(mesh.points)
+        range_loop = enumerate(tqdm.tqdm(mesh.points, disable=not progressbar))
     for i, point in range_loop:
 
         weights, uncertainty, neighbor_idcs = fd_coeff_fun(
