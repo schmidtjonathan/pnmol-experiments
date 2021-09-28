@@ -136,7 +136,7 @@ fig, axes = plt.subplots(
     ncols=3,
     nrows=2,
     dpi=400,
-    figsize=(8, 4),
+    figsize=(5, 3),
     sharex=True,
     sharey=True,
     constrained_layout=True,
@@ -200,8 +200,8 @@ fig.colorbar(
 # Column titles
 top_row_axis = axes[0]
 ax1, ax2, ax3 = top_row_axis
-ax1.set_title(r"$\bf a.$ " + "Means", loc="left")
-ax2.set_title(r"$\bf b.$ " + "Standard deviations", loc="left")
+ax1.set_title(r"$\bf a.$ " + "Mean", loc="left")
+ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left")
 ax3.set_title(r"$\bf c.$ " + "Error", loc="left")
 
 # x-labels
