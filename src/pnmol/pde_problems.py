@@ -22,11 +22,11 @@ class PDEProblemMixin:
 
 
 _LinearPDEBaseClass = namedtuple(
-    "_LinearPDEBaseClass", "spatial_grid t0 tmax y0 L E_sqrtm Kxx_sqrtm"
+    "_LinearPDEBaseClass", "spatial_grid t0 tmax y0 L E_sqrtm"
 )
 
 _NonLinearPDEBaseClass = namedtuple(
-    "_SemiLinearPDEProblem", "spatial_grid t0 tmax y0 f df L E_sqrtm Kxx_sqrtm"
+    "_SemiLinearPDEProblem", "spatial_grid t0 tmax y0 f df L E_sqrtm"
 )
 
 
@@ -47,9 +47,7 @@ class LinearPDEProblem(
             # Return the interior again
             return new_x[1:-1]
 
-        @jax.jit
-        def new_df(t, x):
-            return self.L
+        new_df = jax.jit(jax.jacfwd(new_f, argnums=1))
 
         return tornadox.ivp.InitialValueProblem(
             f=new_f,
@@ -99,7 +97,6 @@ def heat_1d(
     y0=None,
     diffusion_rate=0.1,
     cov_damping_fd=0.0,
-    cov_damping_diffusion=1e-4,
     kernel=None,
     progressbar=False,
 ):
@@ -131,20 +128,6 @@ def heat_1d(
         cov_damping=cov_damping_fd,
         progressbar=progressbar,
     )
-    Kxx = kernel(grid.points, grid.points.T)
-    Kxx_sqrtm = jnp.linalg.cholesky(Kxx + cov_damping_diffusion * jnp.eye(Kxx.shape[0]))
-
-    @jax.jit
-    def f(_, x):
-        return diffusion_rate * L @ x
-
-    @jax.jit
-    def df(_, x):
-        return diffusion_rate * L
-
-    @jax.jit
-    def df_diagonal(_, x):
-        return diffusion_rate * jnp.diagonal(L)
 
     return LinearPDEProblem(
         spatial_grid=grid,
@@ -153,7 +136,6 @@ def heat_1d(
         y0=y0,
         L=L,
         E_sqrtm=E_sqrtm,
-        Kxx_sqrtm=Kxx_sqrtm,
     )
 
 
