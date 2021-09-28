@@ -128,6 +128,7 @@ def heat_1d(
         cov_damping=cov_damping_fd,
         progressbar=progressbar,
     )
+    L = diffusion_rate * L
 
     return LinearPDEProblem(
         spatial_grid=grid,
