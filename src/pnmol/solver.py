@@ -194,9 +194,7 @@ class MeasurementCovarianceEK1(odefilter.ODEFilter):
         E_with_bc_sqrtm = jax.scipy.linalg.block_diag(
             discretized_pde.E_sqrtm, jnp.zeros((2, 2))
         )
-
         sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
-
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
         # [Update]
