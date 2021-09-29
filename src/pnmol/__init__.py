@@ -11,13 +11,13 @@ from . import (
     kernels,
     lfsolver,
     mesh,
+    ode,
     odefilter,
     pde_problems,
     rv,
     solver,
     sqrt,
     stacked_ssm,
-    step,
 )
 
 __version__ = "0.0.1"

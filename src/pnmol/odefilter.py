@@ -9,7 +9,8 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 
-from pnmol import init, kernels, step
+from pnmol import init, kernels
+from pnmol.ode import step
 
 ODEFilterState = namedtuple("_ODEFilterState", "t y error_estimate reference_state")
 
