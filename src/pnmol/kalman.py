@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import jax.scipy.linalg
 
-from pnmol import sqrt
+from pnmol.base import sqrt
 
 
 # Most popular for testing the smoother (and debugging other filters)

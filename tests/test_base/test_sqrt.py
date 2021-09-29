@@ -38,7 +38,7 @@ def test_propagate_cholesky_factor(H_and_SQ, SC, measurement_style):
     H, SQ = H_and_SQ
 
     # First test: Non-optional S2
-    chol = pnmol.sqrt.propagate_cholesky_factor(S1=(H @ SC), S2=SQ)
+    chol = pnmol.base.sqrt.propagate_cholesky_factor(S1=(H @ SC), S2=SQ)
     cov = H @ SC @ SC.T @ H.T + SQ @ SQ.T
     assert jnp.allclose(chol @ chol.T, cov)
     assert jnp.allclose(jnp.tril(chol), chol)
@@ -50,7 +50,9 @@ def test_update_sqrt(H_and_SQ, SC, measurement_style):
 
     H, SQ = H_and_SQ
 
-    SC_new, kalman_gain, innov_chol = pnmol.sqrt.update_sqrt(H, SC, meascov_sqrtm=SQ)
+    SC_new, kalman_gain, innov_chol = pnmol.base.sqrt.update_sqrt(
+        H, SC, meascov_sqrtm=SQ
+    )
     assert isinstance(SC_new, jnp.ndarray)
     assert isinstance(kalman_gain, jnp.ndarray)
     assert isinstance(innov_chol, jnp.ndarray)
