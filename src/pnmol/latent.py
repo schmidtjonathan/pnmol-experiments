@@ -126,10 +126,8 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
 class LinearLatentForceEK1(_LatentForceEK1Base):
     @staticmethod
-    @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(pde, p0, p1, m_pred, t):
         L = pde.L
-        B = pde.mesh_spatial.boundary_projection_matrix
 
         E0_state = E0_eps = p0
         E1_state = p1

@@ -1,4 +1,5 @@
 """Test the PDE filter implementations."""
+import jax
 import jax.numpy as jnp
 import pytest
 import tornadox
@@ -10,7 +11,8 @@ import pnmol.ode
 @pytest.mark.parametrize(
     "solver", [pnmol.white.LinearWhiteNoiseEK1, pnmol.latent.LinearLatentForceEK1]
 )
-def test_solve(solver):
+@pytest.mark.parametrize("bcond", ["neumann", "dirichlet"])
+def test_solve(solver, bcond):
     """The Heat equation is solved without creating NaNs."""
     dt = 0.1
     nu = 2
@@ -22,7 +24,7 @@ def test_solve(solver):
         diffusion_rate=0.05,
         kernel=pnmol.kernels.Polynomial(),
         cov_damping_fd=0.0,
-        bcond="dirichlet",
+        bcond=bcond,
     )
     # Solve the discretised PDE
     solver = solver(num_derivatives=nu, steprule=steprule)
