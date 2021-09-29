@@ -24,7 +24,6 @@ def test_solve(solver):
         diffusion_rate=0.05,
         kernel=pnmol.kernels.Polynomial(),
         cov_damping_fd=0.0,
-        cov_damping_diffusion=1.0,
     )
 
     # Solve the discretised PDE

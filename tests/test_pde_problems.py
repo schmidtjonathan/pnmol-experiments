@@ -16,11 +16,3 @@ def test_problem(pde):
     assert L.shape == E_sqrtm.shape
     # Assert that E is diagonal
     assert jnp.count_nonzero(E_sqrtm - jnp.diag(jnp.diagonal(E_sqrtm))) == 0
-    sol = solve_ivp(
-        discretized_pde.f,
-        t_span=discretized_pde.t_span,
-        y0=discretized_pde.y0,
-        method="Radau",
-    )
-
-    assert len(sol.t) == len(sol.y.T)
