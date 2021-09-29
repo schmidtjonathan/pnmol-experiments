@@ -8,7 +8,7 @@ problems_1d_all = pytest.mark.parametrize(
     "prob1d",
     [
         pnmol.problems.heat_1d(bcond="dirichlet"),
-        pnmol.problems.heat_1d(bcond="dirichlet"),
+        pnmol.problems.heat_1d(bcond="neumann"),
     ],
 )
 

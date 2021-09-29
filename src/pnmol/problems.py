@@ -3,8 +3,9 @@
 import functools
 
 import jax.numpy as jnp
+import jax.scipy.linalg
 
-from pnmol import diffops, discretize
+from pnmol import diffops, discretize, kernels
 
 # PDE Base class and some problem-type-specific implementations
 
@@ -141,9 +142,9 @@ class IVPMixIn:
 class DiscretizationMixIn:
     """Discretisation functionality for PDE problems."""
 
-    def discretize(self, *, mesh_spatial, **kwargs):
+    def discretize(self, *, mesh_spatial, kernel, **kwargs):
         L, E_sqrtm = discretize.discretize(
-            self.diffop, mesh_spatial=mesh_spatial, **kwargs
+            self.diffop, mesh_spatial=mesh_spatial, kernel=kernel, **kwargs
         )
 
         self.L = self.diffop_scale * L
@@ -151,9 +152,36 @@ class DiscretizationMixIn:
         self.mesh_spatial = mesh_spatial
 
         if isinstance(self, NeumannMixIn):
-            raise NotImplementedError
-            # self.N = "discretized"
-            # self.W_sqrtm = "discretized"
+            if self.dimension > 1:
+                raise NotImplementedError
+            diffop = diffops.gradient()  # 1d
+
+            # The below is entirely harakiri, but it somehow works.
+            k = kernel
+            Lk = kernels.Lambda(diffop(k.pairwise, argnums=0))
+            LLk = kernels.Lambda(diffop(Lk.pairwise, argnums=1))
+            x_left = mesh_spatial[0]
+            neighbors_left = mesh_spatial[((0, 1),)]
+            weights_left, uncertainty_left = discretize.fd_coeff(
+                x=x_left,
+                neighbors=neighbors_left,
+                k=k,
+                L_k=Lk,
+                LL_k=LLk,
+            )
+
+            x_right = mesh_spatial[-1]
+            neighbors_right = mesh_spatial[((-1, -2),)]
+            weights_right, uncertainty_right = discretize.fd_coeff(
+                x=x_right,
+                neighbors=neighbors_right,
+                k=k,
+                L_k=Lk,
+                LL_k=LLk,
+            )
+            B = jnp.eye(len(mesh_spatial))[((0, 1, -2, -1),), :]
+            self.B = jax.scipy.linalg.block_diag(-weights_left, weights_right) @ B
+            self.R_sqrtm = jnp.diag(jnp.array([uncertainty_left, uncertainty_right]))
 
         elif isinstance(self, DirichletMixIn):
             self.B = mesh_spatial.boundary_projection_matrix

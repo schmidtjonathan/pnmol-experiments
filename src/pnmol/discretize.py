@@ -82,7 +82,7 @@ def discretize(
     return L, jnp.sqrt(jnp.abs(E))
 
 
-def fd_coeff(x, neighbors, k, L_k, LL_k, nugget_gram_matrix):
+def fd_coeff(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
     """Compute kernel-based finite difference coefficients."""
 
     X = neighbors
