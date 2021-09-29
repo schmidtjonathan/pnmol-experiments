@@ -6,6 +6,8 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
+from pnmol import problems
+
 
 class StepRule(abc.ABC):
     """Step-size selection rules for ODE solvers."""
@@ -105,6 +107,13 @@ class Adaptive(StepRule):
         return jnp.linalg.norm(ratio) / jnp.sqrt(dim)
 
     def first_dt(self, discretized_pde):
+
+        # This check messes up the import structure...
+        # (The present file should not depend on pnmol.problems.)
+        if isinstance(discretized_pde, problems.LinearPDEProblem):
+            return propose_first_dt_linear(
+                discretized_pde.L, discretized_pde.t0, discretized_pde.y0
+            )
         return propose_first_dt(
             discretized_pde.f, discretized_pde.t0, discretized_pde.y0
         )
@@ -114,4 +123,11 @@ class Adaptive(StepRule):
 def propose_first_dt(f, t0, y0):
     norm_y0 = jnp.linalg.norm(y0)
     norm_dy0 = jnp.linalg.norm(f(t0, y0))
+    return 0.01 * norm_y0 / norm_dy0
+
+
+@jax.jit
+def propose_first_dt_linear(L, _, y0):
+    norm_y0 = jnp.linalg.norm(y0)
+    norm_dy0 = jnp.linalg.norm(L @ y0)
     return 0.01 * norm_y0 / norm_dy0

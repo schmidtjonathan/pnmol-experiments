@@ -7,14 +7,6 @@ import pnmol.ode.step
 import pnmol.problems
 
 
-def test_propose_first_dt():
-
-    ivp = pnmol.problems.heat_1d()
-
-    dt = pnmol.ode.step.propose_first_dt(ivp.f, ivp.t0, ivp.y0)
-    assert dt > 0
-
-
 @pytest.fixture
 def ivp():
     return pnmol.problems.heat_1d()
