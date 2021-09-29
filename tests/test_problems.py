@@ -38,8 +38,13 @@ class TestProb1dDiscretized:
 
     @staticmethod
     @pytest.fixture
-    def N(prob1d_discretized):
+    def num_grid_points(prob1d_discretized):
         return prob1d_discretized.mesh_spatial.shape[0]
+
+    @staticmethod
+    @pytest.fixture
+    def num_boundary_points(prob1d_discretized):
+        return prob1d_discretized.mesh_spatial.boundary[0].shape[0]
 
     @staticmethod
     @problems_1d_all
@@ -60,18 +65,31 @@ class TestProb1dDiscretized:
 
     @staticmethod
     @problems_1d_all
-    def test_y0(prob1d_discretized, N):
-        assert prob1d_discretized.y0_array.shape == (N,)
+    def test_y0(prob1d_discretized, num_grid_points):
+        assert prob1d_discretized.y0_array.shape == (num_grid_points,)
 
     # Discretisations
-    @staticmethod
-    @problems_1d_all
-    def test_L(prob1d_discretized, N):
-        L = prob1d_discretized.L
-        assert L.shape == (N, N)
 
     @staticmethod
     @problems_1d_all
-    def test_E_sqrtm(prob1d_discretized, N):
+    def test_L(prob1d_discretized, num_grid_points):
+        L = prob1d_discretized.L
+        assert L.shape == (num_grid_points, num_grid_points)
+
+    @staticmethod
+    @problems_1d_all
+    def test_E_sqrtm(prob1d_discretized, num_grid_points):
         E_sqrtm = prob1d_discretized.E_sqrtm
-        assert E_sqrtm.shape == (N, N)
+        assert E_sqrtm.shape == (num_grid_points, num_grid_points)
+
+    @staticmethod
+    @problems_1d_all
+    def test_B(prob1d_discretized, num_grid_points, num_boundary_points):
+        B = prob1d_discretized.B
+        assert B.shape == (num_boundary_points, num_grid_points)
+
+    @staticmethod
+    @problems_1d_all
+    def test_B(prob1d_discretized, num_boundary_points):
+        R_sqrtm = prob1d_discretized.R_sqrtm
+        assert R_sqrtm.shape == (num_boundary_points, num_boundary_points)

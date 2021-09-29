@@ -68,7 +68,7 @@ class NonLinearMixIn:
 
 
 class SemiLinearPDE(PDE, NonLinearMixIn):
-    """Linear PDE problem. Requires mixing with some boundary condition."""
+    """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
         """Transform PDE into an IVP. Requires prior discretisation."""
@@ -86,13 +86,15 @@ class SemiLinearPDE(PDE, NonLinearMixIn):
 # Add boundary conditions through a MixIn
 
 
-class NeumannMixIn:
-    """Neumann condition functionality for PDE problems."""
-
+class _BoundaryCondition:
     def __init__(self, **kwargs):
-        self.N = None
-        self.W_sqrtm = None
+        self.B = None
+        self.R_sqrtm = None
         super().__init__(**kwargs)
+
+
+class NeumannMixIn(_BoundaryCondition):
+    """Neumann condition functionality for PDE problems."""
 
     def bc_pad(self, x):
         raise NotImplementedError
@@ -101,7 +103,7 @@ class NeumannMixIn:
         raise NotImplementedError
 
 
-class DirichletMixIn:
+class DirichletMixIn(_BoundaryCondition):
     """Dirichlet condition functionality for PDE problems."""
 
     def bc_pad(self, x):
@@ -152,6 +154,10 @@ class DiscretizationMixIn:
             raise NotImplementedError
             # self.N = "discretized"
             # self.W_sqrtm = "discretized"
+
+        elif isinstance(self, DirichletMixIn):
+            self.B = mesh_spatial.boundary_projection_matrix
+            self.R_sqrtm = jnp.zeros((self.B.shape[0], self.B.shape[0]))
 
         if isinstance(self, IVPMixIn):
 
