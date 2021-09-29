@@ -22,12 +22,12 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
         self.state_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.dimension,
+            wiener_process_dimension=X.shape[0],
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.dimension,
+            wiener_process_dimension=X.shape[0],
             wp_diffusion_sqrtm=pde.E_sqrtm,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
@@ -36,7 +36,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         self.E1 = self.state_iwp.projection_matrix(1)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = pde.to_tornadox_ivp_1d()
+        ivp = pde.to_tornadox_ivp()
         extended_dy0, cov_sqrtm_state = self.init(
             f=ivp.f,
             df=ivp.df,
@@ -143,11 +143,11 @@ class LinearLatentForceEK1(_LatentForceEK1Base):
 
         H_state = E1_state - Jx @ E0_state
         H_eps = -E0_eps
-        H_boundaries = pde.B
+        H_boundaries = pde.B @ E0_state
         H_zeros = jnp.zeros_like(H_boundaries)
         H = jnp.block([[H_state, H_eps], [H_boundaries, H_zeros]])
 
-        zeros_bc = jnp.zeros((B.shape[0],))
+        zeros_bc = jnp.zeros((pde.B.shape[0],))
 
         b = jnp.concatenate([Jx @ state_at - fx, zeros_bc])
         z = H @ m_pred + b
