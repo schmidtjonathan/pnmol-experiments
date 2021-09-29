@@ -1,4 +1,8 @@
 
+
+# Stored results
+*.npy
+
 # Expensive, auto-generated files
 *.gif
 *.mp4

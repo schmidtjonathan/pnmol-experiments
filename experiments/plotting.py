@@ -4,6 +4,8 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
+plt.style.use("experiments/lines_and_ticks.mplstyle")
+
 PATH_RESULTS = "experiments/results/figure1/"
 
 
@@ -67,6 +69,10 @@ def figure_1(
             fig.colorbar(bar_error, ax=axes[:, -1].ravel().tolist())
             pnmol_colorbar = 1
 
+        for ax in axis_row:
+            ax.set_yticks(t[:n:4])
+            ax.set_xticks(x[:, 0])
+
     # x-labels
     bottom_row_axis = axes[-1]
     for ax in bottom_row_axis:
@@ -86,7 +92,7 @@ def figure_1(
     for ax in axes.flatten():
         ax.set_xticklabels(())
         ax.set_yticklabels(())
-        ax.grid(which="major", color="k", alpha=0.25, linestyle="dotted")
+        # ax.grid(which="major", color="k", alpha=0.25, linestyle="dotted")
 
     # Column titles
     top_row_axis = axes[0]

@@ -1,5 +1,7 @@
 """Code to generate figure 1."""
 
+import pathlib
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
@@ -7,10 +9,6 @@ import plotting
 import tornadox
 
 import pnmol
-
-SAVE = True
-
-import pathlib
 
 
 def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
@@ -76,10 +74,15 @@ def read_mean_and_std(sol, E0):
 
 
 def read_mean_and_std_latent(sol, E0):
+    d = E0.shape[0]
+    n = E0.shape[1] // d
     means = jnp.split(sol.mean, 2, axis=-1)[0][:, 0]
     cov = sol.cov_sqrtm @ jnp.transpose(sol.cov_sqrtm, axes=(0, 2, 1))
+    vars = jnp.diagonal(cov, axis1=1, axis2=2)
     stds = jnp.sqrt(
-        jnp.split(jnp.diagonal(cov, axis1=1, axis2=2), 2, axis=-1)[0] @ E0.T
+        jnp.split(vars, 2, axis=-1)[0].reshape((cov.shape[0], n, -1), order="F")[
+            :, 0, :
+        ]
     )
     return means, stds
 
@@ -97,9 +100,9 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.05
-DX = 0.2
-HIGH_RES_FACTOR = 12
+DT = 0.5
+DX = 0.1
+HIGH_RES_FACTOR = 2
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
@@ -111,15 +114,6 @@ DIFFUSION_RATE = 0.05
 
 
 # PDE problems
-PDE_PNMOL = pnmol.problems.heat_1d(
-    t0=T0,
-    tmax=TMAX,
-    dx=DX,
-    stencil_size=STENCIL_SIZE,
-    diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.SquareExponential(),
-    cov_damping_fd=NUGGET_COV_FD,
-)
 PDE_PNMOL = pnmol.problems.heat_1d(
     t0=T0,
     tmax=TMAX,
@@ -150,7 +144,7 @@ PDE_REFERENCE = pnmol.problems.heat_1d(
 
 # Solve the PDE with the different methods
 KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(
-    output_scale=1e-4
+    output_scale=1e-3
 )
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
