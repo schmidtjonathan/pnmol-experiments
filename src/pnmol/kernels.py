@@ -46,11 +46,11 @@ class Kernel(ABC):
         def pairwise_new(x, y):
             return self.pairwise(x, y) + other.pairwise(x, y)
 
-        return Lambda(fun=pairwise_new)
+        return Lambda(pairwise_new)
 
 
 class Lambda(Kernel):
-    def __init__(self, fun):
+    def __init__(self, fun, /):
         self._lambda_fun = jax.jit(fun)
 
     @partial(jax.jit, static_argnums=(0,))
@@ -139,7 +139,7 @@ class Polynomial(Kernel):
 
 
 class WhiteNoise(Kernel):
-    def __init__(self, output_scale=1.0):
+    def __init__(self, *, output_scale=1.0):
         self._output_scale = output_scale
 
     @property

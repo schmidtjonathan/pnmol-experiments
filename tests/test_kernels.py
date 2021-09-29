@@ -6,7 +6,7 @@ from pnmol import diffops, kernels
 
 K1a = kernels.SquareExponential()
 K1b = kernels.SquareExponential(input_scale=0.1, output_scale=2.0)
-K2 = kernels.Lambda(fun=lambda x, y: (x - y).dot(x - y))
+K2 = kernels.Lambda(lambda x, y: (x - y).dot(x - y))
 K3a = kernels.Matern52()
 K3b = kernels.Matern52(input_scale=0.1, output_scale=2.0)
 K4a = kernels.Polynomial()

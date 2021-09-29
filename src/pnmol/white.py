@@ -15,21 +15,21 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         self.E0 = None
         self.E1 = None
 
-    def initialize(self, discretized_pde):
+    def initialize(self, pde):
 
-        X = discretized_pde.spatial_grid.points
+        X = pde.spatial_grid.points
         diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=discretized_pde.y0.shape[0],
+            wiener_process_dimension=pde.y0.shape[0],
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         self.P0 = self.E0 = self.iwp.projection_matrix(0)
         self.E1 = self.iwp.projection_matrix(1)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = discretized_pde.to_tornadox_ivp_1d()
+        ivp = pde.to_tornadox_ivp_1d()
         extended_dy0, cov_sqrtm = self.init(
             f=ivp.f,
             df=ivp.df,
@@ -48,16 +48,16 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             cov_sqrtm=jnp.kron(diffusion_state_sqrtm, cov_sqrtm),
         )
         return pdefilter.PDEFilterState(
-            t=discretized_pde.t0,
+            t=pde.t0,
             y=y,
             error_estimate=None,
             reference_state=None,
         )
 
-    def attempt_step(self, state, dt, discretized_pde):
+    def attempt_step(self, state, dt, pde):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
-        n, d = self.num_derivatives + 1, discretized_pde.y0.shape[0]
+        n, d = self.num_derivatives + 1, pde.y0.shape[0]
 
         # [Setup]
         # Pull states into preconditioned state
@@ -68,15 +68,13 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            discretized_pde=discretized_pde,
+            pde=pde,
             p0=self.E0 @ P,
             p1=self.E1 @ P,
             m_pred=mp,
             t=state.t + dt,
         )
-        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(
-            discretized_pde.E_sqrtm, jnp.zeros((2, 2))
-        )
+        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, jnp.zeros((2, 2)))
         sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
@@ -116,15 +114,15 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 
     @abc.abstractstaticmethod
     def evaluate_ode(*args, **kwargs):
-        pass
+        raise NotImplementedError
 
 
 class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
     @staticmethod
     # @partial(jax.jit, static_argnums=(0,))
-    def evaluate_ode(discretized_pde, p0, p1, m_pred, t):
-        B = discretized_pde.spatial_grid.boundary_projection_matrix
-        L = discretized_pde.L
+    def evaluate_ode(pde, p0, p1, m_pred, t):
+        B = pde.spatial_grid.boundary_projection_matrix
+        L = pde.L
 
         m_at = p0 @ m_pred
         fx = L @ m_at

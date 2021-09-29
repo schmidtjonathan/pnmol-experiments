@@ -15,20 +15,20 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         self.E0 = None
         self.E1 = None
 
-    def initialize(self, discretized_pde):
+    def initialize(self, pde):
 
-        X = discretized_pde.spatial_grid.points
+        X = pde.spatial_grid.points
         diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.state_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=discretized_pde.dimension,
+            wiener_process_dimension=pde.dimension,
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=discretized_pde.dimension,
-            wp_diffusion_sqrtm=discretized_pde.E_sqrtm,
+            wiener_process_dimension=pde.dimension,
+            wp_diffusion_sqrtm=pde.E_sqrtm,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
@@ -36,7 +36,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         self.E1 = self.state_iwp.projection_matrix(1)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = discretized_pde.to_tornadox_ivp_1d()
+        ivp = pde.to_tornadox_ivp_1d()
         extended_dy0, cov_sqrtm_state = self.init(
             f=ivp.f,
             df=ivp.df,
@@ -52,9 +52,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         mean = jnp.concatenate([dy0_full, jnp.zeros_like(dy0_full)], -1)
 
         cov_sqrtm_state = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(
-            discretized_pde.E_sqrtm, 1e-10 * jnp.eye(self.num_derivatives + 1)
-        )
+        cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, 1e-10 * jnp.eye(self.num_derivatives + 1))
 
         cov_sqrtm = jax.scipy.linalg.block_diag(
             cov_sqrtm_state,
@@ -64,13 +62,13 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
 
         return pdefilter.PDEFilterState(
-            t=discretized_pde.t0,
+            t=pde.t0,
             y=y,
             error_estimate=None,
             reference_state=None,
         )
 
-    def attempt_step(self, state, dt, discretized_pde):
+    def attempt_step(self, state, dt, pde):
         A, Ql = self.ssm.non_preconditioned_discretize(dt)
         n, d = self.num_derivatives + 1, self.state_iwp.wiener_process_dimension
 
@@ -85,7 +83,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            discretized_pde=discretized_pde,
+            pde=pde,
             p0=self.E0,
             p1=self.E1,
             m_pred=mp,
@@ -123,15 +121,15 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
     @abc.abstractstaticmethod
     def evaluate_ode(*args, **kwargs):
-        pass
+        raise NotImplementedError
 
 
 class LinearLatentForceEK1(_LatentForceEK1Base):
     @staticmethod
     @partial(jax.jit, static_argnums=(0,))
-    def evaluate_ode(discretized_pde, p0, p1, m_pred, t):
-        L = discretized_pde.L
-        B = discretized_pde.spatial_grid.boundary_projection_matrix
+    def evaluate_ode(pde, p0, p1, m_pred, t):
+        L = pde.L
+        B = pde.spatial_grid.boundary_projection_matrix
 
         E0_state = E0_eps = p0
         E1_state = p1
