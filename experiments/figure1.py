@@ -13,7 +13,7 @@ SAVE = True
 import pathlib
 
 
-def solve_pde_pnmol(pde, *, dt, nu, progressbar, kernel):
+def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
     steprule = pnmol.ode.step.Constant(dt)
     ek1 = pnmol.white.LinearWhiteNoiseEK1(
         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
@@ -21,6 +21,16 @@ def solve_pde_pnmol(pde, *, dt, nu, progressbar, kernel):
     sol = ek1.solve(pde, progressbar=progressbar)
     E0 = ek1.iwp.projection_matrix(0)
     return *read_mean_and_std(sol, E0), sol.t, pde.spatial_grid.points
+
+
+def solve_pde_pnmol_latent(pde, *, dt, nu, progressbar, kernel):
+    steprule = pnmol.ode.step.Constant(dt)
+    ek1 = pnmol.latent.LinearLatentForceEK1(
+        num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
+    )
+    sol = ek1.solve(pde, progressbar=progressbar)
+    E0 = ek1.state_iwp.projection_matrix(0)
+    return *read_mean_and_std_latent(sol, E0), sol.t, pde.spatial_grid.points
 
 
 def solve_pde_tornadox(pde, *, dt, nu, progressbar):
@@ -65,6 +75,15 @@ def read_mean_and_std(sol, E0):
     return means, stds
 
 
+def read_mean_and_std_latent(sol, E0):
+    means = jnp.split(sol.mean, 2, axis=-1)[0][:, 0]
+    cov = sol.cov_sqrtm @ jnp.transpose(sol.cov_sqrtm, axes=(0, 2, 1))
+    stds = jnp.sqrt(
+        jnp.split(jnp.diagonal(cov, axis1=1, axis2=2), 2, axis=-1)[0] @ E0.T
+    )
+    return means, stds
+
+
 def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
     means, stds, ts, xs = result
     path_means = path + prefix + "_means.npy"
@@ -80,7 +99,7 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 # Hyperparameters (method)
 DT = 0.05
 DX = 0.2
-HIGH_RES_FACTOR = 2
+HIGH_RES_FACTOR = 12
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
@@ -92,6 +111,15 @@ DIFFUSION_RATE = 0.05
 
 
 # PDE problems
+PDE_PNMOL = pnmol.problems.heat_1d(
+    t0=T0,
+    tmax=TMAX,
+    dx=DX,
+    stencil_size=STENCIL_SIZE,
+    diffusion_rate=DIFFUSION_RATE,
+    kernel=pnmol.kernels.SquareExponential(),
+    cov_damping_fd=NUGGET_COV_FD,
+)
 PDE_PNMOL = pnmol.problems.heat_1d(
     t0=T0,
     tmax=TMAX,
@@ -124,7 +152,14 @@ PDE_REFERENCE = pnmol.problems.heat_1d(
 KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(
     output_scale=1e-4
 )
-RESULT_PNMOL = solve_pde_pnmol(
+RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
+    PDE_PNMOL,
+    dt=DT,
+    nu=NUM_DERIVATIVES,
+    progressbar=PROGRESSBAR,
+    kernel=KERNEL_DIFFUSION_PNMOL,
+)
+RESULT_PNMOL_LATENT = solve_pde_pnmol_latent(
     PDE_PNMOL,
     dt=DT,
     nu=NUM_DERIVATIVES,
@@ -141,7 +176,8 @@ RESULT_REFERENCE = solve_pde_reference(
     progressbar=PROGRESSBAR,
     high_res_factor=HIGH_RES_FACTOR,
 )
-save_result(RESULT_PNMOL, prefix="pnmol")
+save_result(RESULT_PNMOL_WHITE, prefix="pnmol_white")
+save_result(RESULT_PNMOL_LATENT, prefix="pnmol_latent")
 save_result(RESULT_TORNADOX, prefix="tornadox")
 save_result(RESULT_REFERENCE, prefix="reference")
 

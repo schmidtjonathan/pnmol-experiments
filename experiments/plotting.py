@@ -18,7 +18,9 @@ AISTATS_LINEWIDTH_DOUBLE = 6.75
 AISTATS_TEXTWIDTH_SINGLE = 3.25
 
 
-def figure_1(path=PATH_RESULTS, methods=("pnmol", "tornadox", "reference")):
+def figure_1(
+    path=PATH_RESULTS, methods=("pnmol_white", "pnmol_latent", "tornadox", "reference")
+):
 
     results = [figure_1_load_results(prefix=method, path=path) for method in methods]
 
@@ -66,15 +68,19 @@ def figure_1(path=PATH_RESULTS, methods=("pnmol", "tornadox", "reference")):
             pnmol_colorbar = 1
 
     # x-labels
-    bottom_row_axis = axes[1]
+    bottom_row_axis = axes[-1]
     for ax in bottom_row_axis:
         ax.set_xlabel("Space")
 
     # y-labels
-    nicer_label = {"pnmol": "PNMOL", "tornadox": "PN+MOL"}
+    nicer_label = {
+        "pnmol_white": "White",
+        "pnmol_latent": "Latent",
+        "tornadox": "PN+MOL",
+    }
     left_column_axis = axes[:, 0]
     for ax, label in zip(left_column_axis, methods):
-        ax.set_ylabel("Time" + f" ({nicer_label[label]})")
+        ax.set_ylabel(nicer_label[label])
 
     # Common settings for all plots
     for ax in axes.flatten():

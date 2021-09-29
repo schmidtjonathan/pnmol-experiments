@@ -126,7 +126,6 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
 class LinearLatentForceEK1(_LatentForceEK1Base):
     @staticmethod
-    @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(pde, p0, p1, m_pred, t):
         L = pde.L
         B = pde.spatial_grid.boundary_projection_matrix
