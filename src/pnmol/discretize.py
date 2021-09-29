@@ -9,7 +9,14 @@ import tqdm
 from pnmol import kernels
 
 
-def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0, progressbar=False):
+def discretize(
+    diffop,
+    mesh_spatial,
+    kernel,
+    stencil_size,
+    nugget_gram_matrix=0.0,
+    progressbar=False,
+):
     """
     Discretize a differential operator.
 
@@ -37,23 +44,27 @@ def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0, progressbar=
         The discretized linear operator as a ``np.ndarray``.
     """
 
-    M = len(mesh)
+    M = len(mesh_spatial)
 
     L_kx = kernels.Lambda(diffop(kernel.pairwise, argnums=0))
     LL_kx = kernels.Lambda(diffop(L_kx.pairwise, argnums=1))
 
     fd_coeff_fun = partial(
-        fd_coeff, grid=mesh, stencil_size=stencil_size, k=kernel, L_k=L_kx, LL_k=LL_kx
+        fd_coeff,
+        mesh_spatial=mesh_spatial,
+        stencil_size=stencil_size,
+        k=kernel,
+        L_k=L_kx,
+        LL_k=LL_kx,
+        nugget_gram_matrix=nugget_gram_matrix,
     )
 
     L_data, L_row, L_col, E_data = [], [], [], []
 
-    range_loop = enumerate(tqdm.tqdm(mesh.points, disable=not progressbar))
+    range_loop = enumerate(tqdm.tqdm(mesh_spatial.points, disable=not progressbar))
     for i, point in range_loop:
 
-        weights, uncertainty, neighbor_idcs = fd_coeff_fun(
-            x=point, cov_damping=cov_damping
-        )
+        weights, uncertainty, neighbor_idcs = fd_coeff_fun(x=point)
 
         L_data.append(weights)
         L_row.append(jnp.full(shape=stencil_size, fill_value=i, dtype=int))
@@ -70,13 +81,13 @@ def discretize(diffop, mesh, kernel, stencil_size, cov_damping=0.0, progressbar=
     return L, jnp.sqrt(jnp.abs(E))
 
 
-def fd_coeff(x, grid, stencil_size, k, L_k, LL_k, cov_damping):
+def fd_coeff(x, mesh_spatial, stencil_size, k, L_k, LL_k, nugget_gram_matrix):
     """Compute kernel-based finite difference coefficients."""
 
-    neighbors, neighbor_indices = grid.neighbours(point=x, num=stencil_size)
+    neighbors, neighbor_indices = mesh_spatial.neighbours(point=x, num=stencil_size)
 
     X = neighbors.points
-    gram_matrix = k(X, X.T) + cov_damping * jnp.eye(X.shape[0])
+    gram_matrix = k(X, X.T) + nugget_gram_matrix * jnp.eye(X.shape[0])
     diffop_at_point = L_k(x[None, :], X.T).reshape((-1,))
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
     uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point

@@ -17,7 +17,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
     def initialize(self, pde):
 
-        X = pde.spatial_grid.points
+        X = pde.mesh_spatial.points
         diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.state_iwp = iwp.IntegratedWienerTransition(
@@ -129,7 +129,7 @@ class LinearLatentForceEK1(_LatentForceEK1Base):
     @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(pde, p0, p1, m_pred, t):
         L = pde.L
-        B = pde.spatial_grid.boundary_projection_matrix
+        B = pde.mesh_spatial.boundary_projection_matrix
 
         E0_state = E0_eps = p0
         E1_state = p1

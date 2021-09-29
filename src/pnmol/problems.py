@@ -1,91 +1,199 @@
-from collections import namedtuple
+"""PDE Problems and some example implementations."""
 
-import jax
+import functools
+
 import jax.numpy as jnp
-import tornadox
 
-from pnmol import diffops, discretize, kernels, mesh
+from pnmol import diffops, discretize
+
+# PDE Base class and some problem-type-specific implementations
 
 
-class PDEProblemMixin:
-    """Properties and functionalities for general PDE problems."""
+class PDE:
+    """PDE base class."""
+
+    def __init__(self, *, diffop, diffop_scale, bbox, **kwargs):
+        self.diffop = diffop
+        self.diffop_scale = diffop_scale
+        self.bbox = bbox
+
+        # The following fields store an optional discretization.
+        # They are filled by discretize(), provided by the
+        # DiscretizationMixIn below.
+        self.L = None
+        self.E_sqrtm = None
+        self.mesh_spatial = None
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(is_discretized={self.is_discretized})"
+
+    @property
+    def is_discretized(self):
+        return self.L is not None
 
     @property
     def dimension(self):
-        if jnp.isscalar(self.y0):
-            return 1
-        return self.y0.shape[0]
-
-    @property
-    def t_span(self):
-        return self.t0, self.tmax
+        return self.bbox.ndim
 
 
-_LinearPDEBaseClass = namedtuple(
-    "_LinearPDEBaseClass", "spatial_grid t0 tmax y0 L E_sqrtm"
-)
+class LinearPDE(PDE):
+    """Linear PDE problem. Requires mixing with some boundary condition."""
 
-_NonLinearPDEBaseClass = namedtuple(
-    "_SemiLinearPDEProblem", "spatial_grid t0 tmax y0 f df L E_sqrtm"
-)
+    def to_tornadox_ivp(self):
+        """Transform PDE into an IVP. Requires prior discretisation."""
+
+        def f_new(_, x):
+            x_padded = self.bc_pad(x)
+            x_new = self.L @ x_padded
+            return self.bc_remove_pad(x_new)
+
+        df_new = jax.jacfwd(f_new)
+        y0_new = self.bc_remove_pad(self.y0_array)
+        return f_new, df_new, y0_new, self.t0, self.tmax
 
 
-class LinearPDEProblem(
-    _LinearPDEBaseClass,
-    PDEProblemMixin,
-):
-    def to_tornadox_ivp_1d(self):
-        @jax.jit
-        def new_f(t, x):
+class NonLinearMixIn:
+    def __init__(self, *, f, df, df_diagonal, **kwargs):
+        self.f = f
+        self.df = df
+        self.df_diagonal = df_diagonal
+        super().__init__(**kwargs)
 
-            # Pad x into zeros (dirichlet cond.)
-            padded_x = jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
 
-            # Evaluate self.f
-            new_x = self.L @ padded_x
+class SemiLinearPDE(PDE, NonLinearMixIn):
+    """Linear PDE problem. Requires mixing with some boundary condition."""
 
-            # Return the interior again
-            return new_x[1:-1]
+    def to_tornadox_ivp(self):
+        """Transform PDE into an IVP. Requires prior discretisation."""
 
-        new_df = jax.jit(jax.jacfwd(new_f, argnums=1))
+        def f_new(_, x):
+            x_padded = self.bc_pad(x)
+            x_new = self.L @ x_padded + self.f(x_padded)
+            return self.bc_remove_pad(x_new)
 
-        return tornadox.ivp.InitialValueProblem(
-            f=new_f,
-            t0=self.t0,
-            tmax=self.tmax,
-            y0=self.y0[1:-1],
-            df=new_df,
-            df_diagonal=None,
+        df_new = jax.jacfwd(f_new)
+        y0_new = self.bc_remove_pad(self.y0_array)
+        return f_new, df_new, y0_new, self.t0, self.tmax
+
+
+# Add boundary conditions through a MixIn
+
+
+class NeumannMixIn:
+    """Neumann condition functionality for PDE problems."""
+
+    def __init__(self, **kwargs):
+        self.N = None
+        self.W_sqrtm = None
+        super().__init__(**kwargs)
+
+    def bc_pad(self, x):
+        raise NotImplementedError
+
+    def bc_remove_pad(self, x):
+        raise NotImplementedError
+
+
+class DirichletMixIn:
+    """Dirichlet condition functionality for PDE problems."""
+
+    def bc_pad(self, x):
+        raise NotImplementedError
+
+    def bc_remove_pad(self, x):
+        raise NotImplementedError
+
+
+# Make the PDE time-dependent and add initial values
+
+
+class IVPMixIn:
+    """Initial value problem functionality for PDE problems.
+
+    Turns a purely spatial PDE into an evolution equation.
+    """
+
+    def __init__(self, *, t0, tmax, y0_fun):
+        self.t0 = t0
+        self.tmax = tmax
+        self.y0_fun = y0_fun
+
+        # Holds the discretised initial condition.
+        self.y0_array = None
+
+
+# Add discretisation functionality
+
+
+class DiscretizationMixIn:
+    """Discretisation functionality for PDE problems."""
+
+    def discretize(self, *, mesh_spatial, **kwargs):
+        L, E_sqrtm = discretize.discretize(
+            self.diffop, mesh_spatial=mesh_spatial, **kwargs
         )
 
+        self.L = self.diffop_scale * L
+        self.E_sqrtm = self.diffop_scale * E_sqrtm
+        self.mesh_spatial = mesh_spatial
 
-class SemiLinearPDEProblem(
-    _NonLinearPDEBaseClass,
-    PDEProblemMixin,
+        if isinstance(self, NeumannMixIn):
+            raise NotImplementedError
+            # self.N = "discretized"
+            # self.W_sqrtm = "discretized"
+
+        if isinstance(self, IVPMixIn):
+            self.y0_array = self.y0_fun(mesh_spatial.points)
+
+
+# Mix and match a range of PDE problems.
+
+
+class LinearEvolutionDirichlet(
+    LinearPDE, IVPMixIn, DirichletMixIn, DiscretizationMixIn
 ):
-    def to_tornadox_ivp_1d(self):
-        @jax.jit
-        def new_f(t, x):
+    pass
 
-            # Pad x into zeros (dirichlet cond.)
-            padded_x = jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
 
-            # Evaluate self.f
-            new_x = self.f(t, padded_x)
+class SemiLinearEvolutionDirichlet(
+    SemiLinearPDE, IVPMixIn, DirichletMixIn, DiscretizationMixIn
+):
+    pass
 
-            # Return the interior again
-            return new_x[1:-1]
 
-        new_df = jax.jit(jax.jacfwd(new_f, argnums=1))
+# Some precomputed recipes for PDE examples.
 
-        return tornadox.ivp.InitialValueProblem(
-            f=new_f,
-            t0=self.t0,
-            tmax=self.tmax,
-            y0=self.y0[1:-1],
-            df=new_df,
-            df_diagonal=None,
+
+def heat_1d(
+    bbox=None, t0=0.0, tmax=20.0, y0_fun=None, diffusion_rate=0.1, bcond="dirichlet"
+):
+    laplace = diffops.laplace()
+
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
+
+    if y0_fun is None:
+        y0_fun = functools.partial(gaussian_bell_1d_centered, bbox=bbox)
+
+    if bcond == "dirichlet":
+        return LinearEvolutionDirichlet(
+            diffop=laplace,
+            diffop_scale=diffusion_rate,
+            bbox=bbox,
+            t0=t0,
+            tmax=tmax,
+            y0_fun=y0_fun,
         )
+    return LinearEvolutionNeumann(
+        diffop=laplace,
+        diffop_scale=diffusion_rate,
+        bbox=bbox,
+        t0=t0,
+        tmax=tmax,
+        y0_fun=y0_fun,
+    )
 
 
 def heat_1d(
@@ -133,7 +241,7 @@ def heat_1d(
     scaled_sqrt_error = diffusion_rate * E_sqrtm
 
     return LinearPDEProblem(
-        spatial_grid=grid,
+        mesh_spatial=grid,
         t0=t0,
         tmax=tmax,
         y0=y0,

@@ -1,18 +1,40 @@
-import jax.numpy as jnp
 import pytest
-from scipy.integrate import solve_ivp
 
 import pnmol
 
-problems = pytest.mark.parametrize("pde", [pnmol.problems.heat_1d])
+
+@pytest.fixture
+def heat_1d():
+    return pnmol.pde.heat_1d()
 
 
-@problems
-def test_problem(pde):
+def test_heat_1d_type(heat_1d):
+    assert isinstance(heat_1d, pnmol.pde.PDE)
+    assert isinstance(heat_1d, pnmol.pde.LinearPDE)
 
-    discretized_pde = pde(t0=0.0, tmax=10.0)
-    L = discretized_pde.L
-    E_sqrtm = discretized_pde.E_sqrtm
-    assert L.shape == E_sqrtm.shape
-    # Assert that E is diagonal
-    assert jnp.count_nonzero(E_sqrtm - jnp.diag(jnp.diagonal(E_sqrtm))) == 0
+
+@pytest.fixture
+def mesh_spatial(heat_1d):
+    return pnmol.mesh.RectangularMesh.from_bounding_boxes_1d(heat_1d.bbox, step=0.1)
+
+
+@pytest.fixture
+def kernel():
+    return pnmol.kernels.SquareExponential()
+
+
+@pytest.fixture
+def heat_1d_discretized(heat_1d, mesh_spatial, kernel):
+    heat_1d.discretize(
+        mesh_spatial=mesh_spatial,
+        kernel=kernel,
+        stencil_size=3,
+        nugget_gram_matrix=1e-10,
+        progressbar=False,
+    )
+    return heat_1d
+
+
+def test_heat_1d_discretized_type(heat_1d_discretized):
+    assert isinstance(heat_1d_discretized, pnmol.pde.PDE)
+    assert isinstance(heat_1d_discretized, pnmol.pde.LinearPDE)

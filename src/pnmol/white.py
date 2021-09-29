@@ -17,7 +17,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 
     def initialize(self, pde):
 
-        X = pde.spatial_grid.points
+        X = pde.mesh_spatial.points
         diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.iwp = iwp.IntegratedWienerTransition(
@@ -119,9 +119,8 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 
 class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
     @staticmethod
-    # @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(pde, p0, p1, m_pred, t):
-        B = pde.spatial_grid.boundary_projection_matrix
+        B = pde.mesh_spatial.boundary_projection_matrix
         L = pde.L
 
         m_at = p0 @ m_pred
