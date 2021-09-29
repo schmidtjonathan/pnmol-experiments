@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-import pnmol.base
+import pnmol.base.rv
 
 # Common fixtures
 
