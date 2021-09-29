@@ -25,7 +25,7 @@ class StepRule(abc.ABC):
         raise NotImplementedError
 
 
-class ConstantSteps(StepRule):
+class Constant(StepRule):
     """Constant step-sizes."""
 
     def __init__(self, dt):
@@ -53,7 +53,7 @@ class ConstantSteps(StepRule):
         return self.dt
 
 
-class AdaptiveSteps(StepRule):
+class Adaptive(StepRule):
     def __init__(
         self,
         abstol=1e-4,

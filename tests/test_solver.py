@@ -14,7 +14,7 @@ def test_solve(solver):
     """The Heat equation is solved without creating NaNs."""
     dt = 0.1
     nu = 2
-    steprule = pnmol.ode.step.ConstantSteps(dt)
+    steprule = pnmol.ode.step.Constant(dt)
 
     heat = pnmol.pde_problems.heat_1d(
         tmax=1.0,

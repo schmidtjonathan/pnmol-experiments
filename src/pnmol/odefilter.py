@@ -9,10 +9,10 @@ import jax.numpy as jnp
 import numpy as np
 from tqdm import tqdm
 
-from pnmol import init, kernels
-from pnmol.ode import step
+from pnmol import kernels
+from pnmol.ode import init, step
 
-ODEFilterState = namedtuple("_ODEFilterState", "t y error_estimate reference_state")
+ODEFilterState = namedtuple("_", "t y error_estimate reference_state")
 
 
 @dataclasses.dataclass(frozen=False)
@@ -36,7 +36,7 @@ class ODEFilter(ABC):
     ):
 
         # Step-size selection
-        self.steprule = steprule or step.AdaptiveSteps()
+        self.steprule = steprule or step.Adaptive()
 
         # Number of derivatives
         self.num_derivatives = num_derivatives

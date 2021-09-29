@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import pytest
 from tornadox import ivp as tornadox_ivp
 
-import pnmol
+import pnmol.ode
 
 
 @pytest.fixture
@@ -14,18 +14,18 @@ def ivp():
 class TestInitializationInterface:
 
     ALL_ROUTINES = [
-        pnmol.init.RungeKutta(),
-        pnmol.init.RungeKutta(use_df=False),
-        pnmol.init.TaylorMode(),
-        pnmol.init.Stack(),
-        pnmol.init.Stack(use_df=False),
+        pnmol.ode.init.RungeKutta(),
+        pnmol.ode.init.RungeKutta(use_df=False),
+        pnmol.ode.init.TaylorMode(),
+        pnmol.ode.init.Stack(),
+        pnmol.ode.init.Stack(use_df=False),
     ]
     all_init_routines = pytest.mark.parametrize("routine", ALL_ROUTINES)
 
     @staticmethod
     @all_init_routines
     def test_init_routine_type(routine):
-        assert isinstance(routine, pnmol.init.InitializationRoutine)
+        assert isinstance(routine, pnmol.ode.init.InitializationRoutine)
 
     @staticmethod
     @all_init_routines
@@ -119,7 +119,7 @@ class TestTaylorMode:
     @staticmethod
     @pytest.fixture
     def nordsieck_y0(ivp, num_derivatives):
-        return pnmol.init.TaylorMode.taylor_mode(
+        return pnmol.ode.init.TaylorMode.taylor_mode(
             fun=ivp.f, y0=ivp.y0, t0=ivp.t0, num_derivatives=num_derivatives
         )
 
@@ -209,7 +209,7 @@ class TestRungeKutta:
     @staticmethod
     @pytest.fixture
     def rk_data(f, y0, t0, dt, num_steps, method):
-        return pnmol.init.RungeKutta.rk_data(
+        return pnmol.ode.init.RungeKutta.rk_data(
             f=f, t0=t0, dt=dt, num_steps=num_steps, y0=y0, method=method
         )
 
@@ -230,7 +230,7 @@ class TestRungeKutta:
     @staticmethod
     @pytest.fixture
     def init_stack(f, df, y0, t0, num_derivatives):
-        return pnmol.init.Stack.initial_state_jac(
+        return pnmol.ode.init.Stack.initial_state_jac(
             f=f, df=df, y0=y0, t0=t0, num_derivatives=num_derivatives
         )
 
@@ -239,7 +239,7 @@ class TestRungeKutta:
     def rk_init_improved(init_stack, t0, rk_data):
         m, sc = init_stack
         ts, ys = rk_data
-        return pnmol.init.RungeKutta.rk_init_improve(
+        return pnmol.ode.init.RungeKutta.rk_init_improve(
             m=m, sc=sc, t0=t0, ts=ts, ys=ys, wp_diffusion_sqrtm=jnp.eye(m.shape[0])
         )
 
@@ -264,7 +264,7 @@ class TestRungeKutta:
     @staticmethod
     @pytest.fixture
     def ref_init(f, y0, t0, num_derivatives):
-        return pnmol.init.TaylorMode.taylor_mode(
+        return pnmol.ode.init.TaylorMode.taylor_mode(
             fun=f, y0=y0, t0=t0, num_derivatives=num_derivatives
         )
 
@@ -280,7 +280,7 @@ class TestRungeKutta:
 class TestStack:
     @staticmethod
     def test_initial_state_jac(f, df, y0, t0, num_derivatives):
-        m0, sc0 = pnmol.init.Stack.initial_state_jac(
+        m0, sc0 = pnmol.ode.init.Stack.initial_state_jac(
             f=f, df=df, y0=y0, t0=t0, num_derivatives=num_derivatives
         )
 
@@ -289,7 +289,7 @@ class TestStack:
 
     @staticmethod
     def test_initial_state_no_jac(f, df, y0, t0, num_derivatives):
-        m0, sc0 = pnmol.init.Stack.initial_state_no_jac(
+        m0, sc0 = pnmol.ode.init.Stack.initial_state_no_jac(
             f=f, y0=y0, t0=t0, num_derivatives=num_derivatives
         )
 

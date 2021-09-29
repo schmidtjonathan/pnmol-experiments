@@ -19,7 +19,7 @@ def ivp():
     return pnmol.pde_problems.heat_1d()
 
 
-class TestConstantSteps:
+class TestConstant:
     @staticmethod
     @pytest.fixture
     def dt():
@@ -28,7 +28,7 @@ class TestConstantSteps:
     @staticmethod
     @pytest.fixture
     def steprule(dt):
-        steprule = pnmol.ode.step.ConstantSteps(dt)
+        steprule = pnmol.ode.step.Constant(dt)
         return steprule
 
     @staticmethod
@@ -52,7 +52,7 @@ class TestConstantSteps:
         assert first_dt == dt
 
 
-class TestAdaptiveSteps:
+class TestAdaptive:
     @staticmethod
     @pytest.fixture
     def abstol():
@@ -66,12 +66,12 @@ class TestAdaptiveSteps:
     @staticmethod
     @pytest.fixture
     def steprule(abstol, reltol):
-        steprule = pnmol.ode.step.AdaptiveSteps(abstol=abstol, reltol=reltol)
+        steprule = pnmol.ode.step.Adaptive(abstol=abstol, reltol=reltol)
         return steprule
 
     @staticmethod
     def test_type(steprule):
-        assert isinstance(steprule, pnmol.ode.step.AdaptiveSteps)
+        assert isinstance(steprule, pnmol.ode.step.Adaptive)
 
     @staticmethod
     def test_accept_less_than_1(steprule):

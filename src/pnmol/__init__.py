@@ -5,7 +5,6 @@
 from . import (
     differential_operator,
     discretize,
-    init,
     iwp,
     kalman,
     kernels,
