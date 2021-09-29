@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-import pnmol
+import pnmol.base
 
 # Common fixtures
 
@@ -34,11 +34,11 @@ class TestMultivariateNormal:
     @staticmethod
     @pytest.fixture
     def multivariate_normal(mean, cov_sqrtm):
-        return pnmol.rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
+        return pnmol.base.rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
 
     @staticmethod
     def test_type(multivariate_normal):
-        assert isinstance(multivariate_normal, pnmol.rv.MultivariateNormal)
+        assert isinstance(multivariate_normal, pnmol.base.rv.MultivariateNormal)
 
     @staticmethod
     def test_cov(multivariate_normal):
@@ -50,7 +50,7 @@ class TestMultivariateNormal:
     def test_jittable(multivariate_normal):
         def fun(rv):
             m, sc = rv
-            return pnmol.rv.MultivariateNormal(2 * m, 2 * sc)
+            return pnmol.base.rv.MultivariateNormal(2 * m, 2 * sc)
 
         fun_jitted = jax.jit(fun)
         out = fun_jitted(multivariate_normal)

@@ -3,7 +3,8 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from pnmol import iwp, odefilter, rv, sqrt
+from pnmol import iwp, odefilter, sqrt
+from pnmol.base import rv
 
 
 class MeasurementCovarianceEK0(odefilter.ODEFilter):

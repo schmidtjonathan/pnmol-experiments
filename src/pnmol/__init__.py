@@ -3,6 +3,7 @@
 """
 
 from . import (
+    base,
     differential_operator,
     discretize,
     iwp,
@@ -13,7 +14,6 @@ from . import (
     ode,
     odefilter,
     pde_problems,
-    rv,
     solver,
     sqrt,
     stacked_ssm,
