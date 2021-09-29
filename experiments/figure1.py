@@ -81,11 +81,7 @@ def read_mean_and_std_latent(sol, E0):
     means = jnp.split(sol.mean, 2, axis=-1)[0][:, 0]
     cov = sol.cov_sqrtm @ jnp.transpose(sol.cov_sqrtm, axes=(0, 2, 1))
     vars = jnp.diagonal(cov, axis1=1, axis2=2)
-    stds = jnp.sqrt(
-        jnp.split(vars, 2, axis=-1)[0].reshape((cov.shape[0], n, -1), order="F")[
-            :, 0, :
-        ]
-    )
+    stds = jnp.sqrt(jnp.split(vars, 2, axis=-1)[0] @ E0.T)
     return means, stds
 
 
@@ -102,9 +98,9 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.01
+DT = 0.5
 DX = 0.2
-HIGH_RES_FACTOR_DX = 12
+HIGH_RES_FACTOR_DX = 2
 HIGH_RES_FACTOR_DT = 2
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
@@ -146,9 +142,8 @@ PDE_REFERENCE = pnmol.problems.heat_1d(
 )
 
 # Solve the PDE with the different methods
-KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(
-    output_scale=1e-7
-)
+KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-4)
+KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + KERNEL_NUGGET
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
     dt=DT,
