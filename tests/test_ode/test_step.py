@@ -3,7 +3,8 @@
 import jax.numpy as jnp
 import pytest
 
-import pnmol
+import pnmol.ode.step
+import pnmol.pde_problems
 
 
 def test_propose_first_dt():

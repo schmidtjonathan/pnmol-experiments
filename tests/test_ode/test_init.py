@@ -3,7 +3,7 @@ import jax.numpy as jnp
 import pytest
 from tornadox import ivp as tornadox_ivp
 
-import pnmol.ode
+import pnmol.ode.init
 
 
 @pytest.fixture
