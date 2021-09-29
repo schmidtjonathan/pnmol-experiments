@@ -122,6 +122,10 @@ class IVPMixIn:
         # Holds the discretised initial condition.
         self.y0_array = None
 
+    @property
+    def t_span(self):
+        return self.t0, self.tmax
+
 
 # Add discretisation functionality
 
@@ -144,7 +148,9 @@ class DiscretizationMixIn:
             # self.W_sqrtm = "discretized"
 
         if isinstance(self, IVPMixIn):
-            self.y0_array = self.y0_fun(mesh_spatial.points)
+
+            # Enforce a scalar initial value
+            self.y0_array = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
 # Mix and match a range of PDE problems.
@@ -196,7 +202,7 @@ def heat_1d(
     )
 
 
-def heat_1d(
+def heat_1d_old(
     bbox=None,
     dx=0.05,
     stencil_size=3,
