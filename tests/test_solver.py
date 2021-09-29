@@ -3,6 +3,7 @@ import pytest
 import tornadox
 
 import pnmol
+import pnmol.ode
 
 S1 = pnmol.solver.MeasurementCovarianceEK0
 S2 = pnmol.solver.MeasurementCovarianceEK1

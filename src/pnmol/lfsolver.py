@@ -4,8 +4,8 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from pnmol import odefilter, stacked_ssm
-from pnmol.base import iwp, rv, sqrt
+from pnmol import odefilter
+from pnmol.base import iwp, rv, sqrt, stacked_ssm
 
 
 class LatentForceEK1(odefilter.ODEFilter):
