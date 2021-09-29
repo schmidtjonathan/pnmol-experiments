@@ -1,4 +1,4 @@
-from collections import namedtuple
+import abc
 from functools import partial
 
 import jax
@@ -7,41 +7,53 @@ import jax.numpy as jnp
 from pnmol import iwp, odefilter, rv, sqrt, stacked_ssm
 
 
-class LatentForceEK1(odefilter.ODEFilter):
+class LatentForceEK1Base(odefilter.ODEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
         self.E0 = None
         self.E1 = None
 
-    def initialize(self, ivp):
+    def initialize(self, discretized_pde):
+
+        X = discretized_pde.spatial_grid.points
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.state_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=ivp.dimension,
-            wp_diffusion_sqrtm=ivp.Kxx_sqrtm,
+            wiener_process_dimension=discretized_pde.dimension,
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=ivp.dimension,
-            wp_diffusion_sqrtm=ivp.E_sqrtm,
+            wiener_process_dimension=discretized_pde.dimension,
+            wp_diffusion_sqrtm=discretized_pde.E_sqrtm,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
-        self.P0 = self.E0 = self.ssm.projection_matrix(0)
-        self.E1 = self.ssm.projection_matrix(1)
+        self.P0 = self.E0 = self.state_iwp.projection_matrix(0)
+        self.E1 = self.state_iwp.projection_matrix(1)
 
+        # This is kind of wrong still... RK init should get the proper diffusion.
+        ivp = discretized_pde.to_tornadox_ivp_1d()
         extended_dy0, cov_sqrtm_state = self.init(
             f=ivp.f,
             df=ivp.df,
             y0=ivp.y0,
             t0=ivp.t0,
             num_derivatives=self.state_iwp.num_derivatives,
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
-        mean = jnp.concatenate([extended_dy0, jnp.zeros_like(extended_dy0)], -1)
+        dy0_padded = jnp.pad(
+            extended_dy0, pad_width=1, mode="constant", constant_values=0.0
+        )
+        dy0_full = dy0_padded[1:-1]
+        mean = jnp.concatenate([dy0_full, jnp.zeros_like(dy0_full)], -1)
 
-        cov_sqrtm_state = jnp.kron(ivp.Kxx_sqrtm, cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(ivp.E_sqrtm, 1e-10 * jnp.eye(self.num_derivatives + 1))
+        cov_sqrtm_state = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
+        cov_sqrtm_eps = jnp.kron(
+            discretized_pde.E_sqrtm, 1e-10 * jnp.eye(self.num_derivatives + 1)
+        )
 
         cov_sqrtm = jax.scipy.linalg.block_diag(
             cov_sqrtm_state,
@@ -51,7 +63,7 @@ class LatentForceEK1(odefilter.ODEFilter):
         y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
 
         return odefilter.ODEFilterState(
-            t=ivp.t0,
+            t=discretized_pde.t0,
             y=y,
             error_estimate=None,
             reference_state=None,
@@ -64,7 +76,7 @@ class LatentForceEK1(odefilter.ODEFilter):
         # [Predict]
         glued_batched_mean = state.y.mean
         batched_state_mean, batched_eps_mean = jnp.split(glued_batched_mean, 2, axis=-1)
-        assert batched_state_mean.shape == batched_eps_mean.shape
+
         flat_state_mean = batched_state_mean.reshape((-1,), order="F")
         flat_eps_mean = batched_eps_mean.reshape((-1,), order="F")
         glued_flat_mean = jnp.concatenate((flat_state_mean, flat_eps_mean))
@@ -72,13 +84,11 @@ class LatentForceEK1(odefilter.ODEFilter):
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
-            f=discretized_pde.f,
-            df=discretized_pde.df,
+            discretized_pde=discretized_pde,
             p0=self.E0,
             p1=self.E1,
             m_pred=mp,
             t=state.t + dt,
-            B=discretized_pde.spatial_grid.boundary_projection_matrix,
         )
 
         Cl = state.y.cov_sqrtm
@@ -110,36 +120,27 @@ class LatentForceEK1(odefilter.ODEFilter):
     def predict_mean(A, m):
         return A @ m
 
-    @staticmethod
-    @partial(jax.jit, static_argnums=1)
-    def extract_blocks_from_block_diag(block_diag_mat, num_blocks):
-        """ATTENTION: ASSUMES EQUAL-SIZED SQUARE BLOCKS!"""
-        block_rows = jnp.split(block_diag_mat, num_blocks, axis=0)
-        return [
-            jnp.split(
-                block_rows[i],
-                num_blocks,
-                axis=1,
-            )[i]
-            for i in range(num_blocks)
-        ]
+    @abc.abstractstaticmethod
+    def evaluate_ode(*args, **kwargs):
+        pass
 
-    @staticmethod
-    @partial(jax.jit, static_argnums=(0, 1))
-    def evaluate_ode(f, df, p0, p1, m_pred, t, B):
 
-        m_at = p0 @ m_pred  # Project to first derivatives
+class LinearLatentForceEK1(LatentForceEK1Base):
+    @staticmethod
+    @partial(jax.jit, static_argnums=(0,))
+    def evaluate_ode(discretized_pde, p0, p1, m_pred, t):
+        L = discretized_pde.L
+        B = discretized_pde.spatial_grid.boundary_projection_matrix
+
+        E0_state = E0_eps = p0
+        E1_state = p1
+        E0_stacked = jax.scipy.linalg.block_diag(E0_state, E0_eps)
+
+        m_at = E0_stacked @ m_pred  # Project to first derivatives
         state_at, eps_at = jnp.split(m_at, 2)  # Split up into ODE state and error
 
-        fx = f(t, state_at)  # Evaluate vector field
-        Jx = df(t, state_at)  # Evaluate Jacobian of the vector field
-
-        E0_state, E0_eps = LatentForceEK1.extract_blocks_from_block_diag(
-            p0, num_blocks=2
-        )
-        E1_state, E1_eps = LatentForceEK1.extract_blocks_from_block_diag(
-            p1, num_blocks=2
-        )
+        fx = L @ state_at  # Evaluate vector field
+        Jx = L  # Evaluate Jacobian of the vector field
 
         H_state = E1_state - Jx @ E0_state
         H_eps = -E0_eps
