@@ -246,6 +246,9 @@ def heat_1d_discretized(
     )
     mesh_spatial = mesh.RectangularMesh.from_bounding_boxes_1d(heat.bbox, step=dx)
 
+    if kernel is None:
+        kernel = kernels.SquareExponential()
+
     heat.discretize(
         mesh_spatial=mesh_spatial,
         kernel=kernel,

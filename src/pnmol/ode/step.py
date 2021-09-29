@@ -128,6 +128,7 @@ def propose_first_dt(f, t0, y0):
 
 @jax.jit
 def propose_first_dt_linear(L, _, y0):
+    print(y0)
     norm_y0 = jnp.linalg.norm(y0)
     norm_dy0 = jnp.linalg.norm(L @ y0)
     return 0.01 * norm_y0 / norm_dy0

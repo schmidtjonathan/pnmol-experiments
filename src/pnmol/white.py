@@ -129,6 +129,6 @@ class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
 
         H_ode = p1 - Jx @ p0
         H = jnp.vstack((H_ode, pde.B @ p0))
-        shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
+        shift = jnp.hstack((b, jnp.zeros(pde.B.shape[0])))
         z = H @ m_pred + shift
         return z, H
