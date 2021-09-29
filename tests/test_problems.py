@@ -10,6 +10,7 @@ problems_1d_all = pytest.mark.parametrize(
         pnmol.problems.heat_1d(bcond="dirichlet"),
         pnmol.problems.heat_1d(bcond="neumann"),
     ],
+    ids=["dirichlet", "neumann"],
 )
 
 
@@ -90,6 +91,6 @@ class TestProb1dDiscretized:
 
     @staticmethod
     @problems_1d_all
-    def test_B(prob1d_discretized, num_boundary_points):
+    def test_R_sqrtm(prob1d_discretized, num_boundary_points):
         R_sqrtm = prob1d_discretized.R_sqrtm
         assert R_sqrtm.shape == (num_boundary_points, num_boundary_points)

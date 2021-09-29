@@ -169,7 +169,6 @@ class DiscretizationMixIn:
                 L_k=Lk,
                 LL_k=LLk,
             )
-
             x_right = mesh_spatial[-1]
             neighbors_right = mesh_spatial[((-1, -2),)]
             weights_right, uncertainty_right = discretize.fd_coeff(
@@ -178,8 +177,10 @@ class DiscretizationMixIn:
                 k=k,
                 L_k=Lk,
                 LL_k=LLk,
+                nugget_gram_matrix=1e-10,
             )
-            B = jnp.eye(len(mesh_spatial))[((0, 1, -2, -1),), :]
+            # -1 and -2 are swapped, which reflects their locations in 'neighbors'
+            B = jnp.eye(len(mesh_spatial))[((0, 1, -1, -2),)]
             self.B = jax.scipy.linalg.block_diag(-weights_left, weights_right) @ B
             self.R_sqrtm = jnp.diag(jnp.array([uncertainty_left, uncertainty_right]))
 
