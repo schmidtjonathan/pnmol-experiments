@@ -17,7 +17,7 @@ def dx():
 
 
 @pytest.fixture
-def grid_1d(bbox, dx):
+def mesh_spatial_1d(bbox, dx):
     return mesh.RectangularMesh.from_bounding_boxes_1d(bbox, dx)
 
 
@@ -50,16 +50,16 @@ class TestFDCoefficients:
     class TestCentral:
         @staticmethod
         @pytest.fixture
-        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
-            x0 = grid_1d[1]
+        def fd_coeff(mesh_spatial_1d, k, L_k, LL_k, dx):
+            x0 = mesh_spatial_1d[1]
             return discretize.fd_coeff(
                 x=x0,
-                grid=grid_1d,
+                mesh_spatial=mesh_spatial_1d,
                 stencil_size=3,
                 k=k,
                 L_k=L_k,
                 LL_k=LL_k,
-                cov_damping=0.0,
+                nugget_gram_matrix=0.0,
             )
 
         @staticmethod
@@ -75,16 +75,16 @@ class TestFDCoefficients:
     class TestForward:
         @staticmethod
         @pytest.fixture
-        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
-            x0 = grid_1d[0]
+        def fd_coeff(mesh_spatial_1d, k, L_k, LL_k, dx):
+            x0 = mesh_spatial_1d[0]
             return discretize.fd_coeff(
                 x=x0,
-                grid=grid_1d,
+                mesh_spatial=mesh_spatial_1d,
                 stencil_size=3,
                 k=k,
                 L_k=L_k,
                 LL_k=LL_k,
-                cov_damping=0.0,
+                nugget_gram_matrix=0.0,
             )
 
         @staticmethod
@@ -101,16 +101,16 @@ class TestFDCoefficients:
     class TestBackward:
         @staticmethod
         @pytest.fixture
-        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
-            x0 = grid_1d[-1]
+        def fd_coeff(mesh_spatial_1d, k, L_k, LL_k, dx):
+            x0 = mesh_spatial_1d[-1]
             return discretize.fd_coeff(
                 x=x0,
-                grid=grid_1d,
+                mesh_spatial=mesh_spatial_1d,
                 stencil_size=3,
                 k=k,
                 L_k=L_k,
                 LL_k=LL_k,
-                cov_damping=0.0,
+                nugget_gram_matrix=0.0,
             )
 
         @staticmethod
@@ -129,19 +129,23 @@ class TestFDCoefficients:
 class TestDiscretise:
     @staticmethod
     @pytest.fixture
-    def discretised(diffop, grid_1d, k):
+    def discretised(diffop, mesh_spatial_1d, k):
         return discretize.discretize(
-            diffop=diffop, mesh=grid_1d, kernel=k, stencil_size=3, cov_damping=0.0
+            diffop=diffop,
+            mesh_spatial=mesh_spatial_1d,
+            kernel=k,
+            stencil_size=3,
+            nugget_gram_matrix=0.0,
         )
 
     @staticmethod
-    def test_L_shape(discretised, grid_1d):
+    def test_L_shape(discretised, mesh_spatial_1d):
         L, _ = discretised
-        n = grid_1d.shape[0]
+        n = mesh_spatial_1d.shape[0]
         assert L.shape == (n, n)
 
     @staticmethod
-    def test_E_sqrtm_shape(discretised, grid_1d):
+    def test_E_sqrtm_shape(discretised, mesh_spatial_1d):
         _, E_sqrtm = discretised
-        n = grid_1d.shape[0]
+        n = mesh_spatial_1d.shape[0]
         assert E_sqrtm.shape == (n, n)
