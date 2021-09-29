@@ -136,7 +136,7 @@ class LinearPDE(PDE):
             x_new = self.L @ x_padded
             return self.bc_remove_pad(x_new)
 
-        df_new = jax.jacfwd(f_new)
+        df_new = jax.jacfwd(f_new, argnums=1)
         y0_new = self.bc_remove_pad(self.y0)
         return tornadox.ivp.InitialValueProblem(
             f=f_new, df=df_new, y0=y0_new, t0=self.t0, tmax=self.tmax, df_diagonal=None
@@ -162,7 +162,7 @@ class SemiLinearPDE(PDE, _NonLinearMixIn):
             x_new = self.L @ x_padded + self.f(x_padded)
             return self.bc_remove_pad(x_new)
 
-        df_new = jax.jacfwd(f_new)
+        df_new = jax.jacfwd(f_new, argnums=1)
         y0_new = self.bc_remove_pad(self.y0)
         return tornadox.ivp.InitialValueProblem(
             f=f_new, df=df_new, y0=y0_new, t0=self.t0, tmax=self.tmax, df_diagonal=None

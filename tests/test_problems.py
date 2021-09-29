@@ -101,3 +101,9 @@ class TestProb1dDiscretized:
     def test_to_ivp(prob1d_discretized):
         ivp = prob1d_discretized.to_tornadox_ivp()
         assert isinstance(ivp, tornadox.ivp.InitialValueProblem)
+
+        f0 = ivp.f(ivp.t0, ivp.y0)
+        assert f0.shape == ivp.y0.shape
+
+        df0 = ivp.df(ivp.t0, ivp.y0)
+        assert df0.shape == (ivp.y0.shape[0], ivp.y0.shape[0])
