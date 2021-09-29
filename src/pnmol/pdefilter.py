@@ -12,18 +12,18 @@ from tqdm import tqdm
 from pnmol import kernels
 from pnmol.ode import init, step
 
-ODEFilterState = namedtuple("_", "t y error_estimate reference_state")
+PDEFilterState = namedtuple("_", "t y error_estimate reference_state")
 
 
 @dataclasses.dataclass(frozen=False)
-class ODESolution:
+class PDESolution:
     t: jnp.ndarray
     mean: jnp.ndarray
     cov_sqrtm: jnp.ndarray
     info: Dict
 
 
-class ODEFilter(ABC):
+class PDEFilter(ABC):
     """Interface for filtering-based ODE solvers in ProbNum."""
 
     def __init__(
@@ -66,7 +66,7 @@ class ODEFilter(ABC):
             means.append(state.y.mean)
             cov_sqrtms.append(state.y.cov_sqrtm)
 
-        return ODESolution(
+        return PDESolution(
             t=jnp.stack(times),
             mean=jnp.stack(means),
             cov_sqrtm=jnp.stack(cov_sqrtms),

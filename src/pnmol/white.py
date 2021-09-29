@@ -4,11 +4,11 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from pnmol import odefilter
+from pnmol import pdefilter
 from pnmol.base import iwp, rv, sqrt
 
 
-class _MeasurementCovarianceEK1Base(odefilter.ODEFilter):
+class _MeasurementCovarianceEK1Base(pdefilter.PDEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
@@ -47,7 +47,7 @@ class _MeasurementCovarianceEK1Base(odefilter.ODEFilter):
             mean=dy0_full,
             cov_sqrtm=jnp.kron(diffusion_state_sqrtm, cov_sqrtm),
         )
-        return odefilter.ODEFilterState(
+        return pdefilter.PDEFilterState(
             t=discretized_pde.t0,
             y=y,
             error_estimate=None,
@@ -91,7 +91,7 @@ class _MeasurementCovarianceEK1Base(odefilter.ODEFilter):
         m_new = m_new.reshape((n, d), order="F")
         y_new = jnp.abs(m_new[0])
 
-        new_state = odefilter.ODEFilterState(
+        new_state = pdefilter.PDEFilterState(
             t=state.t + dt,
             error_estimate=error,
             reference_state=y_new,

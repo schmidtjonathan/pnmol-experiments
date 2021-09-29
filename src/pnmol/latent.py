@@ -4,11 +4,11 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from pnmol import odefilter
+from pnmol import pdefilter
 from pnmol.base import iwp, rv, sqrt, stacked_ssm
 
 
-class LatentForceEK1Base(odefilter.ODEFilter):
+class _LatentForceEK1Base(pdefilter.PDEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
@@ -63,7 +63,7 @@ class LatentForceEK1Base(odefilter.ODEFilter):
 
         y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
 
-        return odefilter.ODEFilterState(
+        return pdefilter.PDEFilterState(
             t=discretized_pde.t0,
             y=y,
             error_estimate=None,
@@ -107,7 +107,7 @@ class LatentForceEK1Base(odefilter.ODEFilter):
 
         glued_new_mean = jnp.concatenate([batched_state_m_new, batched_eps_m_new], -1)
 
-        new_state = odefilter.ODEFilterState(
+        new_state = pdefilter.PDEFilterState(
             t=state.t + dt,
             error_estimate=None,
             reference_state=None,
@@ -126,7 +126,7 @@ class LatentForceEK1Base(odefilter.ODEFilter):
         pass
 
 
-class LinearLatentForceEK1(LatentForceEK1Base):
+class LinearLatentForceEK1(_LatentForceEK1Base):
     @staticmethod
     @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(discretized_pde, p0, p1, m_pred, t):

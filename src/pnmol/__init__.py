@@ -1,6 +1,6 @@
 """PNMOL."""
 
-from . import diffops, discretize, kernels, latent, mesh, odefilter, problems, white
+from . import diffops, discretize, kernels, latent, mesh, pdefilter, problems, white
 
 __version__ = "0.0.1"
 
