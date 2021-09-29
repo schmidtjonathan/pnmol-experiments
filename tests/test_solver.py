@@ -27,9 +27,7 @@ def test_solve(solver):
     )
 
     # Solve the discretised PDE
-    solver = pnmol.solver.MeasurementCovarianceEK1(
-        num_derivatives=nu, steprule=steprule
-    )
+    solver = solver(num_derivatives=nu, steprule=steprule)
     out = solver.solve(heat)
     assert not jnp.any(jnp.isnan(out.mean))
     assert not jnp.any(jnp.isnan(out.cov_sqrtm))
