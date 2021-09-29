@@ -5,9 +5,8 @@ import tornadox
 import pnmol
 import pnmol.ode
 
-S1 = pnmol.solver.MeasurementCovarianceEK0
-S2 = pnmol.solver.MeasurementCovarianceEK1
-ALL_SOLVERS = pytest.mark.parametrize("solver", [S1, S2])
+S2 = pnmol.white.LinearMeasurementCovarianceEK1
+ALL_SOLVERS = pytest.mark.parametrize("solver", [S2])
 
 
 @ALL_SOLVERS
@@ -17,7 +16,7 @@ def test_solve(solver):
     nu = 2
     steprule = pnmol.ode.step.Constant(dt)
 
-    heat = pnmol.pde_problems.heat_1d(
+    heat = pnmol.problems.heat_1d(
         tmax=1.0,
         dx=0.2,
         stencil_size=3,

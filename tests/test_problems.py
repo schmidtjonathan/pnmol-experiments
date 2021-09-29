@@ -4,10 +4,10 @@ from scipy.integrate import solve_ivp
 
 import pnmol
 
-pde_problems = pytest.mark.parametrize("pde", [pnmol.pde_problems.heat_1d])
+problems = pytest.mark.parametrize("pde", [pnmol.problems.heat_1d])
 
 
-@pde_problems
+@problems
 def test_problem(pde):
 
     discretized_pde = pde(t0=0.0, tmax=10.0)

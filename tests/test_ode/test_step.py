@@ -4,12 +4,12 @@ import jax.numpy as jnp
 import pytest
 
 import pnmol.ode.step
-import pnmol.pde_problems
+import pnmol.problems
 
 
 def test_propose_first_dt():
 
-    ivp = pnmol.pde_problems.heat_1d()
+    ivp = pnmol.problems.heat_1d()
 
     dt = pnmol.ode.step.propose_first_dt(ivp.f, ivp.t0, ivp.y0)
     assert dt > 0
@@ -17,7 +17,7 @@ def test_propose_first_dt():
 
 @pytest.fixture
 def ivp():
-    return pnmol.pde_problems.heat_1d()
+    return pnmol.problems.heat_1d()
 
 
 class TestConstant:
