@@ -46,7 +46,9 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     return means, stds, sol.t, pde.spatial_grid.points
 
 
-def solve_pde_reference(pde, *, dt, nu, progressbar, high_res_factor):
+def solve_pde_reference(
+    pde, *, dt, nu, progressbar, high_res_factor_dx, high_res_factor_dt
+):
     steprule = tornadox.step.ConstantSteps(dt)
     ivp = pde.to_tornadox_ivp_1d()
     ek1 = tornadox.ek1.ReferenceEK1(
@@ -59,9 +61,9 @@ def solve_pde_reference(pde, *, dt, nu, progressbar, high_res_factor):
     means = jnp.pad(means, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
     stds = jnp.pad(stds, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
     return (
-        means[::high_res_factor, ::high_res_factor],
-        stds[::high_res_factor, ::high_res_factor],
-        sol.t[::high_res_factor],
+        means[::high_res_factor_dt, ::high_res_factor_dx],
+        stds[::high_res_factor_dt, ::high_res_factor_dx],
+        sol.t[::high_res_factor_dt],
         pde.spatial_grid.points,
     )
 
@@ -100,9 +102,10 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.5
-DX = 0.1
-HIGH_RES_FACTOR = 2
+DT = 0.01
+DX = 0.2
+HIGH_RES_FACTOR_DX = 12
+HIGH_RES_FACTOR_DT = 2
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
@@ -135,7 +138,7 @@ PDE_TORNADOX = pnmol.problems.heat_1d(
 PDE_REFERENCE = pnmol.problems.heat_1d(
     t0=T0,
     tmax=TMAX,
-    dx=DX / HIGH_RES_FACTOR,
+    dx=DX / HIGH_RES_FACTOR_DX,
     stencil_size=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
     kernel=pnmol.kernels.Polynomial(),
@@ -144,7 +147,7 @@ PDE_REFERENCE = pnmol.problems.heat_1d(
 
 # Solve the PDE with the different methods
 KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(
-    output_scale=1e-3
+    output_scale=1e-7
 )
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
@@ -165,10 +168,11 @@ RESULT_TORNADOX = solve_pde_tornadox(
 )
 RESULT_REFERENCE = solve_pde_reference(
     PDE_REFERENCE,
-    dt=DT / HIGH_RES_FACTOR,
+    dt=DT / HIGH_RES_FACTOR_DT,
     nu=NUM_DERIVATIVES,
     progressbar=PROGRESSBAR,
-    high_res_factor=HIGH_RES_FACTOR,
+    high_res_factor_dt=HIGH_RES_FACTOR_DT,
+    high_res_factor_dx=HIGH_RES_FACTOR_DX,
 )
 save_result(RESULT_PNMOL_WHITE, prefix="pnmol_white")
 save_result(RESULT_PNMOL_LATENT, prefix="pnmol_latent")

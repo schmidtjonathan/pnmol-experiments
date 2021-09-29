@@ -52,7 +52,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         mean = jnp.concatenate([dy0_full, jnp.zeros_like(dy0_full)], -1)
 
         cov_sqrtm_state = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, 1e-10 * jnp.eye(self.num_derivatives + 1))
+        cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, jnp.eye(self.num_derivatives + 1))
 
         cov_sqrtm = jax.scipy.linalg.block_diag(
             cov_sqrtm_state,

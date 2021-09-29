@@ -4,7 +4,7 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 from matplotlib.colors import LogNorm
 
-plt.style.use("experiments/lines_and_ticks.mplstyle")
+plt.style.use(["experiments/lines_and_ticks.mplstyle", "experiments/font.mplstyle"])
 
 PATH_RESULTS = "experiments/results/figure1/"
 
@@ -92,15 +92,14 @@ def figure_1(
     for ax in axes.flatten():
         ax.set_xticklabels(())
         ax.set_yticklabels(())
-        # ax.grid(which="major", color="k", alpha=0.25, linestyle="dotted")
 
     # Column titles
     top_row_axis = axes[0]
     ax1, ax2, ax3 = top_row_axis
-    ax1.set_title(r"$\bf a.$ " + "Mean", loc="left")
-    ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left")
-    ax3.set_title(r"$\bf c.$ " + "Error", loc="left")
-
+    ax1.set_title(r"$\bf a.$ " + "Mean", loc="left", fontsize="medium")
+    ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left", fontsize="medium")
+    ax3.set_title(r"$\bf c.$ " + "Error", loc="left", fontsize="medium")
+    plt.savefig(path + "figure1.pdf", dpi=300)
     plt.show()
 
 
