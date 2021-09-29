@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 import pytest
 
-import pnmol
+import pnmol.base
 
 
 def genkey(key):
@@ -42,10 +42,10 @@ def blocks_and_shape(n_blocks, base_rng):
 def test_matmul(blocks_and_shape):
     blocks, shape, rng = blocks_and_shape
     shape = tuple(shape)
-    block_diag = pnmol.stacked_ssm.BlockDiagonal(blocks)
+    block_diag = pnmol.base.stacked_ssm.BlockDiagonal(blocks)
     dense_block_diag = jax.scipy.linalg.block_diag(*blocks)
 
-    assert isinstance(block_diag, pnmol.stacked_ssm.BlockDiagonal)
+    assert isinstance(block_diag, pnmol.base.stacked_ssm.BlockDiagonal)
     assert isinstance(dense_block_diag, jnp.ndarray)
     assert isinstance(block_diag.todense(), jnp.ndarray)
     assert block_diag.shape == shape == dense_block_diag.shape

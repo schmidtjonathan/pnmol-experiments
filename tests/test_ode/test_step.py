@@ -3,23 +3,16 @@
 import jax.numpy as jnp
 import pytest
 
-import pnmol
-
-
-def test_propose_first_dt():
-
-    ivp = pnmol.pde_problems.heat_1d()
-
-    dt = pnmol.step.propose_first_dt(ivp.f, ivp.t0, ivp.y0)
-    assert dt > 0
+import pnmol.ode.step
+import pnmol.problems
 
 
 @pytest.fixture
 def ivp():
-    return pnmol.pde_problems.heat_1d()
+    return pnmol.problems.heat_1d()
 
 
-class TestConstantSteps:
+class TestConstant:
     @staticmethod
     @pytest.fixture
     def dt():
@@ -28,7 +21,7 @@ class TestConstantSteps:
     @staticmethod
     @pytest.fixture
     def steprule(dt):
-        steprule = pnmol.step.ConstantSteps(dt)
+        steprule = pnmol.ode.step.Constant(dt)
         return steprule
 
     @staticmethod
@@ -52,7 +45,7 @@ class TestConstantSteps:
         assert first_dt == dt
 
 
-class TestAdaptiveSteps:
+class TestAdaptive:
     @staticmethod
     @pytest.fixture
     def abstol():
@@ -66,12 +59,12 @@ class TestAdaptiveSteps:
     @staticmethod
     @pytest.fixture
     def steprule(abstol, reltol):
-        steprule = pnmol.step.AdaptiveSteps(abstol=abstol, reltol=reltol)
+        steprule = pnmol.ode.step.Adaptive(abstol=abstol, reltol=reltol)
         return steprule
 
     @staticmethod
     def test_type(steprule):
-        assert isinstance(steprule, pnmol.step.AdaptiveSteps)
+        assert isinstance(steprule, pnmol.ode.step.Adaptive)
 
     @staticmethod
     def test_accept_less_than_1(steprule):

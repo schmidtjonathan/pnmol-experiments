@@ -4,7 +4,7 @@
 import jax.numpy as jnp
 import pytest
 
-import pnmol
+from pnmol.base import kalman
 
 
 @pytest.fixture
@@ -19,7 +19,7 @@ def m(n):
 
 @pytest.fixture
 def sc(n):
-    return jnp.eye(n)  # + 0.001* jnp.arange(1, 1 + n ** 2).reshape((n, n)).T
+    return jnp.eye(n)
 
 
 @pytest.fixture
@@ -50,7 +50,7 @@ def data(n):
 @pytest.fixture
 def filter_stepped(m, sc, phi, sq, h, b, data):
 
-    return pnmol.kalman.filter_step(
+    return kalman.filter_step(
         m=m,
         sc=sc,
         phi=phi,
@@ -87,7 +87,7 @@ def test_filter_step_shapes(filter_stepped, n):
 def smoother_stepped_traditional(m, sc, filter_stepped):
     m_fut, sc_fut, sgain, mp, scp, _ = filter_stepped
 
-    m, sc = pnmol.kalman.smoother_step_traditional(
+    m, sc = kalman.smoother_step_traditional(
         m=m,
         sc=sc,
         m_fut=m_fut,
@@ -103,7 +103,7 @@ def smoother_stepped_traditional(m, sc, filter_stepped):
 def smoother_stepped_sqrt(m, sc, sq, filter_stepped):
     m_fut, sc_fut, sgain, mp, scp, x = filter_stepped
 
-    m, sc = pnmol.kalman.smoother_step_sqrt(
+    m, sc = kalman.smoother_step_sqrt(
         m=m,
         sc=sc,
         m_fut=m_fut,

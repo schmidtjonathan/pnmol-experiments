@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import scipy.integrate
 from jax.experimental.jet import jet
 
-from pnmol import iwp, kalman, sqrt
+from pnmol.base import iwp, kalman, sqrt
 
 
 class InitializationRoutine(abc.ABC):

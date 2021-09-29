@@ -1,24 +1,6 @@
-"""
+"""PNMOL."""
 
-"""
-
-from . import (
-    differential_operator,
-    discretize,
-    init,
-    iwp,
-    kalman,
-    kernels,
-    lfsolver,
-    mesh,
-    odefilter,
-    pde_problems,
-    rv,
-    solver,
-    sqrt,
-    stacked_ssm,
-    step,
-)
+from . import diffops, discretize, kernels, latent, mesh, pdefilter, problems, white
 
 __version__ = "0.0.1"
 

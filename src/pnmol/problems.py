@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import tornadox
 
-from pnmol import differential_operator, discretize, kernels, mesh
+from pnmol import diffops, discretize, kernels, mesh
 
 
 class PDEProblemMixin:
@@ -119,7 +119,7 @@ def heat_1d(
         kernel = kernels.SquareExponential()
 
     # PNMOL discretization
-    laplace = differential_operator.laplace()
+    laplace = diffops.laplace()
     L, E_sqrtm = discretize.discretize(
         diffop=laplace,
         mesh=grid,
@@ -128,6 +128,7 @@ def heat_1d(
         cov_damping=cov_damping_fd,
         progressbar=progressbar,
     )
+
     scaled_laplace = diffusion_rate * L
     scaled_sqrt_error = diffusion_rate * E_sqrtm
 
