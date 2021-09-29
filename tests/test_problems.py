@@ -1,5 +1,6 @@
 import jax.numpy as jnp
 import pytest
+import tornadox
 
 import pnmol
 
@@ -67,7 +68,7 @@ class TestProb1dDiscretized:
     @staticmethod
     @problems_1d_all
     def test_y0(prob1d_discretized, num_grid_points):
-        assert prob1d_discretized.y0_array.shape == (num_grid_points,)
+        assert prob1d_discretized.y0.shape == (num_grid_points,)
 
     # Discretisations
 
@@ -94,3 +95,9 @@ class TestProb1dDiscretized:
     def test_R_sqrtm(prob1d_discretized, num_boundary_points):
         R_sqrtm = prob1d_discretized.R_sqrtm
         assert R_sqrtm.shape == (num_boundary_points, num_boundary_points)
+
+    @staticmethod
+    @problems_1d_all
+    def test_to_ivp(prob1d_discretized):
+        ivp = prob1d_discretized.to_tornadox_ivp()
+        assert isinstance(ivp, tornadox.ivp.InitialValueProblem)

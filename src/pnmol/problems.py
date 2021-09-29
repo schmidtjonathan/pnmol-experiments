@@ -4,115 +4,9 @@ import functools
 
 import jax.numpy as jnp
 import jax.scipy.linalg
+import tornadox
 
 from pnmol import diffops, discretize, kernels, mesh
-
-# PDE Base class and some problem-type-specific implementations
-
-
-class PDE:
-    """PDE base class.
-
-    The PDE class is central to all the options below.
-    It is extended by LinearPDE, and SemiLinearPDE.
-    The additional functionalities IVPMixIn, DirichletMixIn/NeumannMixIn,
-    and DiscretizationMixIn rely on the attributes provided herein.
-    """
-
-    def __init__(self, *, diffop, diffop_scale, bbox, **kwargs):
-        self.diffop = diffop
-        self.diffop_scale = diffop_scale
-        self.bbox = bbox
-
-        # The following fields store an optional discretization.
-        # They are filled by discretize(), provided by the
-        # DiscretizationMixIn below.
-        self.L = None
-        self.E_sqrtm = None
-        self.mesh_spatial = None
-        super().__init__(**kwargs)
-
-    def __repr__(self):
-        return f"{self.__class__.__name__}(is_discretized={self.is_discretized})"
-
-    @property
-    def is_discretized(self):
-        return self.L is not None
-
-    @property
-    def dimension(self):
-        return self.bbox.ndim
-
-
-class LinearPDE(PDE):
-    """Linear PDE problem. Requires mixing with some boundary condition."""
-
-    def to_tornadox_ivp(self):
-        """Transform PDE into an IVP. Requires prior discretisation."""
-
-        def f_new(_, x):
-            x_padded = self.bc_pad(x)
-            x_new = self.L @ x_padded
-            return self.bc_remove_pad(x_new)
-
-        df_new = jax.jacfwd(f_new)
-        y0_new = self.bc_remove_pad(self.y0_array)
-        return f_new, df_new, y0_new, self.t0, self.tmax
-
-
-class NonLinearMixIn:
-    def __init__(self, *, f, df, df_diagonal, **kwargs):
-        self.f = f
-        self.df = df
-        self.df_diagonal = df_diagonal
-        super().__init__(**kwargs)
-
-
-class SemiLinearPDE(PDE, NonLinearMixIn):
-    """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
-
-    def to_tornadox_ivp(self):
-        """Transform PDE into an IVP. Requires prior discretisation."""
-
-        def f_new(_, x):
-            x_padded = self.bc_pad(x)
-            x_new = self.L @ x_padded + self.f(x_padded)
-            return self.bc_remove_pad(x_new)
-
-        df_new = jax.jacfwd(f_new)
-        y0_new = self.bc_remove_pad(self.y0_array)
-        return f_new, df_new, y0_new, self.t0, self.tmax
-
-
-# Add boundary conditions through a MixIn
-
-
-class _BoundaryCondition:
-    def __init__(self, **kwargs):
-        self.B = None
-        self.R_sqrtm = None
-        super().__init__(**kwargs)
-
-
-class NeumannMixIn(_BoundaryCondition):
-    """Neumann condition functionality for PDE problems."""
-
-    def bc_pad(self, x):
-        raise NotImplementedError
-
-    def bc_remove_pad(self, x):
-        raise NotImplementedError
-
-
-class DirichletMixIn(_BoundaryCondition):
-    """Dirichlet condition functionality for PDE problems."""
-
-    def bc_pad(self, x):
-        raise NotImplementedError
-
-    def bc_remove_pad(self, x):
-        raise NotImplementedError
-
 
 # Make the PDE time-dependent and add initial values
 
@@ -194,57 +88,139 @@ class DiscretizationMixIn:
             self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
+# PDE Base class and some problem-type-specific implementations
+
+
+class PDE(DiscretizationMixIn, IVPMixIn):
+    """PDE base class.
+
+    The PDE class is central to all the options below.
+    It is extended by LinearPDE, and SemiLinearPDE.
+    The additional functionalities IVPMixIn, DirichletMixIn/NeumannMixIn,
+    and DiscretizationMixIn rely on the attributes provided herein.
+    """
+
+    def __init__(self, *, diffop, diffop_scale, bbox, **kwargs):
+        self.diffop = diffop
+        self.diffop_scale = diffop_scale
+        self.bbox = bbox
+
+        # The following fields store an optional discretization.
+        # They are filled by discretize(), provided by the
+        # DiscretizationMixIn below.
+        self.L = None
+        self.E_sqrtm = None
+        self.mesh_spatial = None
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(is_discretized={self.is_discretized})"
+
+    @property
+    def is_discretized(self):
+        return self.L is not None
+
+    @property
+    def dimension(self):
+        return self.bbox.ndim
+
+
+class LinearPDE(PDE):
+    """Linear PDE problem. Requires mixing with some boundary condition."""
+
+    def to_tornadox_ivp(self):
+        """Transform PDE into an IVP. Requires prior discretisation."""
+
+        def f_new(_, x):
+            x_padded = self.bc_pad(x)
+            x_new = self.L @ x_padded
+            return self.bc_remove_pad(x_new)
+
+        df_new = jax.jacfwd(f_new)
+        y0_new = self.bc_remove_pad(self.y0)
+        return tornadox.ivp.InitialValueProblem(
+            f=f_new, df=df_new, y0=y0_new, t0=self.t0, tmax=self.tmax, df_diagonal=None
+        )
+
+
+class _NonLinearMixIn:
+    def __init__(self, *, f, df, df_diagonal, **kwargs):
+        self.f = f
+        self.df = df
+        self.df_diagonal = df_diagonal
+        super().__init__(**kwargs)
+
+
+class SemiLinearPDE(PDE, _NonLinearMixIn):
+    """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
+
+    def to_tornadox_ivp(self):
+        """Transform PDE into an IVP. Requires prior discretisation."""
+
+        def f_new(_, x):
+            x_padded = self.bc_pad(x)
+            x_new = self.L @ x_padded + self.f(x_padded)
+            return self.bc_remove_pad(x_new)
+
+        df_new = jax.jacfwd(f_new)
+        y0_new = self.bc_remove_pad(self.y0)
+        return tornadox.ivp.InitialValueProblem(
+            f=f_new, df=df_new, y0=y0_new, t0=self.t0, tmax=self.tmax, df_diagonal=None
+        )
+
+
+# Add boundary conditions through a MixIn
+
+
+class _BoundaryCondition:
+    def __init__(self, **kwargs):
+        self.B = None
+        self.R_sqrtm = None
+        super().__init__(**kwargs)
+
+
+class NeumannMixIn(_BoundaryCondition):
+    """Neumann condition functionality for PDE problems."""
+
+    def bc_pad(self, x):
+        if self.dimension > 1:
+            raise NotImplementedError
+        return jnp.pad(x, pad_width=1, mode="edge")
+
+    def bc_remove_pad(self, x):
+        if self.dimension > 1:
+            raise NotImplementedError
+        return x[1:-1]
+
+
+class DirichletMixIn(_BoundaryCondition):
+    """Dirichlet condition functionality for PDE problems."""
+
+    def bc_pad(self, x):
+        if self.dimension > 1:
+            raise NotImplementedError
+
+        return jnp.pad(x, pad_width=1, mode="constant", constant_values=1.0)
+
+    def bc_remove_pad(self, x):
+        if self.dimension > 1:
+            raise NotImplementedError
+
+        return x[1:-1]
+
+
 # Mix and match a range of PDE problems.
 
 
-class LinearEvolutionDirichlet(
-    LinearPDE, IVPMixIn, DirichletMixIn, DiscretizationMixIn
-):
+class LinearEvolutionDirichlet(LinearPDE, DirichletMixIn):
     pass
 
 
-class LinearEvolutionNeumann(LinearPDE, IVPMixIn, NeumannMixIn, DiscretizationMixIn):
-    pass
-
-
-class SemiLinearEvolutionDirichlet(
-    SemiLinearPDE, IVPMixIn, DirichletMixIn, DiscretizationMixIn
-):
+class LinearEvolutionNeumann(LinearPDE, NeumannMixIn):
     pass
 
 
 # Some precomputed recipes for PDE examples.
-
-
-def heat_1d(
-    bbox=None, t0=0.0, tmax=20.0, y0_fun=None, diffusion_rate=0.1, bcond="dirichlet"
-):
-    laplace = diffops.laplace()
-
-    if bbox is None:
-        bbox = [0.0, 1.0]
-    bbox = jnp.asarray(bbox)
-
-    if y0_fun is None:
-        y0_fun = functools.partial(gaussian_bell_1d_centered, bbox=bbox)
-
-    if bcond == "dirichlet":
-        return LinearEvolutionDirichlet(
-            diffop=laplace,
-            diffop_scale=diffusion_rate,
-            bbox=bbox,
-            t0=t0,
-            tmax=tmax,
-            y0_fun=y0_fun,
-        )
-    return LinearEvolutionNeumann(
-        diffop=laplace,
-        diffop_scale=diffusion_rate,
-        bbox=bbox,
-        t0=t0,
-        tmax=tmax,
-        y0_fun=y0_fun,
-    )
 
 
 def heat_1d_discretized(
@@ -278,6 +254,37 @@ def heat_1d_discretized(
         progressbar=progressbar,
     )
     return heat
+
+
+def heat_1d(
+    bbox=None, t0=0.0, tmax=20.0, y0_fun=None, diffusion_rate=0.1, bcond="dirichlet"
+):
+    laplace = diffops.laplace()
+
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
+
+    if y0_fun is None:
+        y0_fun = functools.partial(gaussian_bell_1d_centered, bbox=bbox)
+
+    if bcond == "dirichlet":
+        return LinearEvolutionDirichlet(
+            diffop=laplace,
+            diffop_scale=diffusion_rate,
+            bbox=bbox,
+            t0=t0,
+            tmax=tmax,
+            y0_fun=y0_fun,
+        )
+    return LinearEvolutionNeumann(
+        diffop=laplace,
+        diffop_scale=diffusion_rate,
+        bbox=bbox,
+        t0=t0,
+        tmax=tmax,
+        y0_fun=y0_fun,
+    )
 
 
 # A bunch of initial condition defaults

@@ -29,7 +29,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         self.E1 = self.iwp.projection_matrix(1)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = pde.to_tornadox_ivp_1d()
+        ivp = pde.to_tornadox_ivp()
         extended_dy0, cov_sqrtm = self.init(
             f=ivp.f,
             df=ivp.df,
