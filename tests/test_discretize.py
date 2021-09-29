@@ -54,8 +54,7 @@ class TestFDCoefficients:
             x0 = mesh_spatial_1d[1]
             return discretize.fd_coeff(
                 x=x0,
-                mesh_spatial=mesh_spatial_1d,
-                stencil_size=3,
+                neighbors=mesh_spatial_1d[((1, 0, 2),)],
                 k=k,
                 L_k=L_k,
                 LL_k=LL_k,
@@ -79,8 +78,7 @@ class TestFDCoefficients:
             x0 = mesh_spatial_1d[0]
             return discretize.fd_coeff(
                 x=x0,
-                mesh_spatial=mesh_spatial_1d,
-                stencil_size=3,
+                neighbors=mesh_spatial_1d[((0, 1, 2),)],
                 k=k,
                 L_k=L_k,
                 LL_k=LL_k,
@@ -105,8 +103,7 @@ class TestFDCoefficients:
             x0 = mesh_spatial_1d[-1]
             return discretize.fd_coeff(
                 x=x0,
-                mesh_spatial=mesh_spatial_1d,
-                stencil_size=3,
+                neighbors=mesh_spatial_1d[((-1, -2, -3),)],
                 k=k,
                 L_k=L_k,
                 LL_k=LL_k,

@@ -51,8 +51,6 @@ def discretize(
 
     fd_coeff_fun = partial(
         fd_coeff,
-        mesh_spatial=mesh_spatial,
-        stencil_size=stencil_size,
         k=kernel,
         L_k=L_kx,
         LL_k=LL_kx,
@@ -63,12 +61,15 @@ def discretize(
 
     range_loop = enumerate(tqdm.tqdm(mesh_spatial.points, disable=not progressbar))
     for i, point in range_loop:
+        neighbors, neighbor_indices = mesh_spatial.neighbours(
+            point=point, num=stencil_size
+        )
 
-        weights, uncertainty, neighbor_idcs = fd_coeff_fun(x=point)
+        weights, uncertainty = fd_coeff_fun(x=point, neighbors=neighbors.points)
 
         L_data.append(weights)
         L_row.append(jnp.full(shape=stencil_size, fill_value=i, dtype=int))
-        L_col.append(neighbor_idcs)
+        L_col.append(neighbor_indices)
         E_data.append(uncertainty)
 
     L_data = jnp.concatenate(L_data)
@@ -81,12 +82,10 @@ def discretize(
     return L, jnp.sqrt(jnp.abs(E))
 
 
-def fd_coeff(x, mesh_spatial, stencil_size, k, L_k, LL_k, nugget_gram_matrix):
+def fd_coeff(x, neighbors, k, L_k, LL_k, nugget_gram_matrix):
     """Compute kernel-based finite difference coefficients."""
 
-    neighbors, neighbor_indices = mesh_spatial.neighbours(point=x, num=stencil_size)
-
-    X = neighbors.points
+    X = neighbors
     gram_matrix = k(X, X.T) + nugget_gram_matrix * jnp.eye(X.shape[0])
     diffop_at_point = L_k(x[None, :], X.T).reshape((-1,))
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
@@ -102,4 +101,4 @@ def fd_coeff(x, mesh_spatial, stencil_size, k, L_k, LL_k, nugget_gram_matrix):
     )
     assert not jnp.any(jnp.isnan(uncertainty))
 
-    return weights, uncertainty, neighbor_indices
+    return weights, uncertainty
