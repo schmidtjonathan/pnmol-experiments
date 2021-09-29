@@ -4,12 +4,13 @@ import jax.numpy as jnp
 import pytest
 
 import pnmol
+import pnmol.base.iwp
 
 
 @pytest.fixture
 def iwp():
     """Steal system matrices from an IWP transition."""
-    return pnmol.iwp.IntegratedWienerTransition(
+    return pnmol.base.iwp.IntegratedWienerTransition(
         wiener_process_dimension=1,
         num_derivatives=1,
         wp_diffusion_sqrtm=jnp.eye(1),

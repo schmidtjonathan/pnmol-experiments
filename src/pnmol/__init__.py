@@ -5,7 +5,6 @@
 from . import (
     diffops,
     discretize,
-    iwp,
     kernels,
     lfsolver,
     mesh,
