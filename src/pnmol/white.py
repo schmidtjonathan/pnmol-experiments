@@ -8,7 +8,7 @@ from pnmol import pdefilter
 from pnmol.base import iwp, rv, sqrt
 
 
-class _MeasurementCovarianceEK1Base(pdefilter.PDEFilter):
+class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.P0 = None
@@ -119,7 +119,7 @@ class _MeasurementCovarianceEK1Base(pdefilter.PDEFilter):
         pass
 
 
-class LinearMeasurementCovarianceEK1(_MeasurementCovarianceEK1Base):
+class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
     @staticmethod
     # @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(discretized_pde, p0, p1, m_pred, t):

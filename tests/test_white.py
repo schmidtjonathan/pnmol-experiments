@@ -5,11 +5,8 @@ import tornadox
 import pnmol
 import pnmol.ode
 
-S2 = pnmol.white.LinearMeasurementCovarianceEK1
-ALL_SOLVERS = pytest.mark.parametrize("solver", [S2])
 
-
-@ALL_SOLVERS
+@pytest.mark.parametrize("solver", [pnmol.white.LinearWhiteNoiseEK1])
 def test_solve(solver):
     """The Heat equation is solved without creating NaNs."""
     dt = 0.1
