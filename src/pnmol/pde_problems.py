@@ -119,16 +119,16 @@ def heat_1d(
         kernel = kernels.SquareExponential()
 
     # PNMOL discretization
-    laplace = differential_operator.laplace()
+    scalar_mult = differential_operator.scalar_mult(diffusion_rate)
+    scaled_laplace = scalar_mult * differential_operator.laplace()
     L, E_sqrtm = discretize.discretize(
-        diffop=laplace,
+        diffop=scaled_laplace,
         mesh=grid,
         kernel=kernel,
         stencil_size=stencil_size,
         cov_damping=cov_damping_fd,
         progressbar=progressbar,
     )
-    L = diffusion_rate * L
 
     return LinearPDEProblem(
         spatial_grid=grid,
