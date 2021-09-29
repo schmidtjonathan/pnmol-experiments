@@ -22,7 +22,7 @@ class LatentForceEK1Base(odefilter.ODEFilter):
         self.state_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
             wiener_process_dimension=discretized_pde.dimension,
-            wp_diffusion_sqrtm=discretized_pde.Kxx_sqrtm,
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
@@ -34,17 +34,23 @@ class LatentForceEK1Base(odefilter.ODEFilter):
         self.P0 = self.E0 = self.state_iwp.projection_matrix(0)
         self.E1 = self.state_iwp.projection_matrix(1)
 
+        # This is kind of wrong still... RK init should get the proper diffusion.
+        ivp = discretized_pde.to_tornadox_ivp_1d()
         extended_dy0, cov_sqrtm_state = self.init(
-            f=discretized_pde.f,
-            df=discretized_pde.df,
-            y0=discretized_pde.y0,
-            t0=discretized_pde.t0,
+            f=ivp.f,
+            df=ivp.df,
+            y0=ivp.y0,
+            t0=ivp.t0,
             num_derivatives=self.state_iwp.num_derivatives,
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
-        mean = jnp.concatenate([extended_dy0, jnp.zeros_like(extended_dy0)], -1)
+        dy0_padded = jnp.pad(
+            extended_dy0, pad_width=1, mode="constant", constant_values=0.0
+        )
+        dy0_full = dy0_padded[1:-1]
+        mean = jnp.concatenate([dy0_full, jnp.zeros_like(dy0_full)], -1)
 
-        cov_sqrtm_state = jnp.kron(discretized_pde.Kxx_sqrtm, cov_sqrtm_state)
+        cov_sqrtm_state = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
         cov_sqrtm_eps = jnp.kron(
             discretized_pde.E_sqrtm, 1e-10 * jnp.eye(self.num_derivatives + 1)
         )
@@ -70,7 +76,7 @@ class LatentForceEK1Base(odefilter.ODEFilter):
         # [Predict]
         glued_batched_mean = state.y.mean
         batched_state_mean, batched_eps_mean = jnp.split(glued_batched_mean, 2, axis=-1)
-        assert batched_state_mean.shape == batched_eps_mean.shape
+
         flat_state_mean = batched_state_mean.reshape((-1,), order="F")
         flat_eps_mean = batched_eps_mean.reshape((-1,), order="F")
         glued_flat_mean = jnp.concatenate((flat_state_mean, flat_eps_mean))
