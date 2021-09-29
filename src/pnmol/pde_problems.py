@@ -6,7 +6,7 @@ import numpy as np
 import scipy.stats
 import tornadox
 
-from pnmol import differential_operator, discretize, kernels, mesh
+from pnmol import diffops, discretize, kernels, mesh
 
 
 class DiscretizedPDE(
@@ -86,7 +86,7 @@ def heat_1d(
         kernel = kernels.SquareExponential()
 
     # PNMOL discretization
-    laplace = differential_operator.laplace()
+    laplace = diffops.laplace()
     L, E_sqrtm = discretize.discretize(
         diffop=laplace,
         mesh=grid,
@@ -164,7 +164,7 @@ def wave_1d(bbox=None, dx=0.01, stencil_size=3, t0=0.0, tmax=20.0, y0=None):
 
     # PNMOL discretization
     gauss_kernel = kernels.SquareExponentialKernel(scale=1.0, lengthscale=1.0)
-    laplace = differential_operator.laplace()
+    laplace = diffops.laplace()
     L, E_sqrtm = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
@@ -229,8 +229,8 @@ def burgers_1d(
     gauss_kernel = kernels.SquareExponentialKernel(
         scale=lengthscale, lengthscale=lengthscale
     )
-    laplace = differential_operator.laplace()
-    grad = differential_operator.gradient()
+    laplace = diffops.laplace()
+    grad = diffops.gradient()
     L_laplace, E_laplace = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )
@@ -314,9 +314,9 @@ def burgers_2d(
     # PNMOL discretization
     lengthscale = dx * int(stencil_size / 2)
     gauss_kernel = kernels.SquareExponentialKernel(1.0, lengthscale)
-    laplace = differential_operator.laplace()
-    grad_y = differential_operator.gradient_by_dimension(output_coordinate=0)
-    grad_x = differential_operator.gradient_by_dimension(output_coordinate=1)
+    laplace = diffops.laplace()
+    grad_y = diffops.gradient_by_dimension(output_coordinate=0)
+    grad_x = diffops.gradient_by_dimension(output_coordinate=1)
     L_laplace, E_laplace = discretize.discretize(
         diffop=laplace, mesh=grid, kernel=gauss_kernel, stencil_size=stencil_size
     )

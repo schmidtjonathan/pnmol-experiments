@@ -3,7 +3,7 @@
 import jax.numpy as jnp
 import pytest
 
-from pnmol import differential_operator, discretize, kernels, mesh
+from pnmol import diffops, discretize, kernels, mesh
 
 
 @pytest.fixture
@@ -23,7 +23,7 @@ def grid_1d(bbox, dx):
 
 @pytest.fixture
 def diffop():
-    return differential_operator.laplace()
+    return diffops.laplace()
 
 
 @pytest.fixture

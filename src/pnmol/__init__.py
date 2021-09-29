@@ -3,7 +3,7 @@
 """
 
 from . import (
-    differential_operator,
+    diffops,
     discretize,
     iwp,
     kernels,
