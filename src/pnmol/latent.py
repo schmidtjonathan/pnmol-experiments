@@ -143,7 +143,7 @@ class LinearLatentForceEK1(_LatentForceEK1Base):
 
         H_state = E1_state - Jx @ E0_state
         H_eps = -E0_eps
-        H_boundaries = B @ E0_state
+        H_boundaries = pde.B
         H_zeros = jnp.zeros_like(H_boundaries)
         H = jnp.block([[H_state, H_eps], [H_boundaries, H_zeros]])
 

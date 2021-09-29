@@ -74,7 +74,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             m_pred=mp,
             t=state.t + dt,
         )
-        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, jnp.zeros((2, 2)))
+        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, pde.R_sqrtm)
         sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
@@ -120,7 +120,6 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
     @staticmethod
     def evaluate_ode(pde, p0, p1, m_pred, t):
-        B = pde.mesh_spatial.boundary_projection_matrix
         L = pde.L
 
         m_at = p0 @ m_pred
@@ -129,7 +128,7 @@ class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
         b = Jx @ m_at - fx
 
         H_ode = p1 - Jx @ p0
-        H = jnp.vstack((H_ode, B @ p0))
+        H = jnp.vstack((H_ode, pde.B @ p0))
         shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
         z = H @ m_pred + shift
         return z, H

@@ -5,7 +5,7 @@ import functools
 import jax.numpy as jnp
 import jax.scipy.linalg
 
-from pnmol import diffops, discretize, kernels
+from pnmol import diffops, discretize, kernels, mesh
 
 # PDE Base class and some problem-type-specific implementations
 
@@ -129,7 +129,7 @@ class IVPMixIn:
         self.y0_fun = y0_fun
 
         # Holds the discretised initial condition.
-        self.y0_array = None
+        self.y0 = None
 
     @property
     def t_span(self):
@@ -191,7 +191,7 @@ class DiscretizationMixIn:
         if isinstance(self, IVPMixIn):
 
             # Enforce a scalar initial value
-            self.y0_array = self.y0_fun(mesh_spatial.points)[:, 0]
+            self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
 # Mix and match a range of PDE problems.
@@ -247,58 +247,37 @@ def heat_1d(
     )
 
 
-def heat_1d_old(
+def heat_1d_discretized(
     bbox=None,
     dx=0.05,
     stencil_size=3,
     t0=0.0,
     tmax=20.0,
-    y0=None,
+    y0_fun=None,
     diffusion_rate=0.1,
     cov_damping_fd=0.0,
     kernel=None,
     progressbar=False,
+    bcond="dirichlet",
 ):
-    # Bounding box for spatial discretization grid
-    if bbox is None:
-        bbox = [0.0, 1.0]
-    bbox = jnp.asarray(bbox)
-    assert bbox.ndim == 1
-
-    # Create spatial discretization grid
-    grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
-
-    # Spatial initial condition at t=0
-    x = grid.points.reshape((-1,))
-    if y0 is None:
-        y0 = gaussian_bell_1d(x) * sin_bell_1d(x)
-
-    # Default kernels
-    if kernel is None:
-        kernel = kernels.SquareExponential()
-
-    # PNMOL discretization
-    laplace = diffops.laplace()
-    L, E_sqrtm = discretize.discretize(
-        diffop=laplace,
-        mesh=grid,
-        kernel=kernel,
-        stencil_size=stencil_size,
-        cov_damping=cov_damping_fd,
-        progressbar=progressbar,
-    )
-
-    scaled_laplace = diffusion_rate * L
-    scaled_sqrt_error = diffusion_rate * E_sqrtm
-
-    return LinearPDEProblem(
-        mesh_spatial=grid,
+    heat = heat_1d(
+        bbox=bbox,
         t0=t0,
         tmax=tmax,
-        y0=y0,
-        L=scaled_laplace,
-        E_sqrtm=scaled_sqrt_error,
+        y0_fun=y0_fun,
+        diffusion_rate=diffusion_rate,
+        bcond=bcond,
     )
+    mesh_spatial = mesh.RectangularMesh.from_bounding_boxes_1d(heat.bbox, step=dx)
+
+    heat.discretize(
+        mesh_spatial=mesh_spatial,
+        kernel=kernel,
+        stencil_size=stencil_size,
+        nugget_gram_matrix=cov_damping_fd,
+        progressbar=progressbar,
+    )
+    return heat
 
 
 # A bunch of initial condition defaults

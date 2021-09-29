@@ -12,8 +12,7 @@ def test_solve(solver):
     dt = 0.1
     nu = 2
     steprule = pnmol.ode.step.Constant(dt)
-
-    heat = pnmol.problems.heat_1d(
+    heat = pnmol.problems.heat_1d_discretized(
         tmax=1.0,
         dx=0.2,
         stencil_size=3,
@@ -21,7 +20,6 @@ def test_solve(solver):
         kernel=pnmol.kernels.Polynomial(),
         cov_damping_fd=0.0,
     )
-
     # Solve the discretised PDE
     solver = solver(num_derivatives=nu, steprule=steprule)
     out = solver.solve(heat)
