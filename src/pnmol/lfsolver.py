@@ -7,20 +7,6 @@ import jax.numpy as jnp
 from pnmol import iwp, odefilter, rv, sqrt, stacked_ssm
 
 
-@partial(jax.jit, static_argnums=1)
-def extract_blocks_from_block_diag(block_diag_mat, num_blocks):
-    """ATTENTION: ASSUMES EQUAL-SIZED SQUARE BLOCKS!"""
-    block_rows = jnp.split(block_diag_mat, num_blocks, axis=0)
-    return [
-        jnp.split(
-            block_rows[i],
-            num_blocks,
-            axis=1,
-        )[i]
-        for i in range(num_blocks)
-    ]
-
-
 class LatentForceEK1Base(odefilter.ODEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
