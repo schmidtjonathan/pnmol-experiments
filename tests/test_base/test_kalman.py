@@ -19,7 +19,7 @@ def m(n):
 
 @pytest.fixture
 def sc(n):
-    return jnp.eye(n)  # + 0.001* jnp.arange(1, 1 + n ** 2).reshape((n, n)).T
+    return jnp.eye(n)
 
 
 @pytest.fixture
