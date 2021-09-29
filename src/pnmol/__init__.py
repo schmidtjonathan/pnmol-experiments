@@ -6,7 +6,6 @@ from . import (
     differential_operator,
     discretize,
     iwp,
-    kalman,
     kernels,
     lfsolver,
     mesh,
