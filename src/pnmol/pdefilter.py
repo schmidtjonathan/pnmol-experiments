@@ -30,7 +30,7 @@ class PDEFilter(ABC):
         self,
         *,
         steprule=None,
-        num_derivatives=4,
+        num_derivatives=2,
         initialization=None,
         spatial_kernel=None,
     ):
@@ -48,8 +48,9 @@ class PDEFilter(ABC):
         self.init = initialization or init.RungeKutta()
 
         # Spatial covariance kernel
-        # Default is a white-noise kernel, which corresponds to an I_dxd diffusion.
-        self.spatial_kernel = spatial_kernel or kernels.WhiteNoise()
+        self.spatial_kernel = spatial_kernel or kernels.Matern52() + kernels.WhiteNoise(
+            1e-3
+        )
 
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, initialization={self.init})"

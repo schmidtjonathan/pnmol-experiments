@@ -12,10 +12,10 @@ SAVE = True
 def solve_pde_pnmol(pde, dt, nu, progressbar, kernel):
     print()
     print("PNMOL")
-    steprule = pnmol.step.ConstantSteps(dt)
+    steprule = pnmol.ode.step.Constant(dt)
 
     # Solve the discretised PDE
-    ek1 = pnmol.solver.LinearMeasurementCovarianceEK1(
+    ek1 = pnmol.white.LinearWhiteNoiseEK1(
         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
     )
     sol = ek1.solve(pde, progressbar=progressbar)
@@ -70,9 +70,9 @@ def read_mean_and_std(sol, E0):
 
 dt = 0.05
 dx = 0.2
-high_res_factor = 16
+high_res_factor = 2
 kernel = pnmol.kernels.SquareExponential()
-discretized_pde_pnmol = pnmol.pde_problems.heat_1d(
+discretized_pde_pnmol = pnmol.problems.heat_1d(
     tmax=5.0,
     dx=dx,
     stencil_size=3,
@@ -80,7 +80,7 @@ discretized_pde_pnmol = pnmol.pde_problems.heat_1d(
     kernel=pnmol.kernels.SquareExponential(),
     cov_damping_fd=0.0,
 )
-discretized_pde_tornadox = pnmol.pde_problems.heat_1d(
+discretized_pde_tornadox = pnmol.problems.heat_1d(
     tmax=5.0,
     dx=dx,
     stencil_size=3,
@@ -88,7 +88,7 @@ discretized_pde_tornadox = pnmol.pde_problems.heat_1d(
     kernel=pnmol.kernels.Polynomial(),
     cov_damping_fd=0.0,
 )
-discretized_pde_high_res = pnmol.pde_problems.heat_1d(
+discretized_pde_high_res = pnmol.problems.heat_1d(
     tmax=5.0,
     dx=dx / high_res_factor,
     stencil_size=3,
