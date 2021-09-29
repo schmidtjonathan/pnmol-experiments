@@ -301,6 +301,83 @@ def heat_1d(
     raise ValueError
 
 
+def spatial_SIR_1d(
+    bbox=None,
+    dx=1.0,
+    stencil_size=3,
+    t0=0.0,
+    tmax=20.0,
+    beta=0.2,
+    gamma=0.07,
+    N=1000.0,
+    diffusion_constant=0.01,
+    prng_key=None,
+    cov_damping_fd=0.0,
+    kernel=None,
+    progressbar=False,
+):
+
+    # Bounding box for spatial discretization grid
+    if bbox is None:
+        bbox = [0.0, 5.0]
+    bbox = jnp.asarray(bbox)
+
+    grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
+
+    x = grid.points.reshape((-1,))
+    prng_key = prng_key or jax.random.PRNGKey(seed=2)
+
+    init_infectious = jax.random.uniform(
+        prng_key, shape=(x.shape[0],), minval=1.0, maxval=10.0
+    )
+    s0 = N * jnp.ones_like(init_infectious) - init_infectious
+    i0 = init_infectious
+    r0 = jnp.zeros_like(init_infectious)
+    y0 = jnp.concatenate((s0, i0, r0))
+
+    # Default kernels
+    if kernel is None:
+        kernel = kernels.SquareExponential()
+
+    laplace = diffops.laplace()
+    L, E_sqrtm = discretize.discretize(
+        diffop=laplace,
+        mesh=grid,
+        kernel=kernel,
+        stencil_size=stencil_size,
+        cov_damping=cov_damping_fd,
+        progressbar=progressbar,
+    )
+    L = diffusion_constant * L
+    E_sqrtm = diffusion_constant * E_sqrtm
+
+    @jax.jit
+    def sir_rhs(s, i, r):
+        new_s = (-beta / N * s * i) + L @ s
+        new_i = (beta / N * s * i - gamma * i) + L @ i
+        new_r = (gamma * i) + L @ r
+        return new_s, new_i, new_r
+
+    @jax.jit
+    def f(t, x):
+        s, i, r = jnp.split(x, 3)
+        new_s, new_i, new_r = sir_rhs(s, i, r)
+        return jnp.concatenate((new_s, new_i, new_r))
+
+    df = jax.jit(jax.jacfwd(f, argnums=1))
+
+    return SemiLinearPDEProblem(
+        spatial_grid=grid,
+        t0=t0,
+        tmax=tmax,
+        y0=y0,
+        f=f,
+        df=df,
+        L=L,
+        E_sqrtm=E_sqrtm,
+    )
+
+
 # A bunch of initial condition defaults
 # They all adhere to Dirichlet conditions.
 

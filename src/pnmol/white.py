@@ -58,6 +58,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     def attempt_step(self, state, dt, pde):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
+        # print(A.shape, Ql.shape)
         n, d = self.num_derivatives + 1, pde.y0.shape[0]
 
         # [Setup]
@@ -113,6 +114,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     @staticmethod
     @jax.jit
     def estimate_error(ql, z, h, E_sqrtm):
+        # print(h.shape, ql.shape, E_sqrtm.shape)
         S = h @ ql @ ql.T @ h.T + E_sqrtm @ E_sqrtm.T
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
@@ -137,5 +139,25 @@ class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
         H_ode = p1 - Jx @ p0
         H = jnp.vstack((H_ode, pde.B @ p0))
         shift = jnp.hstack((b, jnp.zeros(pde.B.shape[0])))
+        z = H @ m_pred + shift
+        return z, H
+
+
+class SemiLinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
+    @staticmethod
+    # @partial(jax.jit, static_argnums=(0,))
+    def evaluate_ode(pde, p0, p1, m_pred, t):
+        B = jax.scipy.linalg.block_diag(
+            *[pde.spatial_grid.boundary_projection_matrix for _ in range(3)]
+        )
+
+        m_at = p0 @ m_pred
+        fx = pde.f(t, m_at)
+        Jx = pde.df(t, m_at)
+        b = Jx @ m_at - fx
+
+        H_ode = p1 - Jx @ p0
+        H = jnp.vstack((H_ode, B @ p0))
+        shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
         z = H @ m_pred + shift
         return z, H
