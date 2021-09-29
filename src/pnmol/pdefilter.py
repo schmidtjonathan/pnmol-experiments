@@ -12,7 +12,11 @@ from tqdm import tqdm
 from pnmol import kernels
 from pnmol.ode import init, step
 
-PDEFilterState = namedtuple("_", "t y error_estimate reference_state")
+
+class PDEFilterState(namedtuple("_", "t y error_estimate reference_state")):
+    """PDE filter state."""
+
+    pass
 
 
 @dataclasses.dataclass(frozen=False)
