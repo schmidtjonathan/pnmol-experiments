@@ -15,7 +15,7 @@ def solve_pde_pnmol(pde, dt, nu, progressbar, kernel):
     steprule = pnmol.step.ConstantSteps(dt)
 
     # Solve the discretised PDE
-    ek1 = pnmol.solver.MeasurementCovarianceEK1(
+    ek1 = pnmol.solver.LinearMeasurementCovarianceEK1(
         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
     )
     sol = ek1.solve(pde, progressbar=progressbar)
@@ -79,7 +79,6 @@ discretized_pde_pnmol = pnmol.pde_problems.heat_1d(
     diffusion_rate=0.05,
     kernel=pnmol.kernels.SquareExponential(),
     cov_damping_fd=0.0,
-    cov_damping_diffusion=1.0,
 )
 discretized_pde_tornadox = pnmol.pde_problems.heat_1d(
     tmax=5.0,
@@ -88,7 +87,6 @@ discretized_pde_tornadox = pnmol.pde_problems.heat_1d(
     diffusion_rate=0.05,
     kernel=pnmol.kernels.Polynomial(),
     cov_damping_fd=0.0,
-    cov_damping_diffusion=1.0,
 )
 discretized_pde_high_res = pnmol.pde_problems.heat_1d(
     tmax=5.0,
@@ -97,7 +95,6 @@ discretized_pde_high_res = pnmol.pde_problems.heat_1d(
     diffusion_rate=0.05,
     kernel=pnmol.kernels.Polynomial(),
     cov_damping_fd=0.0,
-    cov_damping_diffusion=1.0,
 )
 
 nu = 2
