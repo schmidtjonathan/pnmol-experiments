@@ -3,8 +3,13 @@ import pytest
 
 import pnmol
 
+# Make the second dirichlet a neumann once the basic tests are established.
 problems_1d_all = pytest.mark.parametrize(
-    "prob1d", [pnmol.problems.heat_1d(bcond="dirichlet")]
+    "prob1d",
+    [
+        pnmol.problems.heat_1d(bcond="dirichlet"),
+        pnmol.problems.heat_1d(bcond="dirichlet"),
+    ],
 )
 
 
@@ -32,9 +37,16 @@ class TestProb1dDiscretized:
         return prob1d
 
     @staticmethod
+    @pytest.fixture
+    def N(prob1d_discretized):
+        return prob1d_discretized.mesh_spatial.shape[0]
+
+    @staticmethod
     @problems_1d_all
     def test_type(prob1d_discretized):
-        assert isinstance(prob1d_discretized, pnmol.problems.LinearPDE)
+        assert isinstance(prob1d_discretized, pnmol.problems.PDE)
+
+    # IVP Functionality
 
     @staticmethod
     @problems_1d_all
@@ -48,6 +60,18 @@ class TestProb1dDiscretized:
 
     @staticmethod
     @problems_1d_all
-    def test_y0(prob1d_discretized):
-        N = prob1d_discretized.mesh_spatial.shape[0]
+    def test_y0(prob1d_discretized, N):
         assert prob1d_discretized.y0_array.shape == (N,)
+
+    # Discretisations
+    @staticmethod
+    @problems_1d_all
+    def test_L(prob1d_discretized, N):
+        L = prob1d_discretized.L
+        assert L.shape == (N, N)
+
+    @staticmethod
+    @problems_1d_all
+    def test_E_sqrtm(prob1d_discretized, N):
+        E_sqrtm = prob1d_discretized.E_sqrtm
+        assert E_sqrtm.shape == (N, N)

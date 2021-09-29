@@ -10,7 +10,13 @@ from pnmol import diffops, discretize
 
 
 class PDE:
-    """PDE base class."""
+    """PDE base class.
+
+    The PDE class is central to all the options below.
+    It is extended by LinearPDE, and SemiLinearPDE.
+    The additional functionalities IVPMixIn, DirichletMixIn/NeumannMixIn,
+    and DiscretizationMixIn rely on the attributes provided herein.
+    """
 
     def __init__(self, *, diffop, diffop_scale, bbox, **kwargs):
         self.diffop = diffop
@@ -159,6 +165,10 @@ class DiscretizationMixIn:
 class LinearEvolutionDirichlet(
     LinearPDE, IVPMixIn, DirichletMixIn, DiscretizationMixIn
 ):
+    pass
+
+
+class LinearEvolutionNeumann(LinearPDE, IVPMixIn, NeumannMixIn, DiscretizationMixIn):
     pass
 
 
