@@ -52,6 +52,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             y=y,
             error_estimate=None,
             reference_state=None,
+            diffusion_squared_local=0.0,
         )
 
     def attempt_step(self, state, dt, pde):
@@ -82,6 +83,11 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=sigma * E_with_bc_sqrtm)
         m_new = mp - K @ z
 
+        residual_white = jax.scipy.linalg.solve_triangular(Sl.T, z, lower=False)
+        diffusion_squared_local = (
+            residual_white @ residual_white / residual_white.shape[0]
+        )
+
         # Push back to non-preconditioned state
         Cl_new = P @ Cl_new
         m_new = P @ m_new
@@ -94,6 +100,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             error_estimate=error,
             reference_state=y_new,
             y=rv.MultivariateNormal(m_new, Cl_new),
+            diffusion_squared_local=diffusion_squared_local,
         )
         info_dict = dict(num_f_evaluations=1)
         return new_state, info_dict
