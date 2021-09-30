@@ -230,7 +230,7 @@ class LinearEvolutionNeumann(LinearPDE, NeumannMixIn):
     pass
 
 
-class SIRDirichlet(SemiLinearPDE, DirichletMixIn):
+class SIRDirichlet(SemiLinearPDE, NeumannMixIn):
     def discretize(
         self, *, mesh_spatial, kernel_list, stencil_size_list, nugget_gram_matrix=0.0
     ):
@@ -241,7 +241,9 @@ class SIRDirichlet(SemiLinearPDE, DirichletMixIn):
         L_blocks = []
         E_sqrtm_blocks = []
 
-        for kernel, stencil_size in zip(kernel_list, stencil_size_list):
+        for scale, kernel, stencil_size in zip(
+            self.diffop_scale, kernel_list, stencil_size_list
+        ):
 
             L, E_sqrtm = discretize.fd_probabilistic(
                 self.diffop,
@@ -250,13 +252,11 @@ class SIRDirichlet(SemiLinearPDE, DirichletMixIn):
                 stencil_size=stencil_size,
                 nugget_gram_matrix=nugget_gram_matrix,
             )
-            L_blocks.append(L)
-            E_sqrtm_blocks.append(E_sqrtm)
+            L_blocks.append(scale * L)
+            E_sqrtm_blocks.append(scale * E_sqrtm)
 
-        self.L = jax.scipy.linalg.block_diag(*[self.diffop_scale * L for L in L_blocks])
-        self.E_sqrtm = jax.scipy.linalg.block_diag(
-            *[self.diffop_scale * E_sqrtm for E_sqrtm in E_sqrtm_blocks]
-        )
+        self.L = jax.scipy.linalg.block_diag(*L_blocks)
+        self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_blocks)
         self.mesh_spatial = mesh_spatial
 
         if isinstance(self, NeumannMixIn):
@@ -362,7 +362,9 @@ def spatial_SIR_1d_dirichlet_discretized(
     beta=0.3,
     gamma=0.07,
     N=1000.0,
-    diffusion_rate=0.05,
+    diffusion_rate_S=0.1,
+    diffusion_rate_I=0.1,
+    diffusion_rate_R=0.1,
     kernel_list=None,
     nugget_gram_matrix_fd=0.0,
     stencil_size_list=None,
@@ -372,7 +374,9 @@ def spatial_SIR_1d_dirichlet_discretized(
         bbox=bbox,
         t0=t0,
         tmax=tmax,
-        diffusion_rate=diffusion_rate,
+        diffusion_rate_S=diffusion_rate_S,
+        diffusion_rate_I=diffusion_rate_I,
+        diffusion_rate_R=diffusion_rate_R,
         beta=beta,
         gamma=gamma,
         N=N,
@@ -400,7 +404,9 @@ def spatial_SIR_1d_dirichlet(
     bbox=None,
     t0=0.0,
     tmax=50.0,
-    diffusion_rate=0.05,
+    diffusion_rate_S=0.1,
+    diffusion_rate_I=0.1,
+    diffusion_rate_R=0.1,
     beta=0.3,
     gamma=0.07,
     N=1000.0,
@@ -409,7 +415,7 @@ def spatial_SIR_1d_dirichlet(
     bbox = jnp.asarray(bbox)
 
     def y0_fun(x):
-        init_infectious = 10.0 * gaussian_bell_1d_centered(x, bbox)
+        init_infectious = 10.0 * gaussian_bell_1d_centered(x, bbox, width=3.0) + 1.0
         s0 = N * jnp.ones_like(init_infectious) - init_infectious
         i0 = init_infectious
         r0 = jnp.zeros_like(init_infectious)
@@ -434,7 +440,7 @@ def spatial_SIR_1d_dirichlet(
     laplace = diffops.laplace()
     return SIRDirichlet(
         diffop=laplace,
-        diffop_scale=diffusion_rate,
+        diffop_scale=[diffusion_rate_S, diffusion_rate_I, diffusion_rate_R],
         bbox=bbox,
         t0=t0,
         tmax=tmax,
@@ -449,9 +455,9 @@ def spatial_SIR_1d_dirichlet(
 # They all adhere to Dirichlet conditions.
 
 
-def gaussian_bell_1d_centered(x, bbox):
-    midpoint = 0.5 * (bbox[0] + bbox[1])
-    return jnp.exp(-1.0 * (x - midpoint) ** 2)
+def gaussian_bell_1d_centered(x, bbox, width=1.0):
+    midpoint = 0.5 * (bbox[1] + bbox[0])
+    return jnp.exp(-((x - midpoint) ** 2) / width ** 2)
 
 
 def gaussian_bell_1d(x):
