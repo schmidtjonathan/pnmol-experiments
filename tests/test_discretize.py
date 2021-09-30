@@ -127,7 +127,7 @@ class TestDiscretise:
     @staticmethod
     @pytest.fixture
     def discretised(diffop, mesh_spatial_1d, k):
-        return discretize.discretize(
+        return discretize.fd_probabilistic(
             diffop=diffop,
             mesh_spatial=mesh_spatial_1d,
             kernel=k,

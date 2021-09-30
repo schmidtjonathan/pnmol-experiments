@@ -9,7 +9,7 @@ import tqdm
 from pnmol import kernels
 
 
-def discretize(
+def fd_probabilistic(
     diffop,
     mesh_spatial,
     kernel,

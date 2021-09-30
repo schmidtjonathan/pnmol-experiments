@@ -58,7 +58,7 @@ class DiscretizationMixIn:
     """Discretisation functionality for PDE problems."""
 
     def discretize(self, *, mesh_spatial, kernel, stencil_size, nugget_gram_matrix=0.0):
-        L, E_sqrtm = discretize.discretize(
+        L, E_sqrtm = discretize.fd_probabilistic(
             self.diffop,
             mesh_spatial=mesh_spatial,
             kernel=kernel,
