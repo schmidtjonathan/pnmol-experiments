@@ -417,8 +417,9 @@ def spatial_SIR_1d_dirichlet(
 
     @jax.jit
     def _sir_rhs(s, i, r):
-        new_s = -beta / N * s * i
-        new_i = beta / N * s * i - gamma * i
+        spatial_N = s + i + r
+        new_s = -beta * s * i / spatial_N
+        new_i = beta * s * i / spatial_N - gamma * i
         new_r = gamma * i
         return new_s, new_i, new_r
 
