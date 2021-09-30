@@ -57,9 +57,13 @@ class IVPMixIn:
 class DiscretizationMixIn:
     """Discretisation functionality for PDE problems."""
 
-    def discretize(self, *, mesh_spatial, kernel, **kwargs):
+    def discretize(self, *, mesh_spatial, kernel, stencil_size, nugget_gram_matrix=0.0):
         L, E_sqrtm = discretize.discretize(
-            self.diffop, mesh_spatial=mesh_spatial, kernel=kernel, **kwargs
+            self.diffop,
+            mesh_spatial=mesh_spatial,
+            kernel=kernel,
+            stencil_size=stencil_size,
+            nugget_gram_matrix=nugget_gram_matrix,
         )
 
         self.L = self.diffop_scale * L
@@ -260,7 +264,6 @@ def heat_1d_discretized(
     diffusion_rate=0.1,
     cov_damping_fd=0.0,
     kernel=None,
-    progressbar=False,
     bcond="dirichlet",
 ):
     heat = heat_1d(
@@ -281,7 +284,6 @@ def heat_1d_discretized(
         kernel=kernel,
         stencil_size=stencil_size,
         nugget_gram_matrix=cov_damping_fd,
-        progressbar=progressbar,
     )
     return heat
 
