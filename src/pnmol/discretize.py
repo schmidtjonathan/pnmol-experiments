@@ -66,7 +66,7 @@ def discretize(
         neighbors, neighbor_indices = mesh_spatial.neighbours(
             point=point, num=stencil_size
         )
-        weights, uncertainty = fd_coeff_fun(x=point, neighbors=neighbors.points)
+        weights, uncertainty = fd_coeff_fun(x=point, neighbors=neighbors)
 
         L_data.append(weights)
         L_row.append(jnp.full(shape=stencil_size, fill_value=i, dtype=int))

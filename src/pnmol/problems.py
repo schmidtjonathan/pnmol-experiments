@@ -271,7 +271,7 @@ def heat_1d_discretized(
         diffusion_rate=diffusion_rate,
         bcond=bcond,
     )
-    mesh_spatial = mesh.RectangularMesh.from_bounding_boxes_1d(heat.bbox, step=dx)
+    mesh_spatial = mesh.RectangularMesh.from_bbox_1d(heat.bbox, step=dx)
 
     if kernel is None:
         kernel = kernels.SquareExponential()

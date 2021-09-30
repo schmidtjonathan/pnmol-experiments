@@ -18,7 +18,7 @@ def dx():
 
 @pytest.fixture
 def mesh_spatial_1d(bbox, dx):
-    return mesh.RectangularMesh.from_bounding_boxes_1d(bbox, dx)
+    return mesh.RectangularMesh.from_bbox_1d(bbox, dx)
 
 
 @pytest.fixture

@@ -22,7 +22,7 @@ def kernel():
 
 @pytest.fixture
 def mesh_spatial(prob1d):
-    return pnmol.mesh.RectangularMesh.from_bounding_boxes_1d(prob1d.bbox, step=0.1)
+    return pnmol.mesh.RectangularMesh.from_bbox_1d(prob1d.bbox, step=0.1)
 
 
 class TestProb1dDiscretized:
