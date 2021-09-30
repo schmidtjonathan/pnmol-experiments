@@ -8,9 +8,6 @@ import tqdm
 
 from pnmol import diffops, kernels
 
-# No exports of e.g. tqdm.
-__all__ = ["fd_probabilistic", "fd_coefficients", "fd_probabilistic_neumann_1d"]
-
 
 def fd_probabilistic(
     diffop,
@@ -93,20 +90,6 @@ def _weights_to_matrix(weights_all, uncertainties_all, neighbor_indices_all):
     return L, jnp.sqrt(jnp.abs(E_sqrtm))
 
 
-@partial(jax.jit, static_argnums=(2, 3, 4))
-def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
-    """Compute kernel-based finite difference coefficients."""
-
-    X, n = neighbors, neighbors.shape[0]
-    gram_matrix = k(X, X.T) + nugget_gram_matrix * jnp.eye(n)
-    diffop_at_point = L_k(x[None, :], X.T).reshape((-1,))
-
-    weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
-    uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
-
-    return weights, uncertainty
-
-
 def fd_probabilistic_neumann_1d(
     mesh_spatial,
     kernel=None,
@@ -166,3 +149,17 @@ def _fd_coefficients_neumann(
         LL_k=LL_k,
         nugget_gram_matrix=nugget_gram_matrix,
     )
+
+
+@partial(jax.jit, static_argnums=(2, 3, 4))
+def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
+    """Compute kernel-based finite difference coefficients."""
+
+    X, n = neighbors, neighbors.shape[0]
+    gram_matrix = k(X, X.T) + nugget_gram_matrix * jnp.eye(n)
+    diffop_at_point = L_k(x[None, :], X.T).reshape((-1,))
+
+    weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
+    uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
+
+    return weights, uncertainty
