@@ -97,7 +97,7 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.02
+DT = 0.05
 DX = 0.05
 HIGH_RES_FACTOR_DX = 4
 HIGH_RES_FACTOR_DT = 4
