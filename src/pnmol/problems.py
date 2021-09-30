@@ -161,9 +161,9 @@ class SemiLinearPDE(PDE, NonLinearMixIn, IVPMixIn):
     def to_tornadox_ivp(self):
         """Transform PDE into an IVP. Requires prior discretisation."""
 
-        def f_new(_, x):
+        def f_new(t, x):
             x_padded = self.bc_pad(x)
-            x_new = self.L @ x_padded + self.f(x_padded)
+            x_new = self.L @ x_padded + self.f(t, x_padded)
             return self.bc_remove_pad(x_new)
 
         df_new = jax.jacfwd(f_new, argnums=1)
@@ -228,6 +228,59 @@ class LinearEvolutionDirichlet(LinearPDE, DirichletMixIn):
 
 class LinearEvolutionNeumann(LinearPDE, NeumannMixIn):
     pass
+
+
+class SIRDirichlet(SemiLinearPDE, DirichletMixIn):
+    def discretize(
+        self, *, mesh_spatial, kernel_list, stencil_size_list, nugget_gram_matrix=0.0
+    ):
+
+        num_system_components = 3  # S, I, and R
+        assert len(kernel_list) == len(stencil_size_list) == num_system_components
+
+        L_blocks = []
+        E_sqrtm_blocks = []
+
+        for kernel, stencil_size in zip(kernel_list, stencil_size_list):
+
+            L, E_sqrtm = discretize.fd_probabilistic(
+                self.diffop,
+                mesh_spatial=mesh_spatial,
+                kernel=kernel,
+                stencil_size=stencil_size,
+                nugget_gram_matrix=nugget_gram_matrix,
+            )
+            L_blocks.append(L)
+            E_sqrtm_blocks.append(E_sqrtm)
+
+        self.L = jax.scipy.linalg.block_diag(*[self.diffop_scale * L for L in L_blocks])
+        self.E_sqrtm = jax.scipy.linalg.block_diag(
+            *[self.diffop_scale * E_sqrtm for E_sqrtm in E_sqrtm_blocks]
+        )
+        self.mesh_spatial = mesh_spatial
+
+        if isinstance(self, NeumannMixIn):
+            if self.dimension > 1:
+                raise NotImplementedError
+            B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
+                mesh_spatial=mesh_spatial,
+                kernel=kernel,
+                stencil_size=2,
+                nugget_gram_matrix=nugget_gram_matrix,
+            )
+
+        elif isinstance(self, DirichletMixIn):
+            B = mesh_spatial.boundary_projection_matrix
+            R_sqrtm = jnp.zeros((B.shape[0], B.shape[0]))
+
+        self.B = jax.scipy.linalg.block_diag(*[B for _ in range(num_system_components)])
+        self.R_sqrtm = jax.scipy.linalg.block_diag(
+            *[R_sqrtm for _ in range(num_system_components)]
+        )
+
+        if isinstance(self, IVPMixIn):
+            # Enforce a scalar initial value by slicing the zeroth dimension
+            self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
 # Some precomputed recipes for PDE examples.
@@ -301,80 +354,93 @@ def heat_1d(
     raise ValueError
 
 
-def spatial_SIR_1d(
+def spatial_SIR_1d_dirichlet_discretized(
     bbox=None,
     dx=1.0,
-    stencil_size=3,
     t0=0.0,
-    tmax=20.0,
-    beta=0.2,
+    tmax=50.0,
+    beta=0.3,
     gamma=0.07,
     N=1000.0,
-    diffusion_constant=0.01,
-    prng_key=None,
-    cov_damping_fd=0.0,
-    kernel=None,
-    progressbar=False,
+    diffusion_rate=0.05,
+    kernel_list=None,
+    nugget_gram_matrix_fd=0.0,
+    stencil_size_list=None,
+):
+    num_system_components = 3
+    sir = spatial_SIR_1d_dirichlet(
+        bbox=bbox,
+        t0=t0,
+        tmax=tmax,
+        diffusion_rate=diffusion_rate,
+        beta=beta,
+        gamma=gamma,
+        N=N,
+    )
+    mesh_spatial = mesh.RectangularMesh.from_bbox_1d(sir.bbox, step=dx)
+
+    if kernel_list is None:
+        kernel_list = [
+            kernels.SquareExponential() for _ in range(num_system_components)
+        ]
+
+    if stencil_size_list is None:
+        stencil_size_list = [3 for _ in range(num_system_components)]
+
+    sir.discretize(
+        mesh_spatial=mesh_spatial,
+        kernel_list=kernel_list,
+        stencil_size_list=stencil_size_list,
+        nugget_gram_matrix=nugget_gram_matrix_fd,
+    )
+    return sir
+
+
+def spatial_SIR_1d_dirichlet(
+    bbox=None,
+    t0=0.0,
+    tmax=50.0,
+    diffusion_rate=0.05,
+    beta=0.3,
+    gamma=0.07,
+    N=1000.0,
 ):
 
-    # Bounding box for spatial discretization grid
-    if bbox is None:
-        bbox = [0.0, 5.0]
     bbox = jnp.asarray(bbox)
 
-    grid = mesh.RectangularMesh.from_bounding_boxes_1d(bounding_boxes=bbox, step=dx)
-
-    x = grid.points.reshape((-1,))
-    prng_key = prng_key or jax.random.PRNGKey(seed=2)
-
-    init_infectious = jax.random.uniform(
-        prng_key, shape=(x.shape[0],), minval=1.0, maxval=10.0
-    )
-    s0 = N * jnp.ones_like(init_infectious) - init_infectious
-    i0 = init_infectious
-    r0 = jnp.zeros_like(init_infectious)
-    y0 = jnp.concatenate((s0, i0, r0))
-
-    # Default kernels
-    if kernel is None:
-        kernel = kernels.SquareExponential()
-
-    laplace = diffops.laplace()
-    L, E_sqrtm = discretize.discretize(
-        diffop=laplace,
-        mesh=grid,
-        kernel=kernel,
-        stencil_size=stencil_size,
-        cov_damping=cov_damping_fd,
-        progressbar=progressbar,
-    )
-    L = diffusion_constant * L
-    E_sqrtm = diffusion_constant * E_sqrtm
+    def y0_fun(x):
+        init_infectious = 10.0 * gaussian_bell_1d_centered(x, bbox)
+        s0 = N * jnp.ones_like(init_infectious) - init_infectious
+        i0 = init_infectious
+        r0 = jnp.zeros_like(init_infectious)
+        return jnp.concatenate((s0, i0, r0))
 
     @jax.jit
-    def sir_rhs(s, i, r):
-        new_s = (-beta / N * s * i) + L @ s
-        new_i = (beta / N * s * i - gamma * i) + L @ i
-        new_r = (gamma * i) + L @ r
+    def _sir_rhs(s, i, r):
+        new_s = -beta / N * s * i
+        new_i = beta / N * s * i - gamma * i
+        new_r = gamma * i
         return new_s, new_i, new_r
 
     @jax.jit
     def f(t, x):
         s, i, r = jnp.split(x, 3)
-        new_s, new_i, new_r = sir_rhs(s, i, r)
+        new_s, new_i, new_r = _sir_rhs(s, i, r)
         return jnp.concatenate((new_s, new_i, new_r))
 
     df = jax.jit(jax.jacfwd(f, argnums=1))
 
-    return SemiLinearPDEProblem(
-        spatial_grid=grid,
+    laplace = diffops.laplace()
+    return SIRDirichlet(
+        diffop=laplace,
+        diffop_scale=diffusion_rate,
+        bbox=bbox,
         t0=t0,
         tmax=tmax,
-        y0=y0,
+        y0_fun=y0_fun,
         f=f,
         df=df,
-        L=L,
-        E_sqrtm=E_sqrtm,
+        df_diagonal=None,  # jax.jit(lambda t, x: jnp.diagonal(df(t, x))),
     )
 
 
