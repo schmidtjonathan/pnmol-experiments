@@ -26,7 +26,7 @@ stds = jnp.sqrt(jnp.diagonal(cov, axis1=1, axis2=2) @ E0.T)
 
 # Plot mean and std
 
-xgrid = discretized_pde.spatial_grid.points.squeeze()
+xgrid = discretized_pde.mesh_spatial.points.squeeze()
 tgrid = sol.t
 
 T, X = jnp.meshgrid(xgrid, tgrid)

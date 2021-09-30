@@ -20,8 +20,8 @@ TRUE_BOXES = jnp.array([[0.0, 1.0], [0.0, 1.0], [-1.0, 2.0]])
 
 
 class ReadBoundingBoxesTestCase(unittest.TestCase):
-    def test_read_bounding_boxes(self):
-        read_boxes = mesh.read_bounding_boxes(SET)
+    def test_read_bbox(self):
+        read_boxes = mesh.read_bbox(SET)
         discrepancy = jnp.linalg.norm(TRUE_BOXES - read_boxes)
         self.assertLess(discrepancy, 1e-14)
 
@@ -49,17 +49,6 @@ class TestRectangularMesh(unittest.TestCase):
         self.assertLess(error_n1, 1e-14)
         self.assertLess(error_n2, 1e-14)
 
-    def test_neighbours_bounding_boxes(self):
-        """
-        Bounding boxes of the neighbours() result must be the same
-        as those of the original set. This was a bug once.
-        """
-        neighbours, _ = self.mesh.neighbours(SET[0], num=2)
-        original_bbox = self.mesh.bounding_boxes
-        new_bbox = neighbours.bounding_boxes
-        discrepancy = jnp.linalg.norm(original_bbox - new_bbox)
-        self.assertLess(discrepancy, 1e-14)
-
     def test_len(self):
         self.assertEqual(len(self.mesh), len(SET))
 
@@ -74,26 +63,22 @@ class TestRectangularMesh(unittest.TestCase):
         difference = jnp.linalg.norm(self.mesh[:, 0] - SET[:, 0])
         self.assertLess(difference, 1e-14)
 
-    def test_from_bounding_boxes_1d(self):
-        grid = mesh.RectangularMesh.from_bounding_boxes_1d(
-            bounding_boxes=TRUE_BOXES[0], step=0.1
-        )
+    def test_from_bbox_1d(self):
+        grid = mesh.RectangularMesh.from_bbox_1d(bbox=TRUE_BOXES[0], step=0.1)
         self.assertEqual(isinstance(grid, mesh.RectangularMesh), True)
         self.assertEqual(grid.ndim, 2)
         self.assertEqual(grid.dimension, 1)
 
-    def test_from_bounding_boxes_2d(self):
-        grid = mesh.RectangularMesh.from_bounding_boxes_2d(
-            bounding_boxes=TRUE_BOXES[jnp.array([0, 1])], steps=[0.1, 0.2]
+    def test_from_bbox_2d(self):
+        grid = mesh.RectangularMesh.from_bbox_2d(
+            bbox=TRUE_BOXES[jnp.array([0, 1])], steps=[0.1, 0.2]
         )
         self.assertEqual(isinstance(grid, mesh.RectangularMesh), True)
         self.assertEqual(grid.ndim, 2)
         self.assertEqual(grid.dimension, 2)
 
     def test_boundary_projection_1d(self):
-        grid = mesh.RectangularMesh.from_bounding_boxes_1d(
-            bounding_boxes=[0.0, 1.0], step=0.1
-        )
+        grid = mesh.RectangularMesh.from_bbox_1d(bbox=[0.0, 1.0], step=0.1)
         B = grid.boundary_projection_matrix
 
         boundary_points, _ = grid.boundary
@@ -101,8 +86,8 @@ class TestRectangularMesh(unittest.TestCase):
             self.assertEqual(exp, rec)
 
     def test_boundary_projection_2d(self):
-        grid = mesh.RectangularMesh.from_bounding_boxes_2d(
-            bounding_boxes=[[0.0, 0.0], [1.0, 1.0]], steps=(0.1, 0.1)
+        grid = mesh.RectangularMesh.from_bbox_2d(
+            bbox=[[0.0, 0.0], [1.0, 1.0]], steps=(0.1, 0.1)
         )
         B = grid.boundary_projection_matrix
 

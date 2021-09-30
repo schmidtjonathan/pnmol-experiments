@@ -9,7 +9,7 @@ import pnmol.problems
 
 @pytest.fixture
 def ivp():
-    return pnmol.problems.heat_1d()
+    return pnmol.problems.heat_1d_discretized()
 
 
 class TestConstant:

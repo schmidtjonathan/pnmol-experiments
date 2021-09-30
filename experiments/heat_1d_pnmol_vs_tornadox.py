@@ -78,7 +78,7 @@ discretized_pde_pnmol = pnmol.problems.heat_1d(
     stencil_size=3,
     diffusion_rate=0.05,
     kernel=pnmol.kernels.SquareExponential(),
-    cov_damping_fd=0.0,
+    nugget_gram_matrix_fd=0.0,
 )
 discretized_pde_tornadox = pnmol.problems.heat_1d(
     tmax=5.0,
@@ -86,7 +86,7 @@ discretized_pde_tornadox = pnmol.problems.heat_1d(
     stencil_size=3,
     diffusion_rate=0.05,
     kernel=pnmol.kernels.Polynomial(),
-    cov_damping_fd=0.0,
+    nugget_gram_matrix_fd=0.0,
 )
 discretized_pde_high_res = pnmol.problems.heat_1d(
     tmax=5.0,
@@ -94,7 +94,7 @@ discretized_pde_high_res = pnmol.problems.heat_1d(
     stencil_size=3,
     diffusion_rate=0.05,
     kernel=pnmol.kernels.Polynomial(),
-    cov_damping_fd=0.0,
+    nugget_gram_matrix_fd=0.0,
 )
 
 nu = 2
@@ -125,8 +125,8 @@ def infer_vrange_std(res):
 
 
 # Need this later
-xgrid = discretized_pde_pnmol.spatial_grid.points.squeeze()
-xgrid2 = discretized_pde_high_res.spatial_grid.points.squeeze()
+xgrid = discretized_pde_pnmol.mesh_spatial.points.squeeze()
+xgrid2 = discretized_pde_high_res.mesh_spatial.points.squeeze()
 
 # Create 2x2 grid
 fig, axes = plt.subplots(

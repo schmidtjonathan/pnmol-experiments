@@ -75,55 +75,53 @@ class Mesh(abc.ABC):
 class RectangularMesh(Mesh):
     """Rectangular mesh."""
 
-    def __init__(self, points, bounding_boxes=None):
-        if bounding_boxes is not None:
-            self.bounding_boxes = bounding_boxes
+    def __init__(self, points, bbox=None):
+        if bbox is not None:
+            self.bbox = bbox
         else:
-            self.bounding_boxes = read_bounding_boxes(points)
+            self.bbox = read_bbox(points)
         super().__init__(points)
 
     @classmethod
-    def from_bounding_boxes_1d(cls, bounding_boxes, step=None, num=None):
+    def from_bbox_1d(cls, bbox, step=None, num=None):
 
-        bounding_boxes = jnp.asarray(bounding_boxes)
+        bbox = jnp.asarray(bbox)
 
         if int(step is None) + int(num is None) != 1:
             raise ValueError("Provide exactly one of step or num.")
 
         if step is not None:
-            num = int((bounding_boxes[1] - bounding_boxes[0]) / step) + 1
+            num = int((bbox[1] - bbox[0]) / step) + 1
 
-        X = jnp.linspace(
-            start=bounding_boxes[0], stop=bounding_boxes[1], num=num, endpoint=True
-        )
+        X = jnp.linspace(start=bbox[0], stop=bbox[1], num=num, endpoint=True)
 
         return cls(X.reshape(-1, 1))
 
     @classmethod
-    def from_bounding_boxes_2d(cls, bounding_boxes, steps=None, nums=None):
+    def from_bbox_2d(cls, bbox, steps=None, nums=None):
 
-        bounding_boxes = jnp.asarray(bounding_boxes)
+        bbox = jnp.asarray(bbox)
 
         if int(steps is None) + int(nums is None) != 1:
             raise ValueError("Provide exactly one of step or num.")
 
         if steps is not None:
             step_y, step_x = steps
-            num_y = int((bounding_boxes[1, 0] - bounding_boxes[0, 0]) / step_y) + 1
-            num_x = int((bounding_boxes[1, 1] - bounding_boxes[0, 1]) / step_x) + 1
+            num_y = int((bbox[1, 0] - bbox[0, 0]) / step_y) + 1
+            num_x = int((bbox[1, 1] - bbox[0, 1]) / step_x) + 1
 
         if nums is not None:
             num_y, num_x = nums
 
         Y = jnp.linspace(
-            start=bounding_boxes[0, 0],
-            stop=bounding_boxes[1, 0],
+            start=bbox[0, 0],
+            stop=bbox[1, 0],
             num=num_y,
             endpoint=True,
         )
         X = jnp.linspace(
-            start=bounding_boxes[0, 1],
-            stop=bounding_boxes[1, 1],
+            start=bbox[0, 1],
+            stop=bbox[1, 1],
             num=num_x,
             endpoint=True,
         )
@@ -138,19 +136,19 @@ class RectangularMesh(Mesh):
             return RectangularMesh(points=point[None, :])
         distances, indices = self._tree.query(x=point, k=num)
         neighbours = self.points[indices]
-        return RectangularMesh(neighbours, bounding_boxes=self.bounding_boxes), indices
+        return neighbours, indices
 
     @cached_property
     def boundary(self):
         is_boundary = jnp.logical_or(
-            self.points[:, 0] == self.bounding_boxes[0, 0],
-            self.points[:, 0] == self.bounding_boxes[0, 1],
+            self.points[:, 0] == self.bbox[0, 0],
+            self.points[:, 0] == self.bbox[0, 1],
         )
 
-        for d in range(1, len(self.bounding_boxes)):
+        for d in range(1, len(self.bbox)):
             this_dim = jnp.logical_or(
-                self.points[:, d] == self.bounding_boxes[d, 0],
-                self.points[:, d] == self.bounding_boxes[d, 1],
+                self.points[:, d] == self.bbox[d, 0],
+                self.points[:, d] == self.bbox[d, 1],
             )
             is_boundary = jnp.logical_or(is_boundary, this_dim)
         return self.points[is_boundary], is_boundary
@@ -158,14 +156,14 @@ class RectangularMesh(Mesh):
     @cached_property
     def interior(self):
         is_boundary = jnp.logical_and(
-            self.points[:, 0] != self.bounding_boxes[0, 0],
-            self.points[:, 0] != self.bounding_boxes[0, 1],
+            self.points[:, 0] != self.bbox[0, 0],
+            self.points[:, 0] != self.bbox[0, 1],
         )
 
-        for d in range(1, len(self.bounding_boxes)):
+        for d in range(1, len(self.bbox)):
             this_dim = jnp.logical_and(
-                self.points[:, d] != self.bounding_boxes[d, 0],
-                self.points[:, d] != self.bounding_boxes[d, 1],
+                self.points[:, d] != self.bbox[d, 0],
+                self.points[:, d] != self.bbox[d, 1],
             )
             is_boundary = jnp.logical_and(is_boundary, this_dim)
         return self.points[is_boundary], is_boundary
@@ -177,7 +175,7 @@ class RectangularMesh(Mesh):
         return E[indices, :]
 
 
-def read_bounding_boxes(points):
+def read_bbox(points):
     points = jnp.asarray(points)
     bboxes = np.nan * np.ones((points.shape[-1], 2))
     for d in range(points.shape[-1]):

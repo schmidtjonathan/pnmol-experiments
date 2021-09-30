@@ -17,28 +17,13 @@ def dx():
 
 
 @pytest.fixture
-def grid_1d(bbox, dx):
-    return mesh.RectangularMesh.from_bounding_boxes_1d(bbox, dx)
+def mesh_spatial_1d(bbox, dx):
+    return mesh.RectangularMesh.from_bbox_1d(bbox, dx)
 
 
 @pytest.fixture
 def diffop():
     return diffops.laplace()
-
-
-@pytest.fixture
-def k():
-    return kernels.Polynomial(const=1.0)
-
-
-@pytest.fixture
-def L_k(k, diffop):
-    return kernels.Lambda(diffop(k.pairwise, argnums=0))
-
-
-@pytest.fixture
-def LL_k(L_k, diffop):
-    return kernels.Lambda(diffop(L_k.pairwise, argnums=1))
 
 
 class TestFDCoefficients:
@@ -47,101 +32,82 @@ class TestFDCoefficients:
     https://en.wikipedia.org/wiki/Finite_difference_coefficient
     """
 
-    class TestCentral:
-        @staticmethod
-        @pytest.fixture
-        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
-            x0 = grid_1d[1]
-            return discretize.fd_coeff(
-                x=x0,
-                grid=grid_1d,
-                stencil_size=3,
-                k=k,
-                L_k=L_k,
-                LL_k=LL_k,
-                cov_damping=0.0,
-            )
-
-        @staticmethod
-        def test_weights(fd_coeff, dx):
-            weights_normalized = fd_coeff[0] * dx ** 2
-            assert jnp.allclose(weights_normalized, jnp.array([-2.0, 1.0, 1.0]))
-
-        @staticmethod
-        def test_uncertainty_zero(fd_coeff):
-            uncertainty = fd_coeff[1]
-            assert jnp.allclose(uncertainty, jnp.array(0.0))
-
-    class TestForward:
-        @staticmethod
-        @pytest.fixture
-        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
-            x0 = grid_1d[0]
-            return discretize.fd_coeff(
-                x=x0,
-                grid=grid_1d,
-                stencil_size=3,
-                k=k,
-                L_k=L_k,
-                LL_k=LL_k,
-                cov_damping=0.0,
-            )
-
-        @staticmethod
-        def test_weights(fd_coeff, dx):
-            weights_normalized = fd_coeff[0] * dx ** 2
-            weights_expected = jnp.array([1.0, -2.0, 1.0])
-            assert jnp.allclose(weights_normalized, weights_expected)
-
-        @staticmethod
-        def test_uncertainty_zero(fd_coeff):
-            uncertainty = fd_coeff[1]
-            assert jnp.allclose(uncertainty, jnp.array(0.0))
-
-    class TestBackward:
-        @staticmethod
-        @pytest.fixture
-        def fd_coeff(grid_1d, k, L_k, LL_k, dx):
-            x0 = grid_1d[-1]
-            return discretize.fd_coeff(
-                x=x0,
-                grid=grid_1d,
-                stencil_size=3,
-                k=k,
-                L_k=L_k,
-                LL_k=LL_k,
-                cov_damping=0.0,
-            )
-
-        @staticmethod
-        def test_weights(fd_coeff, dx):
-            weights_computed = fd_coeff[0]
-            weights_normalized = weights_computed * dx ** 2
-            weights_expected = jnp.array([1.0, -2.0, 1.0])
-            assert jnp.allclose(weights_normalized, weights_expected)
-
-        @staticmethod
-        def test_uncertainty_zero(fd_coeff):
-            uncertainty = fd_coeff[1]
-            assert jnp.allclose(uncertainty, jnp.array(0.0))
-
-
-class TestDiscretise:
     @staticmethod
     @pytest.fixture
-    def discretised(diffop, grid_1d, k):
-        return discretize.discretize(
-            diffop=diffop, mesh=grid_1d, kernel=k, stencil_size=3, cov_damping=0.0
+    def k():
+        return kernels.Polynomial(const=1.0)
+
+    @staticmethod
+    @pytest.fixture
+    def L_k(k, diffop):
+        return kernels.Lambda(diffop(k.pairwise, argnums=0))
+
+    @staticmethod
+    @pytest.fixture
+    def LL_k(L_k, diffop):
+        return kernels.Lambda(diffop(L_k.pairwise, argnums=1))
+
+    @staticmethod
+    @pytest.fixture
+    def fd_coeff(mesh_spatial_1d, k, L_k, LL_k, dx):
+        x0 = mesh_spatial_1d[1]
+        return discretize.fd_coefficients(
+            x=x0,
+            neighbors=mesh_spatial_1d[((1, 0, 2),)],
+            k=k,
+            L_k=L_k,
+            LL_k=LL_k,
+            nugget_gram_matrix=0.0,
         )
 
     @staticmethod
-    def test_L_shape(discretised, grid_1d):
-        L, _ = discretised
-        n = grid_1d.shape[0]
+    def test_weights(fd_coeff, dx):
+        weights_normalized = fd_coeff[0] * dx ** 2
+        assert jnp.allclose(weights_normalized, jnp.array([-2.0, 1.0, 1.0]))
+
+    @staticmethod
+    def test_uncertainty_zero(fd_coeff):
+        uncertainty = fd_coeff[1]
+        assert jnp.allclose(uncertainty, jnp.array(0.0))
+
+
+class TestFDProbabilistic:
+    @staticmethod
+    @pytest.fixture
+    def fd_approximation(diffop, mesh_spatial_1d):
+        return discretize.fd_probabilistic(
+            diffop=diffop,
+            mesh_spatial=mesh_spatial_1d,
+            stencil_size=3,
+            nugget_gram_matrix=0.0,
+        )
+
+    @staticmethod
+    def test_L_shape(fd_approximation, mesh_spatial_1d):
+        L, _ = fd_approximation
+        n = mesh_spatial_1d.shape[0]
         assert L.shape == (n, n)
 
     @staticmethod
-    def test_E_sqrtm_shape(discretised, grid_1d):
-        _, E_sqrtm = discretised
-        n = grid_1d.shape[0]
+    def test_E_sqrtm_shape(fd_approximation, mesh_spatial_1d):
+        _, E_sqrtm = fd_approximation
+        n = mesh_spatial_1d.shape[0]
         assert E_sqrtm.shape == (n, n)
+
+
+class TestNeumann:
+    @staticmethod
+    @pytest.fixture
+    def fd_probabilistic_neumann(mesh_spatial_1d):
+        return discretize.fd_probabilistic_neumann_1d(mesh_spatial_1d)
+
+    @staticmethod
+    def test_shape_L(fd_probabilistic_neumann, mesh_spatial_1d):
+        L, _ = fd_probabilistic_neumann
+        n = mesh_spatial_1d.shape[0]
+        assert L.shape == (2, n)
+
+    @staticmethod
+    def test_shape_E_sqrtm(fd_probabilistic_neumann):
+        _, E_sqrtm = fd_probabilistic_neumann
+        assert E_sqrtm.shape == (2, 2)

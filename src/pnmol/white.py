@@ -17,7 +17,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 
     def initialize(self, pde):
 
-        X = pde.spatial_grid.points
+        X = pde.mesh_spatial.points
         diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.iwp = iwp.IntegratedWienerTransition(
@@ -29,7 +29,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         self.E1 = self.iwp.projection_matrix(1)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = pde.to_tornadox_ivp_1d()
+        ivp = pde.to_tornadox_ivp()
         extended_dy0, cov_sqrtm = self.init(
             f=ivp.f,
             df=ivp.df,
@@ -74,7 +74,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             m_pred=mp,
             t=state.t + dt,
         )
-        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, jnp.zeros((2, 2)))
+        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, pde.R_sqrtm)
         sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
 
@@ -119,9 +119,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 
 class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
     @staticmethod
-    # @partial(jax.jit, static_argnums=(0,))
     def evaluate_ode(pde, p0, p1, m_pred, t):
-        B = pde.spatial_grid.boundary_projection_matrix
         L = pde.L
 
         m_at = p0 @ m_pred
@@ -130,7 +128,7 @@ class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
         b = Jx @ m_at - fx
 
         H_ode = p1 - Jx @ p0
-        H = jnp.vstack((H_ode, B @ p0))
-        shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
+        H = jnp.vstack((H_ode, pde.B @ p0))
+        shift = jnp.hstack((b, jnp.zeros(pde.B.shape[0])))
         z = H @ m_pred + shift
         return z, H
