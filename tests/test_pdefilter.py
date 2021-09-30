@@ -23,7 +23,7 @@ def test_solve(solver, bcond):
         stencil_size=3,
         diffusion_rate=0.05,
         kernel=pnmol.kernels.Polynomial(),
-        cov_damping_fd=0.0,
+        nugget_gram_matrix_fd=0.0,
         bcond=bcond,
     )
     # Solve the discretised PDE

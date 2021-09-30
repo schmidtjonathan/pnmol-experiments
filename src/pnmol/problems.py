@@ -238,7 +238,7 @@ def heat_1d_discretized(
     tmax=20.0,
     y0_fun=None,
     diffusion_rate=0.1,
-    cov_damping_fd=0.0,
+    nugget_gram_matrix_fd=0.0,
     kernel=None,
     bcond="dirichlet",
 ):
@@ -259,7 +259,7 @@ def heat_1d_discretized(
         mesh_spatial=mesh_spatial,
         kernel=kernel,
         stencil_size=stencil_size,
-        nugget_gram_matrix=cov_damping_fd,
+        nugget_gram_matrix=nugget_gram_matrix_fd,
     )
     return heat
 
