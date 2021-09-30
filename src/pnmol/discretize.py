@@ -27,7 +27,7 @@ def discretize(
     ---------
     diffop
         Differential operator.
-    mesh
+    mesh_spatial
         On which mesh shall the differential operator be discretized.
     kernel
         Representative kernel object for an underlying reproducing kernel Hilbert
@@ -35,8 +35,10 @@ def discretize(
     stencil_size
         Number of local neighbours to use for localised discretization.
         Optional. Default is ``None``, which implies that all points are used.
-    cov_damping
+    nugget_gram_matrix
         Damping value to be added to the diagonal of each kernel Gram matrix.
+    progressbar
+        Display a progressbar.
 
     Returns
     -------
@@ -59,12 +61,11 @@ def discretize(
 
     L_data, L_row, L_col, E_data = [], [], [], []
 
-    range_loop = enumerate(tqdm.tqdm(mesh_spatial.points, disable=not progressbar))
-    for i, point in range_loop:
+    for i, point in enumerate(tqdm.tqdm(mesh_spatial.points, disable=not progressbar)):
+
         neighbors, neighbor_indices = mesh_spatial.neighbours(
             point=point, num=stencil_size
         )
-
         weights, uncertainty = fd_coeff_fun(x=point, neighbors=neighbors.points)
 
         L_data.append(weights)

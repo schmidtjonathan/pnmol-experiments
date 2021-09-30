@@ -1,4 +1,25 @@
-"""PDE Problems and some example implementations."""
+"""PDE Problems and some example implementations.
+
+The central object here is the :class:`PDE`, which holds a differential operator,
+a bounding box, and fields that store the discretised operator later on.
+
+This can be combined with a number of additional options:
+    * :class:`IVPMixIn`: adds the required fields for making the problem time-dependent.
+      (currently in :class:`PDE` per default, but can be extracted in the future)
+    * :class:`DiscretizationMixIn:` adds a .discretize() functionality
+      (currently in :class:`PDE` per default, but can be extracted in the future)
+    * :class:`NonLinearMixIn`: which adds non-linearities (f, df, etc.)
+
+They are optionally combined with Dirichlet or Neumann boundary conditions
+(optional, because (a) PNMOL does not _need_ boundary conditions to work on paper,
+and because (b) some problems dont have boundary conditions (e.g. PDEs on the sphere)
+    * :class:`DirichletMixIn`: adds Dirichlet boundary conditions.
+    * :class:`NeumannMixIn`: adds Neumann boundary conditions.
+
+These building blocks allow combination in various ways, some predefined recipes are
+    * :class:`LinearEvolutionDirichlet`: used for e.g. the heat equation with Dirichlet conditions.
+    * :class:`LinearEvolutionNeumann`: used for e.g. the heat equation with Neumann conditions.
+"""
 
 import functools
 
@@ -143,7 +164,7 @@ class LinearPDE(PDE):
         )
 
 
-class _NonLinearMixIn:
+class NonLinearMixIn:
     def __init__(self, *, f, df, df_diagonal, **kwargs):
         self.f = f
         self.df = df
@@ -151,7 +172,7 @@ class _NonLinearMixIn:
         super().__init__(**kwargs)
 
 
-class SemiLinearPDE(PDE, _NonLinearMixIn):
+class SemiLinearPDE(PDE, NonLinearMixIn):
     """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
@@ -177,6 +198,12 @@ class _BoundaryCondition:
         self.B = None
         self.R_sqrtm = None
         super().__init__(**kwargs)
+
+    def bc_pad(self, x):
+        raise NotImplementedError
+
+    def bc_remove_pad(self, x):
+        raise NotImplementedError
 
 
 class NeumannMixIn(_BoundaryCondition):
