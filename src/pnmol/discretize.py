@@ -8,6 +8,9 @@ import tqdm
 
 from pnmol import diffops, kernels
 
+# No exports of e.g. tqdm.
+__all__ = ["fd_probabilistic", "fd_coefficients", "fd_probabilistic_neumann_1d"]
+
 
 def fd_probabilistic(
     diffop,
@@ -130,12 +133,11 @@ def fd_probabilistic_neumann_1d(
         LL_k=LLk,
         nugget_gram_matrix=nugget_gram_matrix,
     )
+    fd_coeff_neumann = jax.jit(fd_coeff_neumann_fixed)
 
     # Compute left and right weights and uncertainties
-    weights_left, uncertainty_left = fd_coeff_neumann_fixed(
-        idx_x=0, idx_neighbors=(0, 1)
-    )
-    weights_right, uncertainty_right = fd_coeff_neumann_fixed(
+    weights_left, uncertainty_left = fd_coeff_neumann(idx_x=0, idx_neighbors=(0, 1))
+    weights_right, uncertainty_right = fd_coeff_neumann(
         idx_x=-1, idx_neighbors=(-1, -2)
     )
 
@@ -153,6 +155,7 @@ def fd_probabilistic_neumann_1d(
 def _fd_coefficients_neumann(
     idx_x, idx_neighbors, mesh_spatial, k, L_k, LL_k, nugget_gram_matrix
 ):
+    """Compute finite difference coefficients for Neumann (normal) derivative."""
     x = mesh_spatial[idx_x]
     neighbors = mesh_spatial[(idx_neighbors,)]
     return fd_coefficients(

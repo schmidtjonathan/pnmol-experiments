@@ -73,43 +73,19 @@ class DiscretizationMixIn:
         if isinstance(self, NeumannMixIn):
             if self.dimension > 1:
                 raise NotImplementedError
-            diffop = diffops.gradient()  # 1d
-
-            # The below is entirely harakiri, but it somehow works.
-            k = kernel
-            Lk = kernels.Lambda(diffop(k.pairwise, argnums=0))
-            LLk = kernels.Lambda(diffop(Lk.pairwise, argnums=1))
-            x_left = mesh_spatial[0]
-            neighbors_left = mesh_spatial[((0, 1),)]
-            weights_left, uncertainty_left = discretize.fd_coefficients(
-                x=x_left,
-                neighbors=neighbors_left,
-                k=k,
-                L_k=Lk,
-                LL_k=LLk,
+            self.B, self.R_sqrtm = discretize.fd_probabilistic_neumann_1d(
+                mesh_spatial=mesh_spatial,
+                kernel=kernel,
+                stencil_size=2,
+                nugget_gram_matrix=nugget_gram_matrix,
             )
-            x_right = mesh_spatial[-1]
-            neighbors_right = mesh_spatial[((-1, -2),)]
-            weights_right, uncertainty_right = discretize.fd_coefficients(
-                x=x_right,
-                neighbors=neighbors_right,
-                k=k,
-                L_k=Lk,
-                LL_k=LLk,
-                nugget_gram_matrix=1e-10,
-            )
-            # -1 and -2 are swapped, which reflects their locations in 'neighbors'
-            B = jnp.eye(len(mesh_spatial))[((0, 1, -1, -2),)]
-            self.B = jax.scipy.linalg.block_diag(-weights_left, weights_right) @ B
-            self.R_sqrtm = jnp.diag(jnp.array([uncertainty_left, uncertainty_right]))
 
         elif isinstance(self, DirichletMixIn):
             self.B = mesh_spatial.boundary_projection_matrix
             self.R_sqrtm = jnp.zeros((self.B.shape[0], self.B.shape[0]))
 
         if isinstance(self, IVPMixIn):
-
-            # Enforce a scalar initial value
+            # Enforce a scalar initial value by slicing the zeroth dimension
             self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
