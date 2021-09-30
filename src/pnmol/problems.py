@@ -81,10 +81,12 @@ class DiscretizationMixIn:
             )
 
         elif isinstance(self, DirichletMixIn):
+
             self.B = mesh_spatial.boundary_projection_matrix
             self.R_sqrtm = jnp.zeros((self.B.shape[0], self.B.shape[0]))
 
         if isinstance(self, IVPMixIn):
+
             # Enforce a scalar initial value by slicing the zeroth dimension
             self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
@@ -133,6 +135,7 @@ class LinearPDE(PDE):
         """Transform PDE into an IVP. Requires prior discretisation."""
 
         def f_new(_, x):
+            assert x.ndim == 1
             x_padded = self.bc_pad(x)
             x_new = self.L @ x_padded
             return self.bc_remove_pad(x_new)
@@ -207,7 +210,7 @@ class DirichletMixIn(_BoundaryCondition):
         if self.dimension > 1:
             raise NotImplementedError
 
-        return jnp.pad(x, pad_width=1, mode="constant", constant_values=1.0)
+        return jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
 
     def bc_remove_pad(self, x):
         if self.dimension > 1:
@@ -235,9 +238,9 @@ def heat_1d_discretized(
     dx=0.05,
     stencil_size=3,
     t0=0.0,
-    tmax=20.0,
+    tmax=5.0,
     y0_fun=None,
-    diffusion_rate=0.1,
+    diffusion_rate=0.05,
     nugget_gram_matrix_fd=0.0,
     kernel=None,
     bcond="dirichlet",
@@ -265,7 +268,7 @@ def heat_1d_discretized(
 
 
 def heat_1d(
-    bbox=None, t0=0.0, tmax=20.0, y0_fun=None, diffusion_rate=0.1, bcond="dirichlet"
+    bbox=None, t0=0.0, tmax=5.0, y0_fun=None, diffusion_rate=0.05, bcond="dirichlet"
 ):
     laplace = diffops.laplace()
 
@@ -274,7 +277,8 @@ def heat_1d(
     bbox = jnp.asarray(bbox)
 
     if y0_fun is None:
-        y0_fun = functools.partial(gaussian_bell_1d_centered, bbox=bbox)
+        bell_centered = functools.partial(gaussian_bell_1d_centered, bbox=bbox)
+        y0_fun = lambda x: bell_centered(x) * sin_bell_1d(x)
 
     if bcond == "dirichlet":
         return LinearEvolutionDirichlet(
@@ -285,14 +289,16 @@ def heat_1d(
             tmax=tmax,
             y0_fun=y0_fun,
         )
-    return LinearEvolutionNeumann(
-        diffop=laplace,
-        diffop_scale=diffusion_rate,
-        bbox=bbox,
-        t0=t0,
-        tmax=tmax,
-        y0_fun=y0_fun,
-    )
+    elif bcond == "neumann":
+        return LinearEvolutionNeumann(
+            diffop=laplace,
+            diffop_scale=diffusion_rate,
+            bbox=bbox,
+            t0=t0,
+            tmax=tmax,
+            y0_fun=y0_fun,
+        )
+    raise ValueError
 
 
 # A bunch of initial condition defaults
@@ -300,8 +306,8 @@ def heat_1d(
 
 
 def gaussian_bell_1d_centered(x, bbox):
-    midpoint = bbox[1] - bbox[0]
-    return jnp.exp(-((x - midpoint) ** 2))
+    midpoint = 0.5 * (bbox[0] + bbox[1])
+    return jnp.exp(-1.0 * (x - midpoint) ** 2)
 
 
 def gaussian_bell_1d(x):

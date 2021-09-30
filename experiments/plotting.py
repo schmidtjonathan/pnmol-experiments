@@ -2,7 +2,6 @@
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 
 plt.style.use(["experiments/lines_and_ticks.mplstyle", "experiments/font.mplstyle"])
 
@@ -27,24 +26,23 @@ def figure_1(
     results = [figure_1_load_results(prefix=method, path=path) for method in methods]
 
     results_reference = results[-1]
-    means_reference, *_ = results_reference
+    means_reference, *_, x_reference = results_reference
 
     figure_size = (AISTATS_LINEWIDTH_DOUBLE, AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
-        nrows=len(methods) - 1,
+        nrows=len(methods),
         ncols=3,
         dpi=200,
         figsize=figure_size,
         sharex=True,
         sharey=True,
-        constrained_layout=True,
     )
+
     vmin, vmax = None, None
     pnmol_colorbar = None
     for axis_row, method, result in zip(axes, methods, results):
         m, s, t, x = result
         n = jnp.minimum(len(m), len(means_reference))
-
         T, X = jnp.meshgrid(t[:n], x[:, 0])
         error = jnp.abs(means_reference[:n] - m[:n])
         if vmin is None and vmax is None:
@@ -53,9 +51,9 @@ def figure_1(
             vmin = jnp.minimum(vmin_error, vmin_std)
             vmax = jnp.maximum(vmax_error, vmax_std)
 
-        contour_args = {"alpha": 0.45}
+        contour_args = {"alpha": 0.8}
         contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
-        contour_args_errors = {"vmin": vmin, "vmax": vmax, "cmap": "seismic"}
+        contour_args_errors = {"vmin": vmin, "vmax": vmax, "cmap": "inferno"}
         figure_1_plot_contour(
             axis_row[0], X, T, m[:n].T, **contour_args, **contour_args_means
         )
@@ -83,6 +81,7 @@ def figure_1(
         "pnmol_white": "White",
         "pnmol_latent": "Latent",
         "tornadox": "PN+MOL",
+        "reference": "Scipy",
     }
     left_column_axis = axes[:, 0]
     for ax, label in zip(left_column_axis, methods):
@@ -99,7 +98,7 @@ def figure_1(
     ax1.set_title(r"$\bf a.$ " + "Mean", loc="left", fontsize="medium")
     ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left", fontsize="medium")
     ax3.set_title(r"$\bf c.$ " + "Error", loc="left", fontsize="medium")
-    plt.savefig(path + "figure1.pdf", dpi=300)
+    plt.savefig(path + "figure1.pdf")
     plt.show()
 
 
