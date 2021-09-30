@@ -235,9 +235,9 @@ def heat_1d_discretized(
     dx=0.05,
     stencil_size=3,
     t0=0.0,
-    tmax=20.0,
+    tmax=5.0,
     y0_fun=None,
-    diffusion_rate=0.1,
+    diffusion_rate=0.05,
     nugget_gram_matrix_fd=0.0,
     kernel=None,
     bcond="dirichlet",
@@ -265,7 +265,7 @@ def heat_1d_discretized(
 
 
 def heat_1d(
-    bbox=None, t0=0.0, tmax=20.0, y0_fun=None, diffusion_rate=0.1, bcond="dirichlet"
+    bbox=None, t0=0.0, tmax=5.0, y0_fun=None, diffusion_rate=0.05, bcond="dirichlet"
 ):
     laplace = diffops.laplace()
 
@@ -300,8 +300,8 @@ def heat_1d(
 
 
 def gaussian_bell_1d_centered(x, bbox):
-    midpoint = bbox[1] - bbox[0]
-    return jnp.exp(-((x - midpoint) ** 2))
+    midpoint = 0.5 * (bbox[1] + bbox[0])
+    return jnp.exp(-1.0 * (x - midpoint) ** 2)
 
 
 def gaussian_bell_1d(x):

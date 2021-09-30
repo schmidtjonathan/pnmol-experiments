@@ -2,7 +2,6 @@
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
-from matplotlib.colors import LogNorm
 
 plt.style.use(["experiments/lines_and_ticks.mplstyle", "experiments/font.mplstyle"])
 
@@ -37,13 +36,15 @@ def figure_1(
         figsize=figure_size,
         sharex=True,
         sharey=True,
-        constrained_layout=True,
     )
     vmin, vmax = None, None
     pnmol_colorbar = None
     for axis_row, method, result in zip(axes, methods, results):
         m, s, t, x = result
         n = jnp.minimum(len(m), len(means_reference))
+
+        # If a float becomes too small (<1e-200), jax converts it to NaN :(
+        m = jnp.nan_to_num(m, 0.0)
 
         T, X = jnp.meshgrid(t[:n], x[:, 0])
         error = jnp.abs(means_reference[:n] - m[:n])
@@ -99,7 +100,7 @@ def figure_1(
     ax1.set_title(r"$\bf a.$ " + "Mean", loc="left", fontsize="medium")
     ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left", fontsize="medium")
     ax3.set_title(r"$\bf c.$ " + "Error", loc="left", fontsize="medium")
-    plt.savefig(path + "figure1.pdf", dpi=300)
+    plt.savefig(path + "figure1.pdf")
     plt.show()
 
 

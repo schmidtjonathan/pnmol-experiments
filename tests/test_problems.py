@@ -85,3 +85,29 @@ class TestProb1dDiscretized:
 
         df0 = ivp.df(ivp.t0, ivp.y0)
         assert df0.shape == (ivp.y0.shape[0], ivp.y0.shape[0])
+
+
+def test_to_ivp():
+    """Does the transformation work correctly?"""
+
+    bcond = "neumann"
+    dx = 0.2
+    heat = pnmol.problems.heat_1d_discretized(
+        dx=dx, bcond=bcond, kernel=pnmol.kernels.Polynomial(), diffusion_rate=1.0
+    )
+
+    heat_as_ivp = heat.to_tornadox_ivp()
+
+    # The IVP stuff is copied correctly
+    assert jnp.allclose(heat.y0[1:-1], heat_as_ivp.y0)
+    assert jnp.allclose(heat.t0, heat_as_ivp.t0)
+    assert jnp.allclose(heat.tmax, heat_as_ivp.tmax)
+
+    # The Jacobian is constant and as expected (depending on the BCs)
+    dfy0a = heat_as_ivp.df(heat_as_ivp.t0, heat_as_ivp.y0)
+    dfy0b = heat_as_ivp.df(heat_as_ivp.t0, heat_as_ivp.y0 + 1.0)
+    assert jnp.allclose(dfy0a, dfy0b)
+    if bcond == "neumann":
+        assert jnp.allclose(dfy0a[0, :2] * dx ** 2, jnp.array([-1.0, 1.0]))
+    if bcond == "dirichlet":
+        assert jnp.allclose(dfy0a, heat.L[1:-1, 1:-1])
