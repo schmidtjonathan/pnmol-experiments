@@ -102,7 +102,12 @@ class TestNeumann:
         return discretize.fd_probabilistic_neumann_1d(mesh_spatial_1d)
 
     @staticmethod
-    def test_neumann_shape(fd_probabilistic_neumann, mesh_spatial_1d):
+    def test_shape_L(fd_probabilistic_neumann, mesh_spatial_1d):
         L, _ = fd_probabilistic_neumann
         n = mesh_spatial_1d.shape[0]
         assert L.shape == (2, n)
+
+    @staticmethod
+    def test_shape_E_sqrtm(fd_probabilistic_neumann):
+        _, E_sqrtm = fd_probabilistic_neumann
+        assert E_sqrtm.shape == (2, 2)
