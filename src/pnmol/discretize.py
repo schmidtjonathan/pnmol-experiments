@@ -44,7 +44,7 @@ def fd_probabilistic(
     """
 
     if kernel is None:
-        kernel = kernels.SquareExponential()
+        kernel = kernels.SquareExponential(input_scale=1.0, output_scale=1.0)
 
     # Fix kernel arguments in FD function
     L_kx = kernels.Lambda(diffop(kernel.pairwise, argnums=0))
@@ -99,7 +99,7 @@ def fd_probabilistic_neumann_1d(
     if stencil_size != 2:
         raise NotImplementedError
     if kernel is None:
-        kernel = kernels.SquareExponential()
+        kernel = kernels.SquareExponential(input_scale=1.0, output_scale=1.0)
 
     # Differentiate the kernels
     D = diffops.gradient()  # 1d, so gradient works.
