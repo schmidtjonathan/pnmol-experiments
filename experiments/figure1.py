@@ -3,6 +3,7 @@
 
 import jax.numpy as jnp
 import plotting
+import scipy.integrate
 import tornadox
 
 import pnmol
@@ -43,26 +44,23 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     return means, stds, sol.t, pde.mesh_spatial.points
 
 
-def solve_pde_reference(
-    pde, *, dt, nu, progressbar, high_res_factor_dx, high_res_factor_dt
-):
-    steprule = tornadox.step.ConstantSteps(dt)
+def solve_pde_reference(pde, *, dt, high_res_factor_dx, high_res_factor_dt):
+    t_eval = jnp.arange(pde.t0, pde.tmax, step=dt)
     ivp = pde.to_tornadox_ivp()
-    ek1 = tornadox.ek1.ReferenceEK1(
-        num_derivatives=nu, steprule=steprule, initialization=tornadox.init.RungeKutta()
-    )
-    sol = ek1.solve(ivp, progressbar=progressbar)
-    E0 = ek1.iwp.projection_matrix(0)
-    means, stds = read_mean_and_std(sol, E0)
+    sol = scipy.integrate.solve_ivp(ivp.f, ivp.t_span, ivp.y0, t_eval=t_eval)
 
-    means = jnp.pad(means, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
-    stds = jnp.pad(stds, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
-    return (
-        means[::high_res_factor_dt, ::high_res_factor_dx],
-        stds[::high_res_factor_dt, ::high_res_factor_dx],
-        sol.t[::high_res_factor_dt],
-        pde.mesh_spatial.points,
-    )
+    means = sol.y.T
+    stds = 0.0 * sol.y.T
+    ts = t_eval[::high_res_factor_dt]
+
+    means = jnp.pad(means, pad_width=1, mode="constant", constant_values=0.0)[
+        1:-1, ...
+    ][::high_res_factor_dt, ::high_res_factor_dx]
+    stds = jnp.pad(stds, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...][
+        ::high_res_factor_dt, ::high_res_factor_dx
+    ]
+
+    return means, stds, ts, pde.mesh_spatial.points[::high_res_factor_dx]
 
 
 def read_mean_and_std(sol, E0):
@@ -93,10 +91,10 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.05
-DX = 0.01
-HIGH_RES_FACTOR_DX = 2
-HIGH_RES_FACTOR_DT = 2
+DT = 0.01
+DX = 0.2
+HIGH_RES_FACTOR_DX = 4
+HIGH_RES_FACTOR_DT = 4
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
@@ -104,7 +102,7 @@ PROGRESSBAR = True
 
 # Hyperparameters (problem)
 T0, TMAX = 0.0, 5.0
-DIFFUSION_RATE = 0.1
+DIFFUSION_RATE = 0.035
 
 
 # PDE problems
@@ -116,6 +114,7 @@ PDE_PNMOL = pnmol.problems.heat_1d_discretized(
     diffusion_rate=DIFFUSION_RATE,
     kernel=pnmol.kernels.SquareExponential(),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
+    bcond="dirichlet",
 )
 PDE_TORNADOX = pnmol.problems.heat_1d_discretized(
     t0=T0,
@@ -123,8 +122,9 @@ PDE_TORNADOX = pnmol.problems.heat_1d_discretized(
     dx=DX,
     stencil_size=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.Polynomial(),
+    kernel=pnmol.kernels.SquareExponential(),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
+    bcond="dirichlet",
 )
 PDE_REFERENCE = pnmol.problems.heat_1d_discretized(
     t0=T0,
@@ -132,13 +132,14 @@ PDE_REFERENCE = pnmol.problems.heat_1d_discretized(
     dx=DX / HIGH_RES_FACTOR_DX,
     stencil_size=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.Polynomial(),
+    kernel=pnmol.kernels.SquareExponential(),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
+    bcond="dirichlet",
 )
 
 # Solve the PDE with the different methods
-KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-4)
-KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + KERNEL_NUGGET
+KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-3)
+KERNEL_DIFFUSION_PNMOL = pnmol.kernels.SquareExponential() + KERNEL_NUGGET
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
     dt=DT,
@@ -159,8 +160,6 @@ RESULT_TORNADOX = solve_pde_tornadox(
 RESULT_REFERENCE = solve_pde_reference(
     PDE_REFERENCE,
     dt=DT / HIGH_RES_FACTOR_DT,
-    nu=NUM_DERIVATIVES,
-    progressbar=PROGRESSBAR,
     high_res_factor_dt=HIGH_RES_FACTOR_DT,
     high_res_factor_dx=HIGH_RES_FACTOR_DX,
 )
