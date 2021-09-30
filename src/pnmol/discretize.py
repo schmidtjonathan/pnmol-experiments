@@ -6,7 +6,7 @@ import jax
 import jax.numpy as jnp
 import tqdm
 
-from pnmol import kernels
+from pnmol import diffops, kernels
 
 
 def fd_probabilistic(
@@ -102,3 +102,64 @@ def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
     uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
 
     return weights, uncertainty
+
+
+def fd_probabilistic_neumann_1d(
+    mesh_spatial,
+    kernel=None,
+    stencil_size=2,
+    nugget_gram_matrix=0.0,
+):
+    if stencil_size != 2:
+        raise NotImplementedError
+    if kernel is None:
+        kernel = kernels.SquareExponential()
+
+    # Differentiate the kernels
+    D = diffops.gradient()  # 1d, so gradient works.
+    k = kernel
+    Lk = kernels.Lambda(D(k.pairwise, argnums=0))
+    LLk = kernels.Lambda(D(Lk.pairwise, argnums=1))
+
+    # Fix the inputs of the coefficient function
+    fd_coeff_neumann_fixed = partial(
+        _fd_coefficients_neumann,
+        mesh_spatial=mesh_spatial,
+        k=k,
+        L_k=Lk,
+        LL_k=LLk,
+        nugget_gram_matrix=nugget_gram_matrix,
+    )
+
+    # Compute left and right weights and uncertainties
+    weights_left, uncertainty_left = fd_coeff_neumann_fixed(
+        idx_x=0, idx_neighbors=(0, 1)
+    )
+    weights_right, uncertainty_right = fd_coeff_neumann_fixed(
+        idx_x=-1, idx_neighbors=(-1, -2)
+    )
+
+    # Projection matrix to the boundaries _including_ their neighbors
+    # The order of the indices of the right boundary reflects their locations in 'neighbors'
+    B = jnp.eye(len(mesh_spatial))[((0, 1, -1, -2),)]
+
+    # negate the left weights, because the normal derivative at the left boundary
+    # "points to the left", whereas standard derivatives "point to the right"
+    diffmatrix = jax.scipy.linalg.block_diag(-weights_left, weights_right)
+    errormatrix = jnp.diag(jnp.array([uncertainty_left, uncertainty_right]))
+    return diffmatrix @ B, errormatrix
+
+
+def _fd_coefficients_neumann(
+    idx_x, idx_neighbors, mesh_spatial, k, L_k, LL_k, nugget_gram_matrix
+):
+    x = mesh_spatial[idx_x]
+    neighbors = mesh_spatial[(idx_neighbors,)]
+    return fd_coefficients(
+        x=x,
+        neighbors=neighbors,
+        k=k,
+        L_k=L_k,
+        LL_k=LL_k,
+        nugget_gram_matrix=nugget_gram_matrix,
+    )

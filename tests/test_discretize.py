@@ -99,10 +99,10 @@ class TestNeumann:
     @staticmethod
     @pytest.fixture
     def fd_probabilistic_neumann(mesh_spatial_1d):
-        return discretize.fd_probabilistic_neumann(mesh_spatial_1d)
+        return discretize.fd_probabilistic_neumann_1d(mesh_spatial_1d)
 
     @staticmethod
     def test_neumann_shape(fd_probabilistic_neumann, mesh_spatial_1d):
         L, _ = fd_probabilistic_neumann
         n = mesh_spatial_1d.shape[0]
-        assert L.shape == (4, n)
+        assert L.shape == (2, n)
