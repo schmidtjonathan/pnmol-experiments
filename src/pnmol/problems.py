@@ -94,7 +94,7 @@ class DiscretizationMixIn:
 # PDE Base class and some problem-type-specific implementations
 
 
-class PDE(DiscretizationMixIn, IVPMixIn):
+class PDE(DiscretizationMixIn):
     """PDE base class.
 
     The PDE class is central to all the options below.
@@ -128,7 +128,7 @@ class PDE(DiscretizationMixIn, IVPMixIn):
         return self.bbox.ndim
 
 
-class LinearPDE(PDE):
+class LinearPDE(PDE, IVPMixIn):
     """Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
@@ -155,7 +155,7 @@ class NonLinearMixIn:
         super().__init__(**kwargs)
 
 
-class SemiLinearPDE(PDE, NonLinearMixIn):
+class SemiLinearPDE(PDE, NonLinearMixIn, IVPMixIn):
     """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
