@@ -81,7 +81,7 @@ class DiscretizationMixIn:
             LLk = kernels.Lambda(diffop(Lk.pairwise, argnums=1))
             x_left = mesh_spatial[0]
             neighbors_left = mesh_spatial[((0, 1),)]
-            weights_left, uncertainty_left = discretize.fd_coeff(
+            weights_left, uncertainty_left = discretize.fd_coefficients(
                 x=x_left,
                 neighbors=neighbors_left,
                 k=k,
@@ -90,7 +90,7 @@ class DiscretizationMixIn:
             )
             x_right = mesh_spatial[-1]
             neighbors_right = mesh_spatial[((-1, -2),)]
-            weights_right, uncertainty_right = discretize.fd_coeff(
+            weights_right, uncertainty_right = discretize.fd_coefficients(
                 x=x_right,
                 neighbors=neighbors_right,
                 k=k,

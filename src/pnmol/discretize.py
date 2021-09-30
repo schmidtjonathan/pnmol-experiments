@@ -12,8 +12,8 @@ from pnmol import kernels
 def fd_probabilistic(
     diffop,
     mesh_spatial,
-    kernel,
-    stencil_size,
+    kernel=None,
+    stencil_size=3,
     nugget_gram_matrix=0.0,
 ):
     """
@@ -43,11 +43,14 @@ def fd_probabilistic(
         The discretized linear operator as a ``np.ndarray``.
     """
 
+    if kernel is None:
+        kernel = kernels.SquareExponential()
+
     # Fix kernel arguments in FD function
     L_kx = kernels.Lambda(diffop(kernel.pairwise, argnums=0))
     LL_kx = kernels.Lambda(diffop(L_kx.pairwise, argnums=1))
     fd_coeff_fun_partial = partial(
-        fd_coeff,
+        fd_coefficients,
         k=kernel,
         L_k=L_kx,
         LL_k=LL_kx,
@@ -88,7 +91,7 @@ def _weights_to_matrix(weights_all, uncertainties_all, neighbor_indices_all):
 
 
 @partial(jax.jit, static_argnums=(2, 3, 4))
-def fd_coeff(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
+def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
     """Compute kernel-based finite difference coefficients."""
 
     X, n = neighbors, neighbors.shape[0]
