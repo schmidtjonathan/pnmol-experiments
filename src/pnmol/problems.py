@@ -259,19 +259,14 @@ class SIRDirichlet(SemiLinearPDE, NeumannMixIn):
         self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_blocks)
         self.mesh_spatial = mesh_spatial
 
-        if isinstance(self, NeumannMixIn):
-            if self.dimension > 1:
-                raise NotImplementedError
-            B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
-                mesh_spatial=mesh_spatial,
-                kernel=kernel,
-                stencil_size=2,
-                nugget_gram_matrix=nugget_gram_matrix,
-            )
-
-        elif isinstance(self, DirichletMixIn):
-            B = mesh_spatial.boundary_projection_matrix
-            R_sqrtm = jnp.zeros((B.shape[0], B.shape[0]))
+        if self.dimension > 1:
+            raise NotImplementedError
+        B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
+            mesh_spatial=mesh_spatial,
+            kernel=kernel,
+            stencil_size=2,
+            nugget_gram_matrix=nugget_gram_matrix,
+        )
 
         self.B = jax.scipy.linalg.block_diag(*[B for _ in range(num_system_components)])
         self.R_sqrtm = jax.scipy.linalg.block_diag(
