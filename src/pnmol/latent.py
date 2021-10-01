@@ -46,10 +46,12 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         dy0_padded = jnp.pad(
-            extended_dy0, pad_width=1, mode="constant", constant_values=0.0
+            extended_dy0,
+            pad_width=((0, 0), (1, 1)),
+            mode="constant",
+            constant_values=0.0,
         )
-        dy0_full = dy0_padded[1:-1]
-        mean = jnp.concatenate([dy0_full, jnp.zeros_like(dy0_full)], -1)
+        mean = jnp.concatenate([dy0_padded, jnp.zeros_like(dy0_padded)], -1)
 
         cov_sqrtm_state_ = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
         cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, cov_sqrtm_state)
