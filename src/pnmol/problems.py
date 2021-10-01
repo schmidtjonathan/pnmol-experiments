@@ -354,9 +354,9 @@ def heat_1d(
     raise ValueError
 
 
-def spatial_SIR_1d_dirichlet_discretized(
+def spatial_SIR_1d_discretized(
     bbox=None,
-    dx=1.0,
+    dx=0.05,
     t0=0.0,
     tmax=50.0,
     beta=0.3,
@@ -370,7 +370,7 @@ def spatial_SIR_1d_dirichlet_discretized(
     stencil_size_list=None,
 ):
     num_system_components = 3
-    sir = spatial_SIR_1d_dirichlet(
+    sir = spatial_SIR_1d(
         bbox=bbox,
         t0=t0,
         tmax=tmax,
@@ -400,7 +400,7 @@ def spatial_SIR_1d_dirichlet_discretized(
     return sir
 
 
-def spatial_SIR_1d_dirichlet(
+def spatial_SIR_1d(
     bbox=None,
     t0=0.0,
     tmax=50.0,
@@ -412,10 +412,12 @@ def spatial_SIR_1d_dirichlet(
     N=1000.0,
 ):
 
+    if bbox is None:
+        bbox = [0.0, 1.0]
     bbox = jnp.asarray(bbox)
 
     def y0_fun(x):
-        init_infectious = 10.0 * gaussian_bell_1d_centered(x, bbox, width=3.0) + 1.0
+        init_infectious = 800.0 * gaussian_bell_1d_centered(x, bbox, width=0.5) + 1.0
         s0 = N * jnp.ones_like(init_infectious) - init_infectious
         i0 = init_infectious
         r0 = jnp.zeros_like(init_infectious)
