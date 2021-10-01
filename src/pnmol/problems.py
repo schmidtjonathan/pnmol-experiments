@@ -234,7 +234,10 @@ class SIRDirichlet(SemiLinearPDE, NeumannMixIn):
     def discretize(
         self, *, mesh_spatial, kernel_list, stencil_size_list, nugget_gram_matrix=0.0
     ):
-
+        if self.dimension > 1:
+            raise NotImplementedError(
+                "SIR with Neumann BCs is currently only available in 1D."
+            )
         num_system_components = 3  # S, I, and R
         assert len(kernel_list) == len(stencil_size_list) == num_system_components
 
@@ -259,8 +262,6 @@ class SIRDirichlet(SemiLinearPDE, NeumannMixIn):
         self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_blocks)
         self.mesh_spatial = mesh_spatial
 
-        if self.dimension > 1:
-            raise NotImplementedError
         B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
             mesh_spatial=mesh_spatial,
             kernel=kernel,
