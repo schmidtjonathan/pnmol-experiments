@@ -41,12 +41,15 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         dy0_padded = jnp.pad(
-            extended_dy0, pad_width=1, mode="constant", constant_values=0.0
+            extended_dy0,
+            pad_width=((0, 0), (1, 1)),
+            mode="constant",
+            constant_values=0.0,
         )
-        dy0_full = dy0_padded[1:-1]
 
+        initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
         y = rv.MultivariateNormal(
-            mean=dy0_full,
+            mean=initmean,
             cov_sqrtm=jnp.kron(diffusion_state_sqrtm, cov_sqrtm),
         )
         return pdefilter.PDEFilterState(
@@ -153,7 +156,7 @@ class SemiLinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
         L = pde.L
 
         m_at = p0 @ m_pred
-        fx = pde.f(t, m_at)  # temporal SIR + spatial diffusion
+        fx = pde.f(t, m_at)
         Jx = pde.df(t, m_at)
         b = Jx @ m_at - fx
 
