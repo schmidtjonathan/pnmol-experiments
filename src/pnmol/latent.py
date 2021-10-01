@@ -100,6 +100,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         )
         flat_m_new = mp - K @ z
 
+        # Calibrate local diffusion
         residual_white = jax.scipy.linalg.solve_triangular(Sl.T, z, lower=False)
         diffusion_squared_local = (
             residual_white @ residual_white / residual_white.shape[0]

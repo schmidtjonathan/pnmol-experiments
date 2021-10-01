@@ -78,6 +78,7 @@ class PDEFilter(ABC):
             diffusion_squared_list.append(state.diffusion_squared_local)
 
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
+
         return PDESolution(
             t=jnp.stack(times),
             mean=jnp.stack(means),
@@ -93,10 +94,9 @@ class PDEFilter(ABC):
         for state, info in solution_generator:
             diffusion_squared_list.append(state.diffusion_squared_local)
             pass
-        info["diffusion_squared_calibrated"] = jnp.mean(
-            jnp.array(diffusion_squared_list)
-        )
-        return state, info
+        diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
+        cov_sqrtm_new = state.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
+        return state._replace(cov_sqrtm=cov_sqrtm_new), info
 
     def solution_generator(self, pde, /, *, stop_at=None, progressbar=False):
         """Generate ODE solver steps."""
@@ -132,15 +132,6 @@ class PDEFilter(ABC):
                 dt = time_stopper.adjust_dt_to_time_stops(state.t, dt)
 
             state, dt, step_info = self.perform_full_step(state, dt, pde)
-
-            # if dt < self.steprule.min_step:
-            #     raise ValueError(
-            #         f"Step-size ({dt}) smaller than minimum step-size ({self.steprule.min_step})"
-            #     )
-            # if dt > self.steprule.max_step:
-            #     raise ValueError(
-            #         f"Step-size ({dt}) larger than maximum step-size ({self.steprule.max_step})"
-            #     )
 
             info["num_steps"] += 1
             info["num_f_evaluations"] += step_info["num_f_evaluations"]
