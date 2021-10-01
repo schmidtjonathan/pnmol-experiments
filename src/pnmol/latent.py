@@ -51,11 +51,11 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         dy0_full = dy0_padded[1:-1]
         mean = jnp.concatenate([dy0_full, jnp.zeros_like(dy0_full)], -1)
 
-        cov_sqrtm_state = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, jnp.eye(self.num_derivatives + 1))
+        cov_sqrtm_state_ = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
+        cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, cov_sqrtm_state)
 
         cov_sqrtm = jax.scipy.linalg.block_diag(
-            cov_sqrtm_state,
+            cov_sqrtm_state_,
             cov_sqrtm_eps,
         )
 
@@ -66,6 +66,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             y=y,
             error_estimate=None,
             reference_state=None,
+            diffusion_squared_local=0.0,
         )
 
     def attempt_step(self, state, dt, pde):
@@ -99,6 +100,12 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         )
         flat_m_new = mp - K @ z
 
+        # Calibrate local diffusion
+        residual_white = jax.scipy.linalg.solve_triangular(Sl.T, z, lower=False)
+        diffusion_squared_local = (
+            residual_white @ residual_white / residual_white.shape[0]
+        )
+
         flat_state_m_new, flat_eps_m_new = jnp.split(flat_m_new, 2)
         batched_state_m_new = flat_state_m_new.reshape((n, d), order="F")
         batched_eps_m_new = flat_eps_m_new.reshape((n, d), order="F")
@@ -110,6 +117,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             error_estimate=None,
             reference_state=None,
             y=rv.MultivariateNormal(glued_new_mean, Cl_new),
+            diffusion_squared_local=diffusion_squared_local,
         )
         info_dict = dict(num_f_evaluations=1)
         return new_state, info_dict

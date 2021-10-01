@@ -16,7 +16,10 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
     )
     sol = ek1.solve(pde, progressbar=progressbar)
     E0 = ek1.iwp.projection_matrix(0)
-    return *read_mean_and_std(sol, E0), sol.t, pde.mesh_spatial.points
+    means, stds = read_mean_and_std(sol, E0)
+    gamma = jnp.sqrt(sol.diffusion_squared_calibrated)
+    print(gamma)
+    return means, gamma * stds, sol.t, pde.mesh_spatial.points
 
 
 def solve_pde_pnmol_latent(pde, *, dt, nu, progressbar, kernel):
@@ -26,7 +29,10 @@ def solve_pde_pnmol_latent(pde, *, dt, nu, progressbar, kernel):
     )
     sol = ek1.solve(pde, progressbar=progressbar)
     E0 = ek1.state_iwp.projection_matrix(0)
-    return *read_mean_and_std_latent(sol, E0), sol.t, pde.mesh_spatial.points
+    means, stds = read_mean_and_std_latent(sol, E0)
+    gamma = jnp.sqrt(sol.diffusion_squared_calibrated)
+    print(gamma)
+    return means, gamma * stds, sol.t, pde.mesh_spatial.points
 
 
 def solve_pde_tornadox(pde, *, dt, nu, progressbar):
@@ -91,8 +97,8 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.01
-DX = 0.2
+DT = 0.05
+DX = 0.05
 HIGH_RES_FACTOR_DX = 4
 HIGH_RES_FACTOR_DT = 4
 NUM_DERIVATIVES = 2

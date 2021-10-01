@@ -13,7 +13,9 @@ from pnmol import kernels
 from pnmol.ode import init, step
 
 
-class PDEFilterState(namedtuple("_", "t y error_estimate reference_state")):
+class PDEFilterState(
+    namedtuple("_", "t y error_estimate reference_state diffusion_squared_local")
+):
     """PDE filter state."""
 
     pass
@@ -25,6 +27,7 @@ class PDESolution:
     mean: jnp.ndarray
     cov_sqrtm: jnp.ndarray
     info: Dict
+    diffusion_squared_calibrated: float
 
 
 class PDEFilter(ABC):
@@ -66,24 +69,34 @@ class PDEFilter(ABC):
         times = []
         info = dict()
 
+        diffusion_squared_list = []
+
         for state, info in solution_generator:
             times.append(state.t)
             means.append(state.y.mean)
             cov_sqrtms.append(state.y.cov_sqrtm)
+            diffusion_squared_list.append(state.diffusion_squared_local)
+
+        diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
 
         return PDESolution(
             t=jnp.stack(times),
             mean=jnp.stack(means),
             cov_sqrtm=jnp.stack(cov_sqrtms),
             info=info,
+            diffusion_squared_calibrated=diffusion_squared_calibrated,
         )
 
     def simulate_final_state(self, *args, **kwargs):
         solution_generator = self.solution_generator(*args, **kwargs)
         state, info = None, None
+        diffusion_squared_list = []
         for state, info in solution_generator:
+            diffusion_squared_list.append(state.diffusion_squared_local)
             pass
-        return state, info
+        diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
+        cov_sqrtm_new = state.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
+        return state._replace(cov_sqrtm=cov_sqrtm_new), info
 
     def solution_generator(self, pde, /, *, stop_at=None, progressbar=False):
         """Generate ODE solver steps."""
@@ -106,6 +119,7 @@ class PDEFilter(ABC):
             pde.tmax / progressbar_steps
         )
         pbar = tqdm(total=progressbar_steps) if progressbar else None
+
         while state.t < pde.tmax:
 
             if pbar is not None:
@@ -118,15 +132,6 @@ class PDEFilter(ABC):
                 dt = time_stopper.adjust_dt_to_time_stops(state.t, dt)
 
             state, dt, step_info = self.perform_full_step(state, dt, pde)
-
-            # if dt < self.steprule.min_step:
-            #     raise ValueError(
-            #         f"Step-size ({dt}) smaller than minimum step-size ({self.steprule.min_step})"
-            #     )
-            # if dt > self.steprule.max_step:
-            #     raise ValueError(
-            #         f"Step-size ({dt}) larger than maximum step-size ({self.steprule.max_step})"
-            #     )
 
             info["num_steps"] += 1
             info["num_f_evaluations"] += step_info["num_f_evaluations"]

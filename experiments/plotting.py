@@ -53,7 +53,7 @@ def figure_1(
 
         contour_args = {"alpha": 0.8}
         contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
-        contour_args_errors = {"vmin": vmin, "vmax": vmax, "cmap": "inferno"}
+        contour_args_errors = {"vmin": 0.0, "vmax": 0.5, "cmap": "inferno"}
         figure_1_plot_contour(
             axis_row[0], X, T, m[:n].T, **contour_args, **contour_args_means
         )
