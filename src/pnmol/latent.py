@@ -24,12 +24,12 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
         self.state_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=X.shape[0],
+            wiener_process_dimension=pde.y0.shape[0],
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=X.shape[0],
+            wiener_process_dimension=pde.y0.shape[0],
             wp_diffusion_sqrtm=pde.E_sqrtm,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
