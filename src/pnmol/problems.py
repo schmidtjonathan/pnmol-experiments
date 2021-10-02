@@ -165,22 +165,22 @@ class SystemDiscretizationMixIn:
         self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_list_scaled)
         self.mesh_spatial = mesh_spatial
 
-        if isinstance(self, NeumannMixIn):
-            if self.dimension > 1:
-                raise NotImplementedError
-            B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
-                mesh_spatial=mesh_spatial,
-                kernel=kernel,
-                stencil_size=2,
-                nugget_gram_matrix=nugget_gram_matrix,
-            )
-        elif isinstance(self, DirichletMixIn):
-            B = mesh_spatial.boundary_projection_matrix
-            R_sqrtm = jnp.zeros((self.B.shape[0], self.B.shape[0]))
-
-        n = len(self.diffop)
-        self.B = jax.scipy.linalg.block_diag(*([B] * n))
-        self.R_sqrtm = jax.scipy.linalg.block_diag(*([R_sqrtm] * n))
+        if isinstance(self, _BoundaryConditionMixInInterface):
+            if isinstance(self, (NeumannMixIn, SystemNeumannMixIn)):
+                if self.dimension > 1:
+                    raise NotImplementedError
+                B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
+                    mesh_spatial=mesh_spatial,
+                    kernel=kernel,
+                    stencil_size=2,
+                    nugget_gram_matrix=nugget_gram_matrix,
+                )
+            elif isinstance(self, (DirichletMixIn, SystemDirichletMixIn)):
+                B = mesh_spatial.boundary_projection_matrix
+                R_sqrtm = jnp.zeros((self.B.shape[0], self.B.shape[0]))
+            n = len(self.diffop)
+            self.B = jax.scipy.linalg.block_diag(*([B] * n))
+            self.R_sqrtm = jax.scipy.linalg.block_diag(*([R_sqrtm] * n))
 
         if isinstance(self, IVPMixIn):
 
@@ -215,14 +215,14 @@ class IVPMixIn:
 # Implement to_ivp() conversions for some simple problems.
 
 
-class _IVPConversionMixIn:
+class _IVPConversionMixInInterface:
     """Interface for IVP-conversion mixins."""
 
     def to_tornadox_ivp(self):
         raise NotImplementedError
 
     def _check_ivp_conversion_conditions(self):
-        if not isinstance(self, _BoundaryConditionMixIn):
+        if not isinstance(self, _BoundaryConditionMixInInterface):
             raise Exception(
                 "Conversion to an IVP requires boundary condition functionality."
             )
@@ -230,9 +230,13 @@ class _IVPConversionMixIn:
             raise Exception("Conversion to an IVP requires IVP functionality.")
         if self.L is None:
             raise AttributeError("Conversion to an IVP requires prior discretization.")
+        if self.dimension > 1:
+            raise NotImplementedError(
+                "Conversion to an IVP in more than one spatial dimension is not supported."
+            )
 
 
-class IVPConversionLinearMixIn(_IVPConversionMixIn):
+class IVPConversionLinearMixIn(_IVPConversionMixInInterface):
     """Add functionality for conversion of linear PDEs to IVPs to the PDE class."""
 
     def to_tornadox_ivp(self):
@@ -252,7 +256,7 @@ class IVPConversionLinearMixIn(_IVPConversionMixIn):
         )
 
 
-class IVPConversionSemiLinearMixIn(_IVPConversionMixIn):
+class IVPConversionSemiLinearMixIn(_IVPConversionMixInInterface):
     """Add functionality for conversion of semilinear PDEs to IVPs to the PDE class."""
 
     def to_tornadox_ivp(self):
@@ -273,7 +277,7 @@ class IVPConversionSemiLinearMixIn(_IVPConversionMixIn):
 # Add boundary conditions
 
 
-class _BoundaryConditionMixIn:
+class _BoundaryConditionMixInInterface:
     def __init__(self, **kwargs):
         self.B = None
         self.R_sqrtm = None
@@ -286,33 +290,55 @@ class _BoundaryConditionMixIn:
         raise NotImplementedError
 
 
-class NeumannMixIn(_BoundaryConditionMixIn):
+class _SystemBoundaryConditionMixinInterface(_BoundaryConditionMixInInterface):
+    def __init__(self, *, bc, **kwargs):
+        self.bc = bc
+        super().__init__(**kwargs)
+
+    def bc_pad(self, x):
+        n = len(self.diffop)
+        x_reshaped = x.reshape((n, -1))
+        x_split_padded = jnp.apply_along_axis(self.bc.bc_pad, -1, x_reshaped)
+        return x_split_padded.reshape((-1,))
+
+    def bc_remove_pad(self, x):
+        n = len(self.diffop)
+        x_reshaped = x.reshape((n, -1))
+        x_reshaped_no_pad = jnp.apply_along_axis(self.bc.bc_remove_pad, -1, x_reshaped)
+        return x_reshaped_no_pad.reshape((-1,))
+
+
+class SystemNeumannMixIn(_SystemBoundaryConditionMixinInterface):
+    def __init__(self, **kwargs):
+        super().__init__(bc=NeumannMixIn(), **kwargs)
+
+
+class SystemDirichletMixIn(_SystemBoundaryConditionMixinInterface):
+    def __init__(self, **kwargs):
+        super().__init__(bc=DirichletMixIn(), **kwargs)
+
+
+class NeumannMixIn(_BoundaryConditionMixInInterface):
     """Neumann condition functionality for PDE problems."""
 
     def bc_pad(self, x):
-        if self.dimension > 1:
-            raise NotImplementedError
         return jnp.pad(x, pad_width=1, mode="edge")
 
     def bc_remove_pad(self, x):
-        if self.dimension > 1:
-            raise NotImplementedError
         return x[1:-1]
 
 
-class DirichletMixIn(_BoundaryConditionMixIn):
+class DirichletMixIn(_BoundaryConditionMixInInterface):
     """Dirichlet condition functionality for PDE problems."""
 
-    def bc_pad(self, x):
-        if self.dimension > 1:
-            raise NotImplementedError
+    def __init__(self, **kwargs):
+        self.neumann = NeumannMixIn()
+        super().__init__(**kwargs)
 
+    def bc_pad(self, x):
         return jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
 
     def bc_remove_pad(self, x):
-        if self.dimension > 1:
-            raise NotImplementedError
-
         return x[1:-1]
 
 
@@ -333,18 +359,22 @@ class NonLinearMixIn:
 class LinearEvolutionDirichlet(
     IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, DirichletMixIn, PDE
 ):
+    """Linear, time-dependent evolution equations with Dirichlet boundary conditions."""
+
     pass
 
 
 class LinearEvolutionNeumann(
     IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, NeumannMixIn, PDE
 ):
+    """Linear, time-dependent evolution equations with Neumann boundary conditions."""
+
     pass
 
 
 # For testing purposes
 class LinearPDESystemNeumann(SystemDiscretizationMixIn, NeumannMixIn, PDE):
-    pass
+    """Systems of linear PDEs with Neumann boundary conditions."""
 
 
 class SemiLinearEvolutionSystemNeumann(
@@ -352,9 +382,11 @@ class SemiLinearEvolutionSystemNeumann(
     NonLinearMixIn,
     IVPConversionSemiLinearMixIn,
     SystemDiscretizationMixIn,
-    NeumannMixIn,
+    SystemNeumannMixIn,
     PDE,
 ):
+    """Systems of semilinear, time-dependent PDEs with Neumann boundary conditions."""
+
     pass
 
 
