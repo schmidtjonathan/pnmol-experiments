@@ -320,29 +320,29 @@ class NonLinearMixIn:
 
 
 class LinearEvolutionDirichlet(
-    PDE, IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, DirichletMixIn
+    IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, DirichletMixIn, PDE
 ):
     pass
 
 
 class LinearEvolutionNeumann(
-    PDE, IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, NeumannMixIn
+    IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, NeumannMixIn, PDE
 ):
     pass
 
 
 # For testing purposes
-class LinearPDESystemNeumann(PDE, SystemDiscretizationMixIn, NeumannMixIn):
+class LinearPDESystemNeumann(SystemDiscretizationMixIn, NeumannMixIn, PDE):
     pass
 
 
 class SIRNeumann(
-    PDE,
     IVPMixIn,
     NonLinearMixIn,
     IVPConversionSemiLinearMixIn,
     SystemDiscretizationMixIn,
     NeumannMixIn,
+    PDE,
 ):
     pass
 
