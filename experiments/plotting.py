@@ -7,7 +7,7 @@ plt.style.use(
     ["experiments/style/lines_and_ticks.mplstyle", "experiments/style/font.mplstyle"]
 )
 
-PATH_RESULTS = "experiments/results/figure1/"
+PATH_RESULTS = "experiments/results/"
 
 
 # Extract from the paper template:
@@ -24,6 +24,7 @@ AISTATS_TEXTWIDTH_SINGLE = 3.25
 def figure_1(
     path=PATH_RESULTS, methods=("pnmol_white", "pnmol_latent", "tornadox", "reference")
 ):
+    path = path + "figure1/"
 
     results = [figure_1_load_results(prefix=method, path=path) for method in methods]
 
@@ -120,3 +121,21 @@ def figure_1_plot_contour(ax, /, *args, **kwargs):
     """Contour lines with fill color and sharp edges."""
     ax.contour(*args, **kwargs)
     return ax.contourf(*args, **kwargs)
+
+
+def figure_2(path=PATH_RESULTS):
+    path = path + "figure2/"
+
+    rmse_all = jnp.load(path + "rmse_all.npy")
+    input_scales = jnp.load(path + "input_scales.npy")
+    stencil_sizes = jnp.load(path + "stencil_sizes.npy")
+
+    for sc, errors in zip(input_scales, rmse_all.T):
+        plt.plot(
+            stencil_sizes, errors, "o-", label=rf"$\ell$={sc}", linewidth=2, alpha=0.8
+        )
+
+    plt.xlabel("Stencil size")
+    plt.ylabel("RMSE")
+    plt.legend()
+    plt.show()
