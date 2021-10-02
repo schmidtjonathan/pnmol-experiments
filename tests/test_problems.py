@@ -12,8 +12,16 @@ problems_1d_all = pytest.mark.parametrize(
         pnmol.problems.heat_1d_discretized(dx=0.1, bcond="dirichlet"),
         pnmol.problems.heat_1d_discretized(dx=0.1, bcond="neumann"),
         pnmol.problems.sir_1d_discretized(),
+        pnmol.problems.spruce_budworm_1d_discretized(bcond="dirichlet"),
+        pnmol.problems.spruce_budworm_1d_discretized(bcond="neumann"),
     ],
-    ids=["heat-dirichlet", "heat-neumann", "sir"],
+    ids=[
+        "heat-dirichlet",
+        "heat-neumann",
+        "sir",
+        "spruce-budworm-dirichlet",
+        "spruce-budworm-neumann",
+    ],
 )
 
 

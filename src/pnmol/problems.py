@@ -29,35 +29,6 @@ import tornadox
 
 from pnmol import diffops, discretize, kernels, mesh
 
-# List of all the classes in the present module:
-# (Might help clarity)
-__all__ = [
-    # MixIns for general PDEs
-    "PDE",
-    "DiscretizationMixIn",
-    "IVPMixIn",
-    "IVPConversionLinearMixIn",
-    "IVPConversionSemiLinearMixIn",
-    "DirichletMixIn",
-    "NeumannMixIn",
-    "NonLinearMixIn",
-    # Additional MixIns for systems of PDEs
-    "SystemDiscretizationMixIn",
-    "SystemDirichletMixIn",
-    "SystemNeumannMixIn",
-    # PDE Classes:
-    "LinearEvolutionDirichlet",  # e.g. heat equation
-    "LinearEvolutionNeumann",  # e.g. heat equation
-    "SystemLinearPDEDirichlet",  # for testing
-    "SystemLinearPDENeumann",  # for testing
-    "SystemSemiLinearEvolutionNeumann",  # SIR
-    # Full recipes:
-    "heat_1d_discretized",
-    "heat_1d",
-    "sir_1d_discretized",
-    "sir_1d",
-]
-
 # PDE Base class and some problem-type-specific implementations
 
 
@@ -394,6 +365,28 @@ class SystemSemiLinearEvolutionNeumann(
     pass
 
 
+class SemiLinearEvolutionNeumann(
+    IVPMixIn,
+    NonLinearMixIn,
+    IVPConversionSemiLinearMixIn,
+    DiscretizationMixIn,
+    NeumannMixIn,
+    PDE,
+):
+    pass
+
+
+class SemiLinearEvolutionDirichlet(
+    IVPMixIn,
+    NonLinearMixIn,
+    IVPConversionSemiLinearMixIn,
+    DiscretizationMixIn,
+    DirichletMixIn,
+    PDE,
+):
+    pass
+
+
 # Some precomputed recipes for PDE examples.
 
 
@@ -556,6 +549,91 @@ def sir_1d(
         df=df,
         df_diagonal=None,
     )
+
+
+def spruce_budworm_1d_discretized(
+    bbox=None,
+    t0=0.0,
+    tmax=10.0,
+    diffusion_rate=1.0,
+    y0_fun=None,
+    dx=0.1,
+    kernel=None,
+    nugget_gram_matrix_fd=0.0,
+    stencil_size=3,
+    bcond="dirichlet",
+    growth_rate=1.0,
+):
+    spruce = spruce_budworm_1d(
+        bbox=bbox,
+        t0=t0,
+        tmax=tmax,
+        diffusion_rate=diffusion_rate,
+        y0_fun=y0_fun,
+        bcond=bcond,
+    )
+    mesh_spatial = mesh.RectangularMesh.from_bbox_1d(spruce.bbox, step=dx)
+
+    if kernel is None:
+        kernel = kernels.SquareExponential()
+
+    spruce.discretize(
+        mesh_spatial=mesh_spatial,
+        kernel=kernel,
+        stencil_size=stencil_size,
+        nugget_gram_matrix=nugget_gram_matrix_fd,
+    )
+    return spruce
+
+
+def spruce_budworm_1d(
+    bbox=None,
+    t0=0.0,
+    tmax=10.0,
+    diffusion_rate=1.0,
+    y0_fun=None,
+    bcond="dirichlet",
+    growth_rate=1.0,
+):
+    """Explained in https://www-m6.ma.tum.de/~kuttler/script_reaktdiff.pdf (ctrl+f for "spruce")"""
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
+
+    if y0_fun is None:
+        y0_fun = functools.partial(gaussian_bell_1d_centered, bbox=bbox, width=1.0)
+
+    def f_spruce_general(_, x, c):
+        return c * x * (1.0 - x)
+
+    f_spruce = jax.jit(functools.partial(f_spruce_general, c=growth_rate))
+    df_spruce = jax.jit(jax.jacfwd(f_spruce, argnums=1))
+
+    if bcond == "dirichlet":
+        return SemiLinearEvolutionDirichlet(
+            t0=t0,
+            tmax=tmax,
+            y0_fun=y0_fun,
+            bbox=bbox,
+            diffop=diffops.laplace(),
+            diffop_scale=diffusion_rate,
+            f=f_spruce,
+            df=df_spruce,
+            df_diagonal=None,
+        )
+    elif bcond == "neumann":
+        return SemiLinearEvolutionNeumann(
+            t0=t0,
+            tmax=tmax,
+            y0_fun=y0_fun,
+            bbox=bbox,
+            diffop=diffops.laplace(),
+            diffop_scale=diffusion_rate,
+            f=f_spruce,
+            df=df_spruce,
+            df_diagonal=None,
+        )
+    raise ValueError
 
 
 # A bunch of initial condition defaults. They all adhere to Dirichlet conditions.
