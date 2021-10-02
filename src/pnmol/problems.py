@@ -32,22 +32,25 @@ from pnmol import diffops, discretize, kernels, mesh
 # List of all the classes in the present module:
 # (Might help clarity)
 __all__ = [
-    # MixIns:
+    # MixIns for general PDEs
     "PDE",
     "DiscretizationMixIn",
-    "SystemDiscretizationMixIn",
     "IVPMixIn",
     "IVPConversionLinearMixIn",
     "IVPConversionSemiLinearMixIn",
     "DirichletMixIn",
     "NeumannMixIn",
     "NonLinearMixIn",
+    # Additional MixIns for systems of PDEs
+    "SystemDiscretizationMixIn",
+    "SystemDirichletMixIn",
+    "SystemNeumannMixIn",
     # PDE Classes:
     "LinearEvolutionDirichlet",  # e.g. heat equation
     "LinearEvolutionNeumann",  # e.g. heat equation
-    "LinearPDESystemDirichlet",  # for testing
-    "LinearPDESystemNeumann",  # for testing
-    "SemiLinearEvolutionSystemDirichlet",  # SIR
+    "SystemLinearPDEDirichlet",  # for testing
+    "SystemLinearPDENeumann",  # for testing
+    "SystemSemiLinearEvolutionNeumann",  # SIR
     # Full recipes:
     "heat_1d_discretized",
     "heat_1d",
@@ -222,6 +225,7 @@ class _IVPConversionMixInInterface:
         raise NotImplementedError
 
     def _check_ivp_conversion_conditions(self):
+        """Conversion to an IVP relies on a few assumptions. Check them here."""
         if not isinstance(self, _BoundaryConditionMixInInterface):
             raise Exception(
                 "Conversion to an IVP requires boundary condition functionality."
@@ -373,11 +377,11 @@ class LinearEvolutionNeumann(
 
 
 # For testing purposes
-class LinearPDESystemNeumann(SystemDiscretizationMixIn, NeumannMixIn, PDE):
+class SystemLinearPDENeumann(SystemDiscretizationMixIn, NeumannMixIn, PDE):
     """Systems of linear PDEs with Neumann boundary conditions."""
 
 
-class SemiLinearEvolutionSystemNeumann(
+class SystemSemiLinearEvolutionNeumann(
     IVPMixIn,
     NonLinearMixIn,
     IVPConversionSemiLinearMixIn,
@@ -541,7 +545,7 @@ def sir_1d(
     df = jax.jit(jax.jacfwd(f, argnums=1))
 
     laplace = diffops.laplace()
-    return SemiLinearEvolutionSystemNeumann(
+    return SystemSemiLinearEvolutionNeumann(
         diffop=(laplace, laplace, laplace),
         diffop_scale=(diffusion_rate_S, diffusion_rate_I, diffusion_rate_R),
         bbox=bbox,

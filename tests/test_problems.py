@@ -158,7 +158,7 @@ def test_pde_system():
     diffop = (pde1.diffop, pde2.diffop)
     diffop_scale = (pde1.diffop_scale, pde2.diffop_scale)
 
-    pde = pnmol.problems.LinearPDESystemNeumann(
+    pde = pnmol.problems.SystemLinearPDENeumann(
         diffop=diffop, diffop_scale=diffop_scale, bbox=pde1.bbox
     )
 
