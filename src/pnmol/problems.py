@@ -29,28 +29,6 @@ import tornadox
 
 from pnmol import diffops, discretize, kernels, mesh
 
-# Make the PDE time-dependent and add initial values
-
-
-class IVPMixIn:
-    """Initial value problem functionality for PDE problems.
-
-    Turns a purely spatial PDE into an evolution equation.
-    """
-
-    def __init__(self, *, t0, tmax, y0_fun):
-        self.t0 = t0
-        self.tmax = tmax
-        self.y0_fun = y0_fun
-
-        # Holds the discretised initial condition.
-        self.y0 = None
-
-    @property
-    def t_span(self):
-        return self.t0, self.tmax
-
-
 # Add discretisation functionality
 
 
@@ -126,6 +104,28 @@ class PDE(DiscretizationMixIn):
     @property
     def dimension(self):
         return self.bbox.ndim
+
+
+# Make the PDE time-dependent and add initial values
+
+
+class IVPMixIn:
+    """Initial value problem functionality for PDE problems.
+
+    Turns a purely spatial PDE into an evolution equation.
+    """
+
+    def __init__(self, *, t0, tmax, y0_fun):
+        self.t0 = t0
+        self.tmax = tmax
+        self.y0_fun = y0_fun
+
+        # Holds the discretised initial condition.
+        self.y0 = None
+
+    @property
+    def t_span(self):
+        return self.t0, self.tmax
 
 
 class LinearPDE(PDE, IVPMixIn):
