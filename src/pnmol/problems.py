@@ -215,18 +215,29 @@ class IVPMixIn:
 # Implement to_ivp() conversions for some simple problems.
 
 
-class _IVPConversion:
+class _IVPConversionMixIn:
     """Interface for IVP-conversion mixins."""
 
     def to_tornadox_ivp(self):
         raise NotImplementedError
 
+    def _check_ivp_conversion_conditions(self):
+        if not isinstance(self, _BoundaryConditionMixIn):
+            raise Exception(
+                "Conversion to an IVP requires boundary condition functionality."
+            )
+        if not isinstance(self, IVPMixIn):
+            raise Exception("Conversion to an IVP requires IVP functionality.")
+        if self.L is None:
+            raise AttributeError("Conversion to an IVP requires prior discretization.")
 
-class IVPConversionLinearMixIn:
-    """Linear PDE problem. Requires mixing with some boundary condition."""
+
+class IVPConversionLinearMixIn(_IVPConversionMixIn):
+    """Add functionality for conversion of linear PDEs to IVPs to the PDE class."""
 
     def to_tornadox_ivp(self):
-        """Transform PDE into an IVP. Requires prior discretisation."""
+
+        self._check_ivp_conversion_conditions()
 
         def f_new(_, x):
             assert x.ndim == 1
@@ -241,11 +252,11 @@ class IVPConversionLinearMixIn:
         )
 
 
-class IVPConversionSemiLinearMixIn:
-    """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
+class IVPConversionSemiLinearMixIn(_IVPConversionMixIn):
+    """Add functionality for conversion of semilinear PDEs to IVPs to the PDE class."""
 
     def to_tornadox_ivp(self):
-        """Transform PDE into an IVP. Requires prior discretisation."""
+        self._check_ivp_conversion_conditions()
 
         def f_new(t, x):
             x_padded = self.bc_pad(x)
@@ -262,7 +273,7 @@ class IVPConversionSemiLinearMixIn:
 # Add boundary conditions
 
 
-class _BoundaryCondition:
+class _BoundaryConditionMixIn:
     def __init__(self, **kwargs):
         self.B = None
         self.R_sqrtm = None
@@ -275,7 +286,7 @@ class _BoundaryCondition:
         raise NotImplementedError
 
 
-class NeumannMixIn(_BoundaryCondition):
+class NeumannMixIn(_BoundaryConditionMixIn):
     """Neumann condition functionality for PDE problems."""
 
     def bc_pad(self, x):
@@ -289,7 +300,7 @@ class NeumannMixIn(_BoundaryCondition):
         return x[1:-1]
 
 
-class DirichletMixIn(_BoundaryCondition):
+class DirichletMixIn(_BoundaryConditionMixIn):
     """Dirichlet condition functionality for PDE problems."""
 
     def bc_pad(self, x):
