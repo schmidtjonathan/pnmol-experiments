@@ -18,9 +18,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     def initialize(self, pde):
 
         X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.kron(
-            jnp.eye(3), jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
-        )
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
 
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
