@@ -4,16 +4,17 @@ import pytest
 import tornadox
 
 import pnmol
+from pnmol.pde import examples, problems
 
 # Make the second dirichlet a neumann once the basic tests are established.
 problems_1d_all = pytest.mark.parametrize(
     "prob1d",
     [
-        pnmol.problems.heat_1d_discretized(dx=0.1, bcond="dirichlet"),
-        pnmol.problems.heat_1d_discretized(dx=0.1, bcond="neumann"),
-        pnmol.problems.sir_1d_discretized(),
-        pnmol.problems.spruce_budworm_1d_discretized(bcond="dirichlet"),
-        pnmol.problems.spruce_budworm_1d_discretized(bcond="neumann"),
+        examples.heat_1d_discretized(dx=0.1, bcond="dirichlet"),
+        examples.heat_1d_discretized(dx=0.1, bcond="neumann"),
+        examples.sir_1d_discretized(),
+        examples.spruce_budworm_1d_discretized(bcond="dirichlet"),
+        examples.spruce_budworm_1d_discretized(bcond="neumann"),
     ],
     ids=[
         "heat-dirichlet",
@@ -39,7 +40,7 @@ class TestProb1dDiscretized:
     @staticmethod
     @problems_1d_all
     def test_type(prob1d):
-        assert isinstance(prob1d, pnmol.problems.PDE)
+        assert isinstance(prob1d, problems.PDE)
 
     # IVP Functionality
 
@@ -104,7 +105,7 @@ def test_to_ivp():
     dx = 0.2
     diffusion_rate = 0.01
 
-    heat = pnmol.problems.heat_1d_discretized(
+    heat = examples.heat_1d_discretized(
         dx=dx,
         bcond=bcond,
         kernel=pnmol.kernels.Polynomial(),
@@ -130,7 +131,7 @@ def test_to_ivp():
         assert jnp.allclose(dfy0a, heat.L[1:-1, 1:-1])
 
     bcond = "dirichlet"
-    heat = pnmol.problems.heat_1d_discretized(
+    heat = examples.heat_1d_discretized(
         dx=dx,
         bcond=bcond,
         kernel=pnmol.kernels.Polynomial(),
@@ -161,12 +162,12 @@ def test_to_ivp():
 
 
 def test_pde_system():
-    pde1 = pnmol.problems.heat_1d(bcond="neumann")
-    pde2 = pnmol.problems.heat_1d(bcond="neumann")
+    pde1 = examples.heat_1d(bcond="neumann")
+    pde2 = examples.heat_1d(bcond="neumann")
     diffop = (pde1.diffop, pde2.diffop)
     diffop_scale = (pde1.diffop_scale, pde2.diffop_scale)
 
-    pde = pnmol.problems.SystemLinearPDENeumann(
+    pde = problems.SystemLinearPDENeumann(
         diffop=diffop, diffop_scale=diffop_scale, bbox=pde1.bbox
     )
 
