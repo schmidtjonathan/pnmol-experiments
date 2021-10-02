@@ -94,3 +94,35 @@ def test_add_white_noise(kernel, X, Y):
     Kxy = k(X, Y.T)
     Kxy_expected = kernel(X, Y.T) + white(X, Y.T)
     assert jnp.allclose(Kxy, Kxy_expected)
+
+
+class TestDuplicate:
+    @staticmethod
+    @pytest.fixture
+    def num_duplicates():
+        return 3
+
+    @staticmethod
+    @pytest.fixture
+    def kernel_stacked(kernel, num_duplicates):
+        return kernels.stack_independent(kernel, num=num_duplicates)
+
+    @staticmethod
+    @ALL_KERNELS
+    def test_gram(kernel_stacked, X, Y, num_duplicates):
+
+        num_duplicates = 3
+        matrix_gram = kernel_stacked(X, Y.T)
+
+        n, m = X.shape[0], Y.shape[0]
+        assert matrix_gram.shape == (num_duplicates * n, num_duplicates * m)
+
+    @staticmethod
+    @ALL_KERNELS
+    def test_diagonal(kernel_stacked, X, num_duplicates):
+
+        num_duplicates = 3
+        matrix_gram = kernel_stacked(X, X)
+
+        n = X.shape[0]
+        assert matrix_gram.shape == (num_duplicates * n,)

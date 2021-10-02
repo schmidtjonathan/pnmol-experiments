@@ -1,13 +1,19 @@
-from abc import ABC, abstractmethod
+import abc
 from functools import cached_property, partial
 
 import jax
 import jax.numpy as jnp
 
 
-class Kernel(ABC):
+class Kernel(abc.ABC):
     """Covariance kernel interface."""
 
+    @abc.abstractmethod
+    def __call__(self, X, Y):
+        raise NotImplementedError
+
+
+class _PairwiseKernel(Kernel):
     @partial(jax.jit, static_argnums=(0,))
     def __call__(self, X, Y):
 
@@ -25,7 +31,7 @@ class Kernel(ABC):
         # X.shape=[N,d), Y.shape=(d,K) -> K.shape = (N,K)
         return self._evaluate_outer(X, Y)
 
-    @abstractmethod
+    @abc.abstractmethod
     def pairwise(self, x, y):
         raise NotImplementedError
 
@@ -49,7 +55,7 @@ class Kernel(ABC):
         return Lambda(pairwise_new)
 
 
-class Lambda(Kernel):
+class Lambda(_PairwiseKernel):
     def __init__(self, fun, /):
         self._lambda_fun = jax.jit(fun)
 
@@ -58,7 +64,7 @@ class Lambda(Kernel):
         return self._lambda_fun(x, y)
 
 
-class _RadialKernel(Kernel):
+class _RadialKernel(_PairwiseKernel):
     r"""Radial kernels.
 
     k(x,y) = output_scale * \varphi(\|x-y\|*input_scale)
@@ -89,7 +95,7 @@ class _RadialKernel(Kernel):
     def input_scale_squared(self):
         return self.input_scale ** 2
 
-    @abstractmethod
+    @abc.abstractmethod
     def pairwise(self, X, Y):
         raise NotImplementedError
 
@@ -118,7 +124,7 @@ class Matern52(_RadialKernel):
         return self.output_scale_squared * A * B
 
 
-class Polynomial(Kernel):
+class Polynomial(_PairwiseKernel):
     """k(x,y) = (x.T @ y + c)^d"""
 
     def __init__(self, *, order=2, const=1.0):
@@ -138,7 +144,7 @@ class Polynomial(Kernel):
         return (x.dot(y) + self.const) ** self.order
 
 
-class WhiteNoise(Kernel):
+class WhiteNoise(_PairwiseKernel):
     def __init__(self, *, output_scale=1.0):
         self._output_scale = output_scale
 
@@ -149,3 +155,29 @@ class WhiteNoise(Kernel):
     @partial(jax.jit, static_argnums=(0,))
     def pairwise(self, x, y):
         return self.output_scale ** 2 * jnp.all(x == y)
+
+
+class _StackedKernel(Kernel):
+    def __init__(self, *, kernel_list):
+        self.kernel_list = kernel_list
+
+    @partial(jax.jit, static_argnums=0)
+    def __call__(self, X, Y):
+        gram_matrix_list = [k(X, Y) for k in self.kernel_list]
+
+        # Diagonal of the Gram matrix:
+        # Concatenate the results together
+        if X.shape == Y.shape:
+            return jnp.concatenate(gram_matrix_list)
+
+        # Full Gram matrix:
+        # Block diag the gram matrix
+        return jax.scipy.linalg.block_diag(*gram_matrix_list)
+
+
+def stack_independent(kernel, num):
+    """Create a stack of kernels such that the Gram matrix becomes block diagonal.
+
+    The blocks are all identical.
+    """
+    return _StackedKernel(kernel_list=[kernel] * num)
