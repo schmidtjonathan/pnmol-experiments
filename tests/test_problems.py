@@ -1,3 +1,4 @@
+import jax
 import jax.numpy as jnp
 import pytest
 import tornadox
@@ -148,3 +149,39 @@ def test_to_ivp():
     # The vector field is indeed linear
     fy0 = heat_as_ivp.f(heat_as_ivp.t0, heat_as_ivp.y0)
     assert jnp.allclose(dfy0a @ heat_as_ivp.y0, fy0)
+
+
+def test_pde_system():
+    pde1 = pnmol.problems.heat_1d(bcond="neumann")
+    pde2 = pnmol.problems.heat_1d(bcond="neumann")
+    diffop = (pde1.diffop, pde2.diffop)
+    diffop_scale = (pde1.diffop_scale, pde2.diffop_scale)
+
+    pde = pnmol.problems.LinearPDESystemNeumann(
+        diffop=diffop, diffop_scale=diffop_scale, bbox=pde1.bbox
+    )
+
+    assert pde.L is None
+    assert pde.E_sqrtm is None
+
+    mesh = pnmol.mesh.RectangularMesh.from_bbox_1d([0.0, 1.0], step=0.1)
+    pde1.discretize(
+        mesh_spatial=mesh, kernel=pnmol.kernels.SquareExponential(), stencil_size=3
+    )
+    pde2.discretize(
+        mesh_spatial=mesh, kernel=pnmol.kernels.SquareExponential(), stencil_size=3
+    )
+
+    pde.discretize_system(
+        mesh_spatial=mesh, kernel=pnmol.kernels.SquareExponential(), stencil_size=3
+    )
+
+    L_expected = jax.scipy.linalg.block_diag(pde1.L, pde2.L)
+    E_sqrtm_expected = jax.scipy.linalg.block_diag(pde1.E_sqrtm, pde2.E_sqrtm)
+    assert jnp.allclose(pde.L, L_expected)
+    assert jnp.allclose(pde.E_sqrtm, E_sqrtm_expected)
+
+    B_expected = jax.scipy.linalg.block_diag(pde1.B, pde2.B)
+    R_sqrtm_expected = jax.scipy.linalg.block_diag(pde1.R_sqrtm, pde2.R_sqrtm)
+    assert jnp.allclose(pde.B, B_expected)
+    assert jnp.allclose(pde.R_sqrtm, R_sqrtm_expected)

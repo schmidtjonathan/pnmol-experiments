@@ -29,11 +29,48 @@ import tornadox
 
 from pnmol import diffops, discretize, kernels, mesh
 
+# PDE Base class and some problem-type-specific implementations
+
+
+class PDE:
+    """PDE base class.
+
+    The PDE class is central to all the options below.
+    It is extended by LinearPDE, and SemiLinearPDE.
+    The additional functionalities IVPMixIn, DirichletMixIn/NeumannMixIn,
+    and DiscretizationMixIn rely on the attributes provided herein.
+    """
+
+    def __init__(self, *, diffop, diffop_scale, bbox, **kwargs):
+        self.diffop = diffop
+        self.diffop_scale = diffop_scale
+        self.bbox = bbox
+
+        # The following fields store an optional discretization.
+        # They are filled by discretize(), provided by the
+        # DiscretizationMixIn below.
+        self.L = None
+        self.E_sqrtm = None
+        self.mesh_spatial = None
+        super().__init__(**kwargs)
+
+    def __repr__(self):
+        return f"{self.__class__.__name__}(is_discretized={self.is_discretized})"
+
+    @property
+    def is_discretized(self):
+        return self.L is not None
+
+    @property
+    def dimension(self):
+        return self.bbox.ndim
+
+
 # Add discretisation functionality
 
 
 class DiscretizationMixIn:
-    """Discretisation functionality for PDE problems."""
+    """Add functionality for discretization of PDEs to the PDE class."""
 
     def discretize(self, *, mesh_spatial, kernel, stencil_size, nugget_gram_matrix=0.0):
         L, E_sqrtm = discretize.fd_probabilistic(
@@ -69,41 +106,51 @@ class DiscretizationMixIn:
             self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
-# PDE Base class and some problem-type-specific implementations
+class SystemDiscretizationMixIn:
+    """Add functionality for discretization of systems of PDEs to the PDE class."""
 
+    # Overwrite the discretization functionality
+    def discretize_system(
+        self, *, mesh_spatial, kernel, stencil_size, nugget_gram_matrix=0.0
+    ):
 
-class PDE(DiscretizationMixIn):
-    """PDE base class.
+        fd = functools.partial(
+            discretize.fd_probabilistic,
+            mesh_spatial=mesh_spatial,
+            kernel=kernel,
+            stencil_size=stencil_size,
+            nugget_gram_matrix=nugget_gram_matrix,
+        )
 
-    The PDE class is central to all the options below.
-    It is extended by LinearPDE, and SemiLinearPDE.
-    The additional functionalities IVPMixIn, DirichletMixIn/NeumannMixIn,
-    and DiscretizationMixIn rely on the attributes provided herein.
-    """
+        L_list, E_sqrtm_list = map(fd, self.diffop)
+        L_list_scaled, E_sqrtm_list_scaled = map(
+            lambda s, l, e: (s * l, s * e), self.diffop_scale, L_list, E_sqrtm_list
+        )
 
-    def __init__(self, *, diffop, diffop_scale, bbox, **kwargs):
-        self.diffop = diffop
-        self.diffop_scale = diffop_scale
-        self.bbox = bbox
+        self.L = jax.scipy.linalg.block_diag(*L_list_scaled)
+        self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_list_scaled)
 
-        # The following fields store an optional discretization.
-        # They are filled by discretize(), provided by the
-        # DiscretizationMixIn below.
-        self.L = None
-        self.E_sqrtm = None
-        self.mesh_spatial = None
-        super().__init__(**kwargs)
+        if isinstance(self, NeumannMixIn):
+            if self.dimension > 1:
+                raise NotImplementedError
+            B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
+                mesh_spatial=mesh_spatial,
+                kernel=kernel,
+                stencil_size=2,
+                nugget_gram_matrix=nugget_gram_matrix,
+            )
+        elif isinstance(self, DirichletMixIn):
+            B = mesh_spatial.boundary_projection_matrix
+            R_sqrtm = jnp.zeros((self.B.shape[0], self.B.shape[0]))
 
-    def __repr__(self):
-        return f"{self.__class__.__name__}(is_discretized={self.is_discretized})"
+        n = len(self.diffop)
+        self.B = jax.scipy.linalg.block_diag(*([B] * n))
+        self.R_sqrtm = jax.scipy.linalg.block_diag(*([R_sqrtm] * n))
 
-    @property
-    def is_discretized(self):
-        return self.L is not None
+        if isinstance(self, IVPMixIn):
 
-    @property
-    def dimension(self):
-        return self.bbox.ndim
+            # Enforce a scalar initial value by slicing the zeroth dimension
+            self.y0 = self.y0_fun(mesh_spatial.points).squeeze()
 
 
 # Make the PDE time-dependent and add initial values
@@ -128,7 +175,17 @@ class IVPMixIn:
         return self.t0, self.tmax
 
 
-class LinearPDE(PDE, IVPMixIn):
+# Implement to_ivp() conversions for some simple problems.
+
+
+class _IVPConversion:
+    """Interface for IVP-conversion mixins."""
+
+    def to_tornadox_ivp(self):
+        raise NotImplementedError
+
+
+class IVPConversionLinearMixIn:
     """Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
@@ -147,15 +204,7 @@ class LinearPDE(PDE, IVPMixIn):
         )
 
 
-class NonLinearMixIn:
-    def __init__(self, *, f, df, df_diagonal, **kwargs):
-        self.f = f
-        self.df = df
-        self.df_diagonal = df_diagonal
-        super().__init__(**kwargs)
-
-
-class SemiLinearPDE(PDE, NonLinearMixIn, IVPMixIn):
+class IVPConversionSemiLinearMixIn:
     """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
@@ -173,7 +222,7 @@ class SemiLinearPDE(PDE, NonLinearMixIn, IVPMixIn):
         )
 
 
-# Add boundary conditions through a MixIn
+# Add boundary conditions
 
 
 class _BoundaryCondition:
@@ -219,18 +268,41 @@ class DirichletMixIn(_BoundaryCondition):
         return x[1:-1]
 
 
+# Add nonlinearities
+
+
+class NonLinearMixIn:
+    def __init__(self, *, f, df, df_diagonal, **kwargs):
+        self.f = f
+        self.df = df
+        self.df_diagonal = df_diagonal
+        super().__init__(**kwargs)
+
+
 # Mix and match a range of PDE problems.
 
 
-class LinearEvolutionDirichlet(LinearPDE, DirichletMixIn):
+class LinearEvolutionDirichlet(
+    PDE, IVPMixInLinearPDE, DiscretizationMixIn, DirichletMixIn
+):
     pass
 
 
-class LinearEvolutionNeumann(LinearPDE, NeumannMixIn):
+class LinearEvolutionNeumann(PDE, IVPMixInLinearPDE, DiscretizationMixIn, NeumannMixIn):
     pass
 
 
-class SIRDirichlet(SemiLinearPDE, NeumannMixIn):
+class LinearPDESystemNeumann(PDE, SystemDiscretizationMixIn, NeumannMixIn):
+    pass
+
+
+class LinearEvolutionSystemNeumann(
+    PDE, IVPMixIn, SystemDiscretizationMixIn, NeumannMixIn
+):
+    pass
+
+
+class SIRDirichlet(PDE, IVPMixInSemiLinearPDE, DiscretizationMixIn, NeumannMixIn):
     def discretize(
         self, *, mesh_spatial, kernel_list, stencil_size_list, nugget_gram_matrix=0.0
     ):
@@ -449,8 +521,7 @@ def spatial_SIR_1d(
     )
 
 
-# A bunch of initial condition defaults
-# They all adhere to Dirichlet conditions.
+# A bunch of initial condition defaults. They all adhere to Dirichlet conditions.
 
 
 def gaussian_bell_1d_centered(x, bbox, width=1.0):
