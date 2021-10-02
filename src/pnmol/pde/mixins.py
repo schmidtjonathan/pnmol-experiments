@@ -1,3 +1,7 @@
+"""Extend PDE problem functionality.
+
+Includes time-dependency, boundary conditions, discretisation, and more.
+"""
 import functools
 
 import jax.numpy as jnp
