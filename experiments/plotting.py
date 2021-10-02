@@ -2,14 +2,15 @@
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
-plt.style.use(
-    [
-        "experiments/style/lines_and_ticks.mplstyle",
-        "experiments/style/font.mplstyle",
-        "experiments/style/colors.mplstyle",
-    ]
-)
+STYLESHEETS = [
+    "experiments/style/lines_and_ticks.mplstyle",
+    "experiments/style/font.mplstyle",
+    "experiments/style/colors.mplstyle",
+    "experiments/style/markers.mplstyle",
+    "experiments/style/bottomleftaxes.mplstyle",
+]
 
 PATH_RESULTS = "experiments/results/"
 
@@ -29,13 +30,14 @@ def figure_1(
     path=PATH_RESULTS, methods=("pnmol_white", "pnmol_latent", "tornadox", "reference")
 ):
     path = path + "figure1/"
+    plt.style.use(STYLESHEETS)
 
     results = [figure_1_load_results(prefix=method, path=path) for method in methods]
 
     results_reference = results[-1]
     means_reference, *_, x_reference = results_reference
 
-    figure_size = (AISTATS_LINEWIDTH_DOUBLE, AISTATS_TEXTWIDTH_SINGLE)
+    figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
         nrows=len(methods),
         ncols=3,
@@ -105,7 +107,7 @@ def figure_1(
     ax1.set_title(r"$\bf a.$ " + "Mean", loc="left", fontsize="medium")
     ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left", fontsize="medium")
     ax3.set_title(r"$\bf c.$ " + "Error", loc="left", fontsize="medium")
-    plt.savefig(path + "figure1.pdf")
+    plt.savefig(path + "figure.pdf")
     plt.show()
 
 
@@ -129,6 +131,7 @@ def figure_1_plot_contour(ax, /, *args, **kwargs):
 
 def figure_2(path=PATH_RESULTS):
     path = path + "figure2/"
+    plt.style.use(STYLESHEETS)
 
     rmse_all = jnp.load(path + "rmse_all.npy")
     input_scales = jnp.load(path + "input_scales.npy")
@@ -141,7 +144,7 @@ def figure_2(path=PATH_RESULTS):
     fx = jnp.load(path + "fx.npy")
     dfx = jnp.load(path + "dfx.npy")
 
-    figsize = (AISTATS_LINEWIDTH_DOUBLE, AISTATS_TEXTWIDTH_SINGLE)
+    figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig = plt.figure(constrained_layout=True, figsize=figsize, dpi=200)
     gs = fig.add_gridspec(2, 6)
 
@@ -154,26 +157,28 @@ def figure_2(path=PATH_RESULTS):
     ax_curve = fig.add_subplot(gs[:, 4:])
 
     vrange = {"vmin": 0.0}
-    cmap = {"cmap": "inferno"}
+    cmap = {"cmap": "copper"}
     ax_L_sparse.imshow(jnp.abs(L_sparse), **vrange, **cmap, aspect="auto")
     ax_L_dense.imshow(jnp.abs(L_dense), **vrange, **cmap, aspect="auto")
-    ax_E_sparse.imshow(jnp.abs(E_sparse), **vrange, **cmap, aspect="auto")
-    ax_E_dense.imshow(jnp.abs(E_dense), **vrange, **cmap, aspect="auto")
+    ax_E_sparse.imshow(jnp.abs(E_sparse), **cmap, aspect="auto", norm=LogNorm())
+    ax_E_dense.imshow(jnp.abs(E_dense), **cmap, aspect="auto", norm=LogNorm())
 
     for sc, errors in zip(input_scales, rmse_all.T):
-        ax_rmse.plot(
-            stencil_sizes, errors, "o-", label=rf"$\ell$={sc}", linewidth=2, alpha=0.8
-        )
+        ax_rmse.plot(stencil_sizes, errors, "o-", label=rf"$r={sc}$")
     ax_rmse.set_xlabel("Stencil size")
     ax_rmse.set_ylabel("RMSE")
-    ax_rmse.legend()
+    ax_rmse.legend(
+        loc="lower right", fancybox=False, edgecolor="black"
+    ).get_frame().set_linewidth(0.5)
 
     # Dummy
-    ax_curve.plot(x, fx, label="u(x)", linewidth=2, alpha=0.8)
-    ax_curve.plot(x, dfx, label="$\Delta u(x)$", linewidth=2, alpha=0.8)
+    ax_curve.plot(x, fx, label="u(x)")
+    ax_curve.plot(x, dfx, label="$\Delta u(x)$")
     ax_curve.set_xlabel("x")
     ax_curve.set_ylabel("u(x)")
-    ax_curve.legend()
+    ax_curve.legend(
+        loc="lower left", fancybox=False, edgecolor="black"
+    ).get_frame().set_linewidth(0.5)
 
     ax_L_dense.set_xticks(())
     ax_L_dense.set_yticks(())
@@ -192,4 +197,5 @@ def figure_2(path=PATH_RESULTS):
     ax_rmse.set_title(r"$\bf e.$ " + "Approximation", loc="left", fontsize="medium")
     ax_curve.set_title(r"$\bf f.$ " + "Solution", loc="left", fontsize="medium")
 
+    plt.savefig(path + "figure.pdf")
     plt.show()
