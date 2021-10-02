@@ -164,7 +164,8 @@ def figure_2(path=PATH_RESULTS):
     ax_E_dense.imshow(jnp.abs(E_dense), **cmap, aspect="auto", norm=LogNorm())
 
     for sc, errors in zip(input_scales, rmse_all.T):
-        ax_rmse.plot(stencil_sizes, errors, "o-", label=rf"$r={sc}$")
+        ax_rmse.semilogy(stencil_sizes, errors, "o-", label=rf"$r={sc}$")
+
     ax_rmse.set_xlabel("Stencil size")
     ax_rmse.set_ylabel("RMSE")
     ax_rmse.legend(

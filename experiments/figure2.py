@@ -1,6 +1,5 @@
 """Figure 2."""
 
-
 from functools import partial
 
 import jax
@@ -52,10 +51,10 @@ def input_scale_to_rmse(scale, stencil_size, diffop, mesh, obj_fun, truth_fun):
         kernel=kernel,
         stencil_size=stencil_size,
     )
-    x = mesh.points[1:-1]
-    fx = obj_fun(x)
-    dfx = truth_fun(x)
-    error_abs = jnp.abs(l[1:-1, 1:-1] @ fx - dfx)
+    x = mesh.points
+    fx = obj_fun(x).squeeze()
+    dfx = truth_fun(x).squeeze()
+    error_abs = jnp.abs(l @ fx - dfx) / jnp.abs(dfx)
     rmse = jnp.linalg.norm(error_abs) / jnp.sqrt(error_abs.size)
     return rmse, (l, e)
 
@@ -66,7 +65,7 @@ def save_array(arr, /, *, suffix, path="experiments/results/figure2/"):
 
 
 # Define the basic setup: target function, etc.
-obj_fun = jax.vmap(lambda x: jnp.sin(jnp.linalg.norm(x) ** 2))
+obj_fun = jax.vmap(lambda x: jnp.sin(x.dot(x)))
 diffop = pnmol.diffops.laplace()
 truth_fun = jax.vmap(diffop(obj_fun))
 
@@ -84,9 +83,11 @@ scale_mle = input_scale_mle(
     scale_to_like=input_scale_to_log_likelihood_general,
 )
 
+print(scale_mle)
+
 # Compute all RMSEs
-input_scales = jnp.array([0.1, 1.0, 10.0])
-stencil_sizes = jnp.array([3, 5, 8, 13, 21])
+input_scales = jnp.array([0.2, 0.8, 3.2])
+stencil_sizes = jnp.arange(3, len(mesh), step=2)
 
 scale_to_rmse = partial(
     input_scale_to_rmse, diffop=diffop, mesh=mesh, obj_fun=obj_fun, truth_fun=truth_fun
