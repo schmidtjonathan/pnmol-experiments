@@ -347,7 +347,7 @@ class LinearPDESystemNeumann(SystemDiscretizationMixIn, NeumannMixIn, PDE):
     pass
 
 
-class SIRNeumann(
+class SemiLinearEvolutionSystemNeumann(
     IVPMixIn,
     NonLinearMixIn,
     IVPConversionSemiLinearMixIn,
@@ -509,7 +509,7 @@ def sir_1d(
     df = jax.jit(jax.jacfwd(f, argnums=1))
 
     laplace = diffops.laplace()
-    return SIRNeumann(
+    return SemiLinearEvolutionSystemNeumann(
         diffop=(laplace, laplace, laplace),
         diffop_scale=(diffusion_rate_S, diffusion_rate_I, diffusion_rate_R),
         bbox=bbox,
