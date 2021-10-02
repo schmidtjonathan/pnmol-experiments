@@ -104,25 +104,25 @@ class TestDuplicate:
 
     @staticmethod
     @pytest.fixture
-    def kernel_stacked(kernel, num_duplicates):
-        return kernels.stack_independent(kernel, num=num_duplicates)
+    def kernel_duplicated(kernel, num_duplicates):
+        return kernels.duplicate(kernel, num=num_duplicates)
 
     @staticmethod
     @ALL_KERNELS
-    def test_gram(kernel_stacked, X, Y, num_duplicates):
+    def test_gram(kernel_duplicated, X, Y, num_duplicates):
 
         num_duplicates = 3
-        matrix_gram = kernel_stacked(X, Y.T)
+        matrix_gram = kernel_duplicated(X, Y.T)
 
         n, m = X.shape[0], Y.shape[0]
         assert matrix_gram.shape == (num_duplicates * n, num_duplicates * m)
 
     @staticmethod
     @ALL_KERNELS
-    def test_diagonal(kernel_stacked, X, num_duplicates):
+    def test_diagonal(kernel_duplicated, X, num_duplicates):
 
         num_duplicates = 3
-        matrix_gram = kernel_stacked(X, X)
+        matrix_gram = kernel_duplicated(X, X)
 
         n = X.shape[0]
         assert matrix_gram.shape == (num_duplicates * n,)

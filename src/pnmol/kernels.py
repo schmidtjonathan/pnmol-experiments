@@ -175,7 +175,7 @@ class _StackedKernel(Kernel):
         return jax.scipy.linalg.block_diag(*gram_matrix_list)
 
 
-def stack_independent(kernel, num):
+def duplicate(kernel, num):
     """Create a stack of kernels such that the Gram matrix becomes block diagonal.
 
     The blocks are all identical.
