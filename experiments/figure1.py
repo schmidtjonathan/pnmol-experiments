@@ -10,7 +10,7 @@ import pnmol
 
 
 def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
-    steprule = pnmol.ode.step.Constant(dt)
+    steprule = pnmol.odetools.step.Constant(dt)
     ek1 = pnmol.white.LinearWhiteNoiseEK1(
         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
     )
@@ -23,7 +23,7 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
 
 
 def solve_pde_pnmol_latent(pde, *, dt, nu, progressbar, kernel):
-    steprule = pnmol.ode.step.Constant(dt)
+    steprule = pnmol.odetools.step.Constant(dt)
     ek1 = pnmol.latent.LinearLatentForceEK1(
         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
     )
@@ -112,7 +112,7 @@ DIFFUSION_RATE = 0.035
 
 
 # PDE problems
-PDE_PNMOL = pnmol.problems.heat_1d_discretized(
+PDE_PNMOL = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX,
@@ -122,7 +122,7 @@ PDE_PNMOL = pnmol.problems.heat_1d_discretized(
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
-PDE_TORNADOX = pnmol.problems.heat_1d_discretized(
+PDE_TORNADOX = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX,
@@ -132,7 +132,7 @@ PDE_TORNADOX = pnmol.problems.heat_1d_discretized(
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
-PDE_REFERENCE = pnmol.problems.heat_1d_discretized(
+PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX / HIGH_RES_FACTOR_DX,

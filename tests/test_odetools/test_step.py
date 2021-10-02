@@ -3,13 +3,13 @@
 import jax.numpy as jnp
 import pytest
 
-import pnmol.ode.step
-import pnmol.problems
+import pnmol.odetools.step
+import pnmol.pde.examples
 
 
 @pytest.fixture
 def ivp():
-    return pnmol.problems.heat_1d_discretized()
+    return pnmol.pde.examples.heat_1d_discretized()
 
 
 class TestConstant:
@@ -21,7 +21,7 @@ class TestConstant:
     @staticmethod
     @pytest.fixture
     def steprule(dt):
-        steprule = pnmol.ode.step.Constant(dt)
+        steprule = pnmol.odetools.step.Constant(dt)
         return steprule
 
     @staticmethod
@@ -59,12 +59,12 @@ class TestAdaptive:
     @staticmethod
     @pytest.fixture
     def steprule(abstol, reltol):
-        steprule = pnmol.ode.step.Adaptive(abstol=abstol, reltol=reltol)
+        steprule = pnmol.odetools.step.Adaptive(abstol=abstol, reltol=reltol)
         return steprule
 
     @staticmethod
     def test_type(steprule):
-        assert isinstance(steprule, pnmol.ode.step.Adaptive)
+        assert isinstance(steprule, pnmol.odetools.step.Adaptive)
 
     @staticmethod
     def test_accept_less_than_1(steprule):

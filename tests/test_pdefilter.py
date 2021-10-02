@@ -6,7 +6,7 @@ import tornadox
 from pytest_cases import parametrize_with_cases
 
 import pnmol
-import pnmol.ode
+import pnmol.odetools
 import pnmol.pde
 
 # Common fixtures used for all cases
@@ -19,7 +19,7 @@ def num_derivatives():
 
 @pytest.fixture
 def steprule():
-    return pnmol.ode.step.Constant(dt=0.1)
+    return pnmol.odetools.step.Constant(dt=0.1)
 
 
 @pytest.fixture
