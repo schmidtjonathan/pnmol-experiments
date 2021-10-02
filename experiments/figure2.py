@@ -101,6 +101,11 @@ rmse_all = jnp.stack(
 L_sparse, E_sparse = scale_to_rmse(scale=scale_mle, stencil_size=3)[1]
 L_dense, E_dense = scale_to_rmse(scale=scale_mle, stencil_size=300)[1]
 
+# Plotting purposes...
+xgrid = jnp.linspace(0, 1, 150)
+fx = obj_fun(xgrid[:, None]).squeeze()
+dfx = truth_fun(xgrid[:, None]).squeeze()
+
 
 save_array(rmse_all, suffix="rmse_all")
 save_array(input_scales, suffix="input_scales")
@@ -108,6 +113,9 @@ save_array(stencil_sizes, suffix="stencil_sizes")
 save_array(L_sparse, suffix="L_sparse")
 save_array(L_dense, suffix="L_dense")
 save_array(E_sparse, suffix="E_sparse")
-save_array(E_dense, suffix="E_dense")
+save_array(xgrid, suffix="xgrid")
+save_array(fx, suffix="fx")
+save_array(dfx, suffix="dfx")
+
 
 plotting.figure_2()

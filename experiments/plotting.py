@@ -4,7 +4,11 @@ import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
 plt.style.use(
-    ["experiments/style/lines_and_ticks.mplstyle", "experiments/style/font.mplstyle"]
+    [
+        "experiments/style/lines_and_ticks.mplstyle",
+        "experiments/style/font.mplstyle",
+        "experiments/style/colors.mplstyle",
+    ]
 )
 
 PATH_RESULTS = "experiments/results/"
@@ -129,13 +133,63 @@ def figure_2(path=PATH_RESULTS):
     rmse_all = jnp.load(path + "rmse_all.npy")
     input_scales = jnp.load(path + "input_scales.npy")
     stencil_sizes = jnp.load(path + "stencil_sizes.npy")
+    L_sparse = jnp.load(path + "L_sparse.npy")
+    L_dense = jnp.load(path + "L_dense.npy")
+    E_sparse = jnp.load(path + "E_sparse.npy")
+    E_dense = jnp.load(path + "E_dense.npy")
+    x = jnp.load(path + "xgrid.npy")
+    fx = jnp.load(path + "fx.npy")
+    dfx = jnp.load(path + "dfx.npy")
+
+    figsize = (AISTATS_LINEWIDTH_DOUBLE, AISTATS_TEXTWIDTH_SINGLE)
+    fig = plt.figure(constrained_layout=True, figsize=figsize, dpi=200)
+    gs = fig.add_gridspec(2, 6)
+
+    ax_L_sparse = fig.add_subplot(gs[0, 0])
+    ax_L_dense = fig.add_subplot(gs[0, 1])
+    ax_E_sparse = fig.add_subplot(gs[1, 0])
+    ax_E_dense = fig.add_subplot(gs[1, 1])
+
+    ax_rmse = fig.add_subplot(gs[:, 2:4])
+    ax_curve = fig.add_subplot(gs[:, 4:])
+
+    vrange = {"vmin": 0.0}
+    cmap = {"cmap": "inferno"}
+    ax_L_sparse.imshow(jnp.abs(L_sparse), **vrange, **cmap, aspect="auto")
+    ax_L_dense.imshow(jnp.abs(L_dense), **vrange, **cmap, aspect="auto")
+    ax_E_sparse.imshow(jnp.abs(E_sparse), **vrange, **cmap, aspect="auto")
+    ax_E_dense.imshow(jnp.abs(E_dense), **vrange, **cmap, aspect="auto")
 
     for sc, errors in zip(input_scales, rmse_all.T):
-        plt.plot(
+        ax_rmse.plot(
             stencil_sizes, errors, "o-", label=rf"$\ell$={sc}", linewidth=2, alpha=0.8
         )
+    ax_rmse.set_xlabel("Stencil size")
+    ax_rmse.set_ylabel("RMSE")
+    ax_rmse.legend()
 
-    plt.xlabel("Stencil size")
-    plt.ylabel("RMSE")
-    plt.legend()
+    # Dummy
+    ax_curve.plot(x, fx, label="u(x)", linewidth=2, alpha=0.8)
+    ax_curve.plot(x, dfx, label="$\Delta u(x)$", linewidth=2, alpha=0.8)
+    ax_curve.set_xlabel("x")
+    ax_curve.set_ylabel("u(x)")
+    ax_curve.legend()
+
+    ax_L_dense.set_xticks(())
+    ax_L_dense.set_yticks(())
+    ax_L_sparse.set_xticks(())
+    ax_L_sparse.set_yticks(())
+    ax_E_sparse.set_xticks(())
+    ax_E_sparse.set_yticks(())
+    ax_E_dense.set_xticks(())
+    ax_E_dense.set_yticks(())
+
+    ax_L_sparse.set_title(r"$\bf a.$ " + "D (sparse)", loc="left", fontsize="medium")
+    ax_L_dense.set_title(r"$\bf b.$ " + "D (dense)", loc="left", fontsize="medium")
+    ax_E_sparse.set_title(r"$\bf c.$ " + "E (sparse)", loc="left", fontsize="medium")
+    ax_E_dense.set_title(r"$\bf d.$ " + "E (dense)", loc="left", fontsize="medium")
+
+    ax_rmse.set_title(r"$\bf e.$ " + "Approximation", loc="left", fontsize="medium")
+    ax_curve.set_title(r"$\bf f.$ " + "Solution", loc="left", fontsize="medium")
+
     plt.show()
