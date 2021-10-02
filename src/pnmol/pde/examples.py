@@ -191,6 +191,7 @@ def spruce_budworm_1d_discretized(
         diffusion_rate=diffusion_rate,
         y0_fun=y0_fun,
         bcond=bcond,
+        growth_rate=growth_rate,
     )
     mesh_spatial = mesh.RectangularMesh.from_bbox_1d(spruce.bbox, step=dx)
 
