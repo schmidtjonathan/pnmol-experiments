@@ -29,6 +29,32 @@ import tornadox
 
 from pnmol import diffops, discretize, kernels, mesh
 
+# List of all the classes in the present module:
+# (Might help clarity)
+__all__ = [
+    # MixIns:
+    "PDE",
+    "DiscretizationMixIn",
+    "SystemDiscretizationMixIn",
+    "IVPMixIn",
+    "IVPConversionLinearMixIn",
+    "IVPConversionSemiLinearMixIn",
+    "DirichletMixIn",
+    "NeumannMixIn",
+    "NonLinearMixIn",
+    # PDE Classes:
+    "LinearEvolutionDirichlet",  # e.g. heat equation
+    "LinearEvolutionNeumann",  # e.g. heat equation
+    "LinearPDESystemDirichlet",  # for testing
+    "LinearPDESystemNeumann",  # for testing
+    "SemiLinearEvolutionSystemDirichlet",  # SIR
+    # Full recipes:
+    "heat_1d_discretized",
+    "heat_1d",
+    "sir_1d_discretized",
+    "sir_1d",
+]
+
 # PDE Base class and some problem-type-specific implementations
 
 
@@ -122,13 +148,22 @@ class SystemDiscretizationMixIn:
             nugget_gram_matrix=nugget_gram_matrix,
         )
 
-        L_list, E_sqrtm_list = map(fd, self.diffop)
-        L_list_scaled, E_sqrtm_list_scaled = map(
-            lambda s, l, e: (s * l, s * e), self.diffop_scale, L_list, E_sqrtm_list
+        # Compute the FD approximation for each differential operator
+        fd_output = tuple(map(fd, self.diffop))
+        fd_output_scaled = tuple(
+            map(lambda s, x: (s * x[0], s * x[1]), self.diffop_scale, fd_output)
         )
 
+        # Read out the coefficients and append to a list
+        L_list_scaled, E_sqrtm_list_scaled = [], []
+        for (l, e) in fd_output_scaled:
+            L_list_scaled.append(l)
+            E_sqrtm_list_scaled.append(e)
+
+        # Turn the list of coefficients into a block diagonal matrix
         self.L = jax.scipy.linalg.block_diag(*L_list_scaled)
         self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_list_scaled)
+        self.mesh_spatial = mesh_spatial
 
         if isinstance(self, NeumannMixIn):
             if self.dimension > 1:
@@ -162,13 +197,15 @@ class IVPMixIn:
     Turns a purely spatial PDE into an evolution equation.
     """
 
-    def __init__(self, *, t0, tmax, y0_fun):
+    def __init__(self, *, t0, tmax, y0_fun, **kwargs):
         self.t0 = t0
         self.tmax = tmax
         self.y0_fun = y0_fun
 
         # Holds the discretised initial condition.
         self.y0 = None
+
+        super().__init__(**kwargs)
 
     @property
     def t_span(self):
@@ -283,72 +320,31 @@ class NonLinearMixIn:
 
 
 class LinearEvolutionDirichlet(
-    PDE, IVPMixInLinearPDE, DiscretizationMixIn, DirichletMixIn
+    PDE, IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, DirichletMixIn
 ):
     pass
 
 
-class LinearEvolutionNeumann(PDE, IVPMixInLinearPDE, DiscretizationMixIn, NeumannMixIn):
+class LinearEvolutionNeumann(
+    PDE, IVPMixIn, IVPConversionLinearMixIn, DiscretizationMixIn, NeumannMixIn
+):
     pass
 
 
+# For testing purposes
 class LinearPDESystemNeumann(PDE, SystemDiscretizationMixIn, NeumannMixIn):
     pass
 
 
-class LinearEvolutionSystemNeumann(
-    PDE, IVPMixIn, SystemDiscretizationMixIn, NeumannMixIn
+class SIRNeumann(
+    PDE,
+    IVPMixIn,
+    NonLinearMixIn,
+    IVPConversionSemiLinearMixIn,
+    SystemDiscretizationMixIn,
+    NeumannMixIn,
 ):
     pass
-
-
-class SIRDirichlet(PDE, IVPMixInSemiLinearPDE, DiscretizationMixIn, NeumannMixIn):
-    def discretize(
-        self, *, mesh_spatial, kernel_list, stencil_size_list, nugget_gram_matrix=0.0
-    ):
-        if self.dimension > 1:
-            raise NotImplementedError(
-                "SIR with Neumann BCs is currently only available in 1D."
-            )
-        num_system_components = 3  # S, I, and R
-        assert len(kernel_list) == len(stencil_size_list) == num_system_components
-
-        L_blocks = []
-        E_sqrtm_blocks = []
-
-        for scale, kernel, stencil_size in zip(
-            self.diffop_scale, kernel_list, stencil_size_list
-        ):
-
-            L, E_sqrtm = discretize.fd_probabilistic(
-                self.diffop,
-                mesh_spatial=mesh_spatial,
-                kernel=kernel,
-                stencil_size=stencil_size,
-                nugget_gram_matrix=nugget_gram_matrix,
-            )
-            L_blocks.append(scale * L)
-            E_sqrtm_blocks.append(scale * E_sqrtm)
-
-        self.L = jax.scipy.linalg.block_diag(*L_blocks)
-        self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_blocks)
-        self.mesh_spatial = mesh_spatial
-
-        B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
-            mesh_spatial=mesh_spatial,
-            kernel=kernel,
-            stencil_size=2,
-            nugget_gram_matrix=nugget_gram_matrix,
-        )
-
-        self.B = jax.scipy.linalg.block_diag(*[B for _ in range(num_system_components)])
-        self.R_sqrtm = jax.scipy.linalg.block_diag(
-            *[R_sqrtm for _ in range(num_system_components)]
-        )
-
-        if isinstance(self, IVPMixIn):
-            # Enforce a scalar initial value by slicing the zeroth dimension
-            self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
 # Some precomputed recipes for PDE examples.
@@ -422,7 +418,7 @@ def heat_1d(
     raise ValueError
 
 
-def spatial_SIR_1d_discretized(
+def sir_1d_discretized(
     bbox=None,
     dx=0.05,
     t0=0.0,
@@ -433,12 +429,11 @@ def spatial_SIR_1d_discretized(
     diffusion_rate_S=0.1,
     diffusion_rate_I=0.1,
     diffusion_rate_R=0.1,
-    kernel_list=None,
+    kernel=None,
     nugget_gram_matrix_fd=0.0,
-    stencil_size_list=None,
+    stencil_size=3,
 ):
-    num_system_components = 3
-    sir = spatial_SIR_1d(
+    sir = sir_1d(
         bbox=bbox,
         t0=t0,
         tmax=tmax,
@@ -451,24 +446,19 @@ def spatial_SIR_1d_discretized(
     )
     mesh_spatial = mesh.RectangularMesh.from_bbox_1d(sir.bbox, step=dx)
 
-    if kernel_list is None:
-        kernel_list = [
-            kernels.SquareExponential() for _ in range(num_system_components)
-        ]
+    if kernel is None:
+        kernel = kernels.SquareExponential()
 
-    if stencil_size_list is None:
-        stencil_size_list = [3 for _ in range(num_system_components)]
-
-    sir.discretize(
+    sir.discretize_system(
         mesh_spatial=mesh_spatial,
-        kernel_list=kernel_list,
-        stencil_size_list=stencil_size_list,
+        kernel=kernel,
+        stencil_size=stencil_size,
         nugget_gram_matrix=nugget_gram_matrix_fd,
     )
     return sir
 
 
-def spatial_SIR_1d(
+def sir_1d(
     bbox=None,
     t0=0.0,
     tmax=50.0,
@@ -508,16 +498,16 @@ def spatial_SIR_1d(
     df = jax.jit(jax.jacfwd(f, argnums=1))
 
     laplace = diffops.laplace()
-    return SIRDirichlet(
-        diffop=laplace,
-        diffop_scale=[diffusion_rate_S, diffusion_rate_I, diffusion_rate_R],
+    return SIRNeumann(
+        diffop=(laplace, laplace, laplace),
+        diffop_scale=(diffusion_rate_S, diffusion_rate_I, diffusion_rate_R),
         bbox=bbox,
         t0=t0,
         tmax=tmax,
         y0_fun=y0_fun,
         f=f,
         df=df,
-        df_diagonal=None,  # jax.jit(lambda t, x: jnp.diagonal(df(t, x))),
+        df_diagonal=None,
     )
 
 

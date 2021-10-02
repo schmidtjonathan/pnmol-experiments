@@ -110,7 +110,7 @@ class Adaptive(StepRule):
 
         # This check messes up the import structure...
         # (The present file should not depend on pnmol.problems.)
-        if isinstance(discretized_pde, problems.LinearPDE):
+        if not isinstance(discretized_pde, problems.NonLinearMixIn):
             return propose_first_dt_linear(
                 discretized_pde.L, discretized_pde.t0, discretized_pde.y0
             )
