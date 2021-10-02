@@ -18,7 +18,9 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     def initialize(self, pde):
 
         X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        diffusion_state_sqrtm = jnp.kron(
+            jnp.eye(3), jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        )
 
         self.iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
@@ -39,12 +41,15 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         dy0_padded = jnp.pad(
-            extended_dy0, pad_width=1, mode="constant", constant_values=0.0
+            extended_dy0,
+            pad_width=((0, 0), (1, 1)),
+            mode="constant",
+            constant_values=0.0,
         )
-        dy0_full = dy0_padded[1:-1]
 
+        initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
         y = rv.MultivariateNormal(
-            mean=dy0_full,
+            mean=initmean,
             cov_sqrtm=jnp.kron(diffusion_state_sqrtm, cov_sqrtm),
         )
         return pdefilter.PDEFilterState(
@@ -58,6 +63,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     def attempt_step(self, state, dt, pde):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)
         A, Ql = self.iwp.preconditioned_discretize
+        # print(A.shape, Ql.shape)
         n, d = self.num_derivatives + 1, pde.y0.shape[0]
 
         # [Setup]
@@ -113,6 +119,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     @staticmethod
     @jax.jit
     def estimate_error(ql, z, h, E_sqrtm):
+        # print(h.shape, ql.shape, E_sqrtm.shape)
         S = h @ ql @ ql.T @ h.T + E_sqrtm @ E_sqrtm.T
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
@@ -137,5 +144,24 @@ class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
         H_ode = p1 - Jx @ p0
         H = jnp.vstack((H_ode, pde.B @ p0))
         shift = jnp.hstack((b, jnp.zeros(pde.B.shape[0])))
+        z = H @ m_pred + shift
+        return z, H
+
+
+class SemiLinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
+    @staticmethod
+    # @partial(jax.jit, static_argnums=(0,))
+    def evaluate_ode(pde, p0, p1, m_pred, t):
+        B = pde.B
+        L = pde.L
+
+        m_at = p0 @ m_pred
+        fx = pde.f(t, m_at)
+        Jx = pde.df(t, m_at)
+        b = Jx @ m_at - fx
+
+        H_ode = p1 - Jx @ p0 - L @ p0
+        H = jnp.vstack((H_ode, B @ p0))
+        shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
         z = H @ m_pred + shift
         return z, H

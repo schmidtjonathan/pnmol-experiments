@@ -94,7 +94,7 @@ class DiscretizationMixIn:
 # PDE Base class and some problem-type-specific implementations
 
 
-class PDE(DiscretizationMixIn, IVPMixIn):
+class PDE(DiscretizationMixIn):
     """PDE base class.
 
     The PDE class is central to all the options below.
@@ -128,7 +128,7 @@ class PDE(DiscretizationMixIn, IVPMixIn):
         return self.bbox.ndim
 
 
-class LinearPDE(PDE):
+class LinearPDE(PDE, IVPMixIn):
     """Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
@@ -155,15 +155,15 @@ class NonLinearMixIn:
         super().__init__(**kwargs)
 
 
-class SemiLinearPDE(PDE, NonLinearMixIn):
+class SemiLinearPDE(PDE, NonLinearMixIn, IVPMixIn):
     """Semi-Linear PDE problem. Requires mixing with some boundary condition."""
 
     def to_tornadox_ivp(self):
         """Transform PDE into an IVP. Requires prior discretisation."""
 
-        def f_new(_, x):
+        def f_new(t, x):
             x_padded = self.bc_pad(x)
-            x_new = self.L @ x_padded + self.f(x_padded)
+            x_new = self.L @ x_padded + self.f(t, x_padded)
             return self.bc_remove_pad(x_new)
 
         df_new = jax.jacfwd(f_new, argnums=1)
@@ -228,6 +228,55 @@ class LinearEvolutionDirichlet(LinearPDE, DirichletMixIn):
 
 class LinearEvolutionNeumann(LinearPDE, NeumannMixIn):
     pass
+
+
+class SIRDirichlet(SemiLinearPDE, NeumannMixIn):
+    def discretize(
+        self, *, mesh_spatial, kernel_list, stencil_size_list, nugget_gram_matrix=0.0
+    ):
+        if self.dimension > 1:
+            raise NotImplementedError(
+                "SIR with Neumann BCs is currently only available in 1D."
+            )
+        num_system_components = 3  # S, I, and R
+        assert len(kernel_list) == len(stencil_size_list) == num_system_components
+
+        L_blocks = []
+        E_sqrtm_blocks = []
+
+        for scale, kernel, stencil_size in zip(
+            self.diffop_scale, kernel_list, stencil_size_list
+        ):
+
+            L, E_sqrtm = discretize.fd_probabilistic(
+                self.diffop,
+                mesh_spatial=mesh_spatial,
+                kernel=kernel,
+                stencil_size=stencil_size,
+                nugget_gram_matrix=nugget_gram_matrix,
+            )
+            L_blocks.append(scale * L)
+            E_sqrtm_blocks.append(scale * E_sqrtm)
+
+        self.L = jax.scipy.linalg.block_diag(*L_blocks)
+        self.E_sqrtm = jax.scipy.linalg.block_diag(*E_sqrtm_blocks)
+        self.mesh_spatial = mesh_spatial
+
+        B, R_sqrtm = discretize.fd_probabilistic_neumann_1d(
+            mesh_spatial=mesh_spatial,
+            kernel=kernel,
+            stencil_size=2,
+            nugget_gram_matrix=nugget_gram_matrix,
+        )
+
+        self.B = jax.scipy.linalg.block_diag(*[B for _ in range(num_system_components)])
+        self.R_sqrtm = jax.scipy.linalg.block_diag(
+            *[R_sqrtm for _ in range(num_system_components)]
+        )
+
+        if isinstance(self, IVPMixIn):
+            # Enforce a scalar initial value by slicing the zeroth dimension
+            self.y0 = self.y0_fun(mesh_spatial.points)[:, 0]
 
 
 # Some precomputed recipes for PDE examples.
@@ -301,13 +350,112 @@ def heat_1d(
     raise ValueError
 
 
+def spatial_SIR_1d_discretized(
+    bbox=None,
+    dx=0.05,
+    t0=0.0,
+    tmax=50.0,
+    beta=0.3,
+    gamma=0.07,
+    N=1000.0,
+    diffusion_rate_S=0.1,
+    diffusion_rate_I=0.1,
+    diffusion_rate_R=0.1,
+    kernel_list=None,
+    nugget_gram_matrix_fd=0.0,
+    stencil_size_list=None,
+):
+    num_system_components = 3
+    sir = spatial_SIR_1d(
+        bbox=bbox,
+        t0=t0,
+        tmax=tmax,
+        diffusion_rate_S=diffusion_rate_S,
+        diffusion_rate_I=diffusion_rate_I,
+        diffusion_rate_R=diffusion_rate_R,
+        beta=beta,
+        gamma=gamma,
+        N=N,
+    )
+    mesh_spatial = mesh.RectangularMesh.from_bbox_1d(sir.bbox, step=dx)
+
+    if kernel_list is None:
+        kernel_list = [
+            kernels.SquareExponential() for _ in range(num_system_components)
+        ]
+
+    if stencil_size_list is None:
+        stencil_size_list = [3 for _ in range(num_system_components)]
+
+    sir.discretize(
+        mesh_spatial=mesh_spatial,
+        kernel_list=kernel_list,
+        stencil_size_list=stencil_size_list,
+        nugget_gram_matrix=nugget_gram_matrix_fd,
+    )
+    return sir
+
+
+def spatial_SIR_1d(
+    bbox=None,
+    t0=0.0,
+    tmax=50.0,
+    diffusion_rate_S=0.1,
+    diffusion_rate_I=0.1,
+    diffusion_rate_R=0.1,
+    beta=0.3,
+    gamma=0.07,
+    N=1000.0,
+):
+
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
+
+    def y0_fun(x):
+        init_infectious = 800.0 * gaussian_bell_1d_centered(x, bbox, width=0.5) + 1.0
+        s0 = N * jnp.ones_like(init_infectious) - init_infectious
+        i0 = init_infectious
+        r0 = jnp.zeros_like(init_infectious)
+        return jnp.concatenate((s0, i0, r0))
+
+    @jax.jit
+    def _sir_rhs(s, i, r):
+        spatial_N = s + i + r
+        new_s = -beta * s * i / spatial_N
+        new_i = beta * s * i / spatial_N - gamma * i
+        new_r = gamma * i
+        return new_s, new_i, new_r
+
+    @jax.jit
+    def f(t, x):
+        s, i, r = jnp.split(x, 3)
+        new_s, new_i, new_r = _sir_rhs(s, i, r)
+        return jnp.concatenate((new_s, new_i, new_r))
+
+    df = jax.jit(jax.jacfwd(f, argnums=1))
+
+    laplace = diffops.laplace()
+    return SIRDirichlet(
+        diffop=laplace,
+        diffop_scale=[diffusion_rate_S, diffusion_rate_I, diffusion_rate_R],
+        bbox=bbox,
+        t0=t0,
+        tmax=tmax,
+        y0_fun=y0_fun,
+        f=f,
+        df=df,
+        df_diagonal=None,  # jax.jit(lambda t, x: jnp.diagonal(df(t, x))),
+    )
+
+
 # A bunch of initial condition defaults
 # They all adhere to Dirichlet conditions.
 
 
-def gaussian_bell_1d_centered(x, bbox):
-    midpoint = 0.5 * (bbox[0] + bbox[1])
-    return jnp.exp(-1.0 * (x - midpoint) ** 2)
+def gaussian_bell_1d_centered(x, bbox, width=1.0):
+    midpoint = 0.5 * (bbox[1] + bbox[0])
+    return jnp.exp(-((x - midpoint) ** 2) / width ** 2)
 
 
 def gaussian_bell_1d(x):

@@ -18,16 +18,18 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
     def initialize(self, pde):
 
         X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        diffusion_state_sqrtm = jnp.kron(
+            jnp.eye(3), jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        )
 
         self.state_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=X.shape[0],
+            wiener_process_dimension=pde.y0.shape[0],
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         self.lf_iwp = iwp.IntegratedWienerTransition(
             num_derivatives=self.num_derivatives,
-            wiener_process_dimension=X.shape[0],
+            wiener_process_dimension=pde.y0.shape[0],
             wp_diffusion_sqrtm=pde.E_sqrtm,
         )
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
@@ -46,10 +48,13 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             wp_diffusion_sqrtm=diffusion_state_sqrtm,
         )
         dy0_padded = jnp.pad(
-            extended_dy0, pad_width=1, mode="constant", constant_values=0.0
+            extended_dy0,
+            pad_width=((0, 0), (1, 1)),
+            mode="constant",
+            constant_values=0.0,
         )
-        dy0_full = dy0_padded[1:-1]
-        mean = jnp.concatenate([dy0_full, jnp.zeros_like(dy0_full)], -1)
+        initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
+        mean = jnp.concatenate([initmean, jnp.zeros_like(initmean)], -1)
 
         cov_sqrtm_state_ = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
         cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, cov_sqrtm_state)
@@ -148,6 +153,34 @@ class LinearLatentForceEK1(_LatentForceEK1Base):
         Jx = L  # Evaluate Jacobian of the vector field
 
         H_state = E1_state - Jx @ E0_state
+        H_eps = -E0_eps
+        H_boundaries = pde.B @ E0_state
+        H_zeros = jnp.zeros_like(H_boundaries)
+        H = jnp.block([[H_state, H_eps], [H_boundaries, H_zeros]])
+
+        zeros_bc = jnp.zeros((pde.B.shape[0],))
+
+        b = jnp.concatenate([Jx @ state_at - fx, zeros_bc])
+        z = H @ m_pred + b
+        return z, H
+
+
+class SemiLinearLatentForceEK1(_LatentForceEK1Base):
+    @staticmethod
+    def evaluate_ode(pde, p0, p1, m_pred, t):
+        L = pde.L
+
+        E0_state = E0_eps = p0
+        E1_state = p1
+        E0_stacked = jax.scipy.linalg.block_diag(E0_state, E0_eps)
+
+        m_at = E0_stacked @ m_pred  # Project to first derivatives
+        state_at, eps_at = jnp.split(m_at, 2)  # Split up into ODE state and error
+
+        fx = pde.f(t, state_at)  # Evaluate vector field
+        Jx = pde.df(t, state_at)  # Evaluate Jacobian of the vector field
+
+        H_state = E1_state - Jx @ E0_state - L @ E0_state
         H_eps = -E0_eps
         H_boundaries = pde.B @ E0_state
         H_zeros = jnp.zeros_like(H_boundaries)
