@@ -156,29 +156,54 @@ def figure_2(path=PATH_RESULTS):
     ax_rmse = fig.add_subplot(gs[:, 2:4])
     ax_curve = fig.add_subplot(gs[:, 4:])
 
-    vrange = {"vmin": 0.0}
+    clip_value = 1e-12
+    vrange = {"vmin": clip_value}
     cmap = {"cmap": "Blues"}
-    ax_L_sparse.imshow(jnp.abs(L_sparse), **vrange, **cmap, aspect="auto")
-    ax_L_dense.imshow(jnp.abs(L_dense), **vrange, **cmap, aspect="auto")
+    ax_L_sparse.imshow(jnp.abs(L_sparse) + clip_value, **vrange, **cmap, aspect="auto")
+    ax_L_dense.imshow(jnp.abs(L_dense) + clip_value, **vrange, **cmap, aspect="auto")
+
+    # Add 1e-12 for a reasonable log-norm
     ax_E_sparse.imshow(
-        jnp.abs(E_sparse @ E_sparse.T), **cmap, aspect="auto", norm=LogNorm()
+        jnp.abs(E_sparse @ E_sparse.T) + clip_value,
+        **cmap,
+        aspect="auto",
+        norm=LogNorm(),
     )
     ax_E_dense.imshow(
-        jnp.abs(E_dense @ E_dense.T), **cmap, aspect="auto", norm=LogNorm()
+        jnp.abs(E_dense @ E_dense.T) + clip_value, **cmap, aspect="auto", norm=LogNorm()
     )
 
-    for sc, errors in zip(input_scales, rmse_all.T):
-        ax_rmse.semilogy(stencil_sizes, errors, "o-", label=rf"$r={sc}$")
-
+    ax_rmse.semilogy(
+        stencil_sizes,
+        rmse_all.T[0],
+        "o-",
+        alpha=0.6,
+        label=rf"$r={input_scales[0]}$",
+        color="C1",
+    )
+    ax_rmse.semilogy(
+        stencil_sizes,
+        rmse_all.T[1],
+        "o-",
+        label=rf"$r={input_scales[1]}$ (~MLE)",
+        color="C2",
+    )
+    ax_rmse.semilogy(
+        stencil_sizes,
+        rmse_all.T[2],
+        "o-",
+        alpha=0.6,
+        label=rf"$r={input_scales[2]}$",
+        color="C3",
+    )
     ax_rmse.set_xlabel("Stencil size")
     ax_rmse.set_ylabel("RMSE")
     ax_rmse.legend(
-        loc="lower right", fancybox=False, edgecolor="black"
+        loc="upper right", fancybox=False, edgecolor="black"
     ).get_frame().set_linewidth(0.5)
 
-    # Dummy
-    ax_curve.plot(x, fx, label="u(x)")
-    ax_curve.plot(x, dfx, label="$\Delta u(x)$")
+    ax_curve.plot(x, fx, label="u(x)", color="black", linestyle="dotted")
+    ax_curve.plot(x, dfx, label="$\Delta u(x)$", color="black")
     ax_curve.set_xlabel("x")
     ax_curve.set_ylabel("u(x)")
     ax_curve.legend(
