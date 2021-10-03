@@ -4,6 +4,7 @@ from functools import partial
 
 import jax
 import jax.numpy as jnp
+import jax.random
 import matplotlib.pyplot as plt
 import plotting
 from tqdm import tqdm
@@ -63,6 +64,15 @@ def input_scale_to_rmse(scale, stencil_size, *, diffop, mesh, obj_fun, truth_fun
     return rmse, (l, e)
 
 
+def sample(key, kernel, mesh_points, nugget_gram_matrix=1e-12):
+    N = mesh_points.shape[0]
+    gram_matrix = kernel(mesh_points, mesh_points.T)
+    gram_matrix += nugget_gram_matrix * jnp.eye(N)
+
+    sample = jax.random.normal(key, shape=(N, 2))
+    return jnp.linalg.cholesky(gram_matrix) @ sample
+
+
 def save_array(arr, /, *, suffix, path="experiments/results/figure2/"):
     _assert_not_nan(arr)
     path_with_suffix = path + suffix
@@ -119,9 +129,21 @@ L_dense, E_dense = pnmol.discretize.collocation_global(
 )
 
 # Plotting purposes...
-xgrid = jnp.linspace(0, 1, 150)
-fx = obj_fun(xgrid[:, None]).squeeze()
-dfx = truth_fun(xgrid[:, None]).squeeze()
+xgrid = jnp.linspace(0, 1, 150)[:, None]
+fx = obj_fun(xgrid).squeeze()
+dfx = truth_fun(xgrid).squeeze()
+
+
+# Sample from the different priors
+key = jax.random.PRNGKey(seed=123)
+k1 = pnmol.kernels.SquareExponential(input_scale=input_scales[0])
+k2 = pnmol.kernels.SquareExponential(input_scale=input_scales[1])
+k3 = pnmol.kernels.SquareExponential(input_scale=input_scales[2])
+s1 = sample(key=key, kernel=k1, mesh_points=xgrid)
+_, key = jax.random.split(key)
+s2 = sample(key=key, kernel=k2, mesh_points=xgrid)
+_, key = jax.random.split(key)
+s3 = sample(key=key, kernel=k3, mesh_points=xgrid)
 
 
 save_array(rmse_all, suffix="rmse_all")
@@ -134,6 +156,9 @@ save_array(E_dense, suffix="E_dense")
 save_array(xgrid, suffix="xgrid")
 save_array(fx, suffix="fx")
 save_array(dfx, suffix="dfx")
+save_array(s1, suffix="s1")
+save_array(s2, suffix="s2")
+save_array(s3, suffix="s3")
 
 
 plotting.figure_2()

@@ -143,6 +143,9 @@ def figure_2(path=PATH_RESULTS):
     x = jnp.load(path + "xgrid.npy")
     fx = jnp.load(path + "fx.npy")
     dfx = jnp.load(path + "dfx.npy")
+    # s1 = jnp.load(path + "s1.npy")  # not shown, thus not loaded
+    s2 = jnp.load(path + "s2.npy")
+    s3 = jnp.load(path + "s3.npy")
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig = plt.figure(constrained_layout=True, figsize=figsize, dpi=200)
@@ -157,10 +160,14 @@ def figure_2(path=PATH_RESULTS):
     ax_curve = fig.add_subplot(gs[:, 4:])
 
     clip_value = 1e-12
-    vrange = {"vmin": clip_value}
     cmap = {"cmap": "Blues"}
-    ax_L_sparse.imshow(jnp.abs(L_sparse) + clip_value, **vrange, **cmap, aspect="auto")
-    ax_L_dense.imshow(jnp.abs(L_dense) + clip_value, **vrange, **cmap, aspect="auto")
+    ax_L_sparse.imshow(jnp.abs(L_sparse) + clip_value, **cmap, aspect="auto")
+    ax_L_dense.imshow(
+        jnp.abs(L_dense) + clip_value,
+        vmax=7 * jnp.median(jnp.abs(L_dense)),
+        **cmap,
+        aspect="auto",
+    )
 
     # Add 1e-12 for a reasonable log-norm
     ax_E_sparse.imshow(
@@ -173,41 +180,50 @@ def figure_2(path=PATH_RESULTS):
         jnp.abs(E_dense @ E_dense.T) + clip_value, **cmap, aspect="auto", norm=LogNorm()
     )
 
-    ax_rmse.semilogy(
-        stencil_sizes,
-        rmse_all.T[0],
-        "o-",
-        alpha=0.6,
-        label=rf"$r={input_scales[0]}$",
-        color="C1",
-    )
-    ax_rmse.semilogy(
-        stencil_sizes,
-        rmse_all.T[1],
-        "o-",
-        label=rf"$r={input_scales[1]}$ (~MLE)",
-        color="C2",
-    )
-    ax_rmse.semilogy(
-        stencil_sizes,
-        rmse_all.T[2],
-        "o-",
-        alpha=0.6,
-        label=rf"$r={input_scales[2]}$",
-        color="C3",
-    )
+    s1_style = {
+        "color": "C1",
+        "linestyle": "-",
+    }
+    s1_label = {"label": rf"$r={input_scales[1]}$ (~MLE)"}
+    s2_style = {
+        "color": "C0",
+        "linestyle": "dashdot",
+    }
+    s2_label = {"label": rf"$r={input_scales[2]}$"}
+
+    ax_rmse.semilogy(stencil_sizes, rmse_all.T[1], **s1_style, **s1_label, marker="o")
+    ax_rmse.semilogy(stencil_sizes, rmse_all.T[2], **s2_style, **s2_label, marker="s")
     ax_rmse.set_xlabel("Stencil size")
     ax_rmse.set_ylabel("RMSE")
     ax_rmse.legend(
-        loc="upper right", fancybox=False, edgecolor="black"
+        loc="center right", fancybox=False, edgecolor="black"
     ).get_frame().set_linewidth(0.5)
 
-    ax_curve.plot(x, fx, label="u(x)", color="black", linestyle="dotted")
+    ax_curve.plot(x, fx, label="u(x)", color="black", linestyle="dashed")
     ax_curve.plot(x, dfx, label="$\Delta u(x)$", color="black")
+    ax_curve.plot(x, s2, **s1_style, alpha=0.6)
+    ax_curve.plot(x, s3, **s2_style, alpha=0.6)
+
+    endmarker_style = {
+        "marker": "o",
+        "markerfacecolor": "white",
+        "markeredgecolor": "auto",
+        "markeredgewidth": 1.0,
+        "markersize": 2.5,
+    }
+    ax_curve.plot(x[0], fx[0], **endmarker_style, color="black")
+    ax_curve.plot(x[-1], fx[-1], **endmarker_style, color="black")
+    ax_curve.plot(x[0], dfx[0], **endmarker_style, color="black")
+    ax_curve.plot(x[-1], dfx[-1], **endmarker_style, color="black")
+    ax_curve.plot(x[0, None], s2[None, 0], **endmarker_style, **s1_style)
+    ax_curve.plot(x[-1, None], s2[None, -1], **endmarker_style, **s1_style)
+    ax_curve.plot(x[0, None], s3[None, 0], **endmarker_style, **s2_style)
+    ax_curve.plot(x[-1, None], s3[None, -1], **endmarker_style, **s2_style)
+
     ax_curve.set_xlabel("x")
     ax_curve.set_ylabel("u(x)")
     ax_curve.legend(
-        loc="lower left", fancybox=False, edgecolor="black"
+        loc="lower center", fancybox=False, edgecolor="black"
     ).get_frame().set_linewidth(0.5)
 
     ax_L_dense.set_xticks(())
@@ -219,13 +235,17 @@ def figure_2(path=PATH_RESULTS):
     ax_E_dense.set_xticks(())
     ax_E_dense.set_yticks(())
 
-    ax_L_sparse.set_title(r"$\bf a.$ " + "D (sparse)", loc="left", fontsize="medium")
-    ax_E_sparse.set_title(r"$\bf b.$ " + "E (sparse)", loc="left", fontsize="medium")
-    ax_L_dense.set_title(r"$\bf c.$ " + "D (dense)", loc="left", fontsize="medium")
-    ax_E_dense.set_title(r"$\bf d.$ " + "E (dense)", loc="left", fontsize="medium")
+    ax_L_sparse.set_title(r"$\bf a.$ " + "$D$ (sparse)", loc="left", fontsize="medium")
+    ax_E_sparse.set_title(r"$\bf b.$ " + "$E$ (sparse)", loc="left", fontsize="medium")
+    ax_L_dense.set_title(r"$\bf c.$ " + "$D$ (dense)", loc="left", fontsize="medium")
+    ax_E_dense.set_title(r"$\bf d.$ " + "$E$ (dense)", loc="left", fontsize="medium")
 
-    ax_rmse.set_title(r"$\bf e.$ " + "Approximation", loc="left", fontsize="medium")
-    ax_curve.set_title(r"$\bf f.$ " + "Solution", loc="left", fontsize="medium")
+    ax_rmse.set_title(
+        r"$\bf e.$ " + "RMSE vs. Stencil Size", loc="left", fontsize="medium"
+    )
+    ax_curve.set_title(
+        r"$\bf f.$ " + "Solution / Laplacian / Samples", loc="left", fontsize="medium"
+    )
 
-    plt.savefig(path + "figure.pdf")
+    plt.savefig(path + "figure.pdf", dpi=300)
     plt.show()
