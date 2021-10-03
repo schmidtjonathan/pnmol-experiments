@@ -95,6 +95,29 @@ class TestFDProbabilistic:
         assert E_sqrtm.shape == (n, n)
 
 
+class TestCollocationGlobal:
+    @staticmethod
+    @pytest.fixture
+    def collocation_global(diffop, mesh_spatial_1d):
+        return discretize.collocation_global(
+            diffop=diffop,
+            mesh_spatial_1d=mesh_spatial_1d,
+            nugget_gram_matrix=nugget_gram_matrix,
+        )
+
+    @staticmethod
+    def test_L_shape(collocation_global, mesh_spatial_1d):
+        L, _ = collocation_global
+        n = mesh_spatial_1d.shape[0]
+        assert L.shape == (n, n)
+
+    @staticmethod
+    def test_E_sqrtm_shape(collocation_global, mesh_spatial_1d):
+        _, E_sqrtm = collocation_global
+        n = mesh_spatial_1d.shape[0]
+        assert E_sqrtm.shape == (n, n)
+
+
 class TestNeumann:
     @staticmethod
     @pytest.fixture
