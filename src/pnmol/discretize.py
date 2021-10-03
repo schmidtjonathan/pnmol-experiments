@@ -163,3 +163,30 @@ def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
     uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
 
     return weights, uncertainty
+
+
+def collocation_global(
+    diffop,
+    mesh_spatial,
+    kernel=None,
+    nugget_gram_matrix=0.0,
+):
+    """Discretize a differential operator with global, unsymmetric collocation."""
+
+    if kernel is None:
+        kernel = kernels.SquareExponential(input_scale=1.0, output_scale=1.0)
+
+    # Fix kernel arguments in FD function
+    L_kx = kernels.Lambda(diffop(kernel.pairwise, argnums=0))
+    LL_kx = kernels.Lambda(diffop(L_kx.pairwise, argnums=1))
+
+    gram_matrix = kernel(mesh_spatial.points, mesh_spatial.points.T)
+    gram_matrix += nugget_gram_matrix * jnp.eye(mesh_spatial.shape[0])
+
+    diffop_at_set = L_kx(mesh_spatial.points, mesh_spatial.points.T)
+
+    D = jnp.linalg.solve(gram_matrix, diffop_at_set)
+
+    x = LL_kx(mesh_spatial.points, mesh_spatial.points.T)
+    E = x - D.T @ diffop_at_set
+    return D, jnp.linalg.cholesky(E)

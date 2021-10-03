@@ -101,8 +101,8 @@ class TestCollocationGlobal:
     def collocation_global(diffop, mesh_spatial_1d):
         return discretize.collocation_global(
             diffop=diffop,
-            mesh_spatial_1d=mesh_spatial_1d,
-            nugget_gram_matrix=nugget_gram_matrix,
+            mesh_spatial=mesh_spatial_1d,
+            nugget_gram_matrix=1e-10,
         )
 
     @staticmethod
