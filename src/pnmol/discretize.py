@@ -176,17 +176,18 @@ def collocation_global(
     if kernel is None:
         kernel = kernels.SquareExponential(input_scale=1.0, output_scale=1.0)
 
-    # Fix kernel arguments in FD function
-    L_kx = kernels.Lambda(diffop(kernel.pairwise, argnums=0))
+    # Differentiate kernel
+    k = kernel
+    L_kx = kernels.Lambda(diffop(k.pairwise, argnums=0))
     LL_kx = kernels.Lambda(diffop(L_kx.pairwise, argnums=1))
 
-    gram_matrix = kernel(mesh_spatial.points, mesh_spatial.points.T)
-    gram_matrix += nugget_gram_matrix * jnp.eye(mesh_spatial.shape[0])
+    # Assemble Gram matrices
+    gram_matrix_k = kernel(mesh_spatial.points, mesh_spatial.points.T)
+    gram_matrix_k += nugget_gram_matrix * jnp.eye(mesh_spatial.shape[0])
+    gram_matrix_Lk = L_kx(mesh_spatial.points, mesh_spatial.points.T)
+    gram_matrix_LLk = LL_kx(mesh_spatial.points, mesh_spatial.points.T)
 
-    diffop_at_set = L_kx(mesh_spatial.points, mesh_spatial.points.T)
-
-    D = jnp.linalg.solve(gram_matrix, diffop_at_set)
-
-    x = LL_kx(mesh_spatial.points, mesh_spatial.points.T)
-    E = x - D.T @ diffop_at_set
+    # Compute differentiation matrix and error covariance matrix
+    D = jnp.linalg.solve(gram_matrix_k, gram_matrix_Lk.T).T
+    E = gram_matrix_LLk - D.T @ gram_matrix_Lk
     return D, jnp.linalg.cholesky(E)
