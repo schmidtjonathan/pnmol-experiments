@@ -170,6 +170,7 @@ def collocation_global(
     mesh_spatial,
     kernel=None,
     nugget_gram_matrix=0.0,
+    nugget_cholesky_E=0.0,
 ):
     """Discretize a differential operator with global, unsymmetric collocation."""
 
@@ -190,4 +191,5 @@ def collocation_global(
     # Compute differentiation matrix and error covariance matrix
     D = jnp.linalg.solve(gram_matrix_k, gram_matrix_Lk.T).T
     E = gram_matrix_LLk - D.T @ gram_matrix_Lk
+    E += nugget_cholesky_E * jnp.eye(mesh_spatial.shape[0])
     return D, jnp.linalg.cholesky(E)

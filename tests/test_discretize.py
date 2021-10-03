@@ -103,6 +103,7 @@ class TestCollocationGlobal:
             diffop=diffop,
             mesh_spatial=mesh_spatial_1d,
             nugget_gram_matrix=1e-10,
+            nugget_cholesky_E=1e-10,
         )
 
     @staticmethod
