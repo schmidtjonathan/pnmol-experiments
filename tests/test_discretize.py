@@ -118,6 +118,11 @@ class TestCollocationGlobal:
         n = mesh_spatial_1d.shape[0]
         assert E_sqrtm.shape == (n, n)
 
+    @staticmethod
+    def test_E_sqrtm_not_nan(collocation_global, mesh_spatial_1d):
+        _, E_sqrtm = collocation_global
+        assert not jnp.any(jnp.isnan(E_sqrtm))
+
 
 class TestNeumann:
     @staticmethod

@@ -13,37 +13,41 @@ import pnmol
 # Part 1: Maximum likelihood estimation of the input scale.
 
 
-def log_likelihood(gram_matrix, y, n):
+def input_scale_mle(*, mesh_points, obj, num_trial_points):
+    """Compute the MLE over the input_scale parameter in a square exponential kernel."""
+    y = obj(mesh_points[:, None]).squeeze()
+    input_scale_trials = jnp.logspace(-3, 3, num_trial_points)
+
+    log_likelihood_values = jnp.stack(
+        [
+            input_scale_to_log_likelihood(
+                l=l,
+                y=y,
+                n=num_mesh_points,
+                mesh_points=mesh_points,
+            )
+            for l in input_scale_trials
+        ]
+    )
+
+    index_max = jnp.argmax(log_likelihood_values)
+    return input_scale_trials[index_max]
+
+
+def input_scale_to_log_likelihood(*, l, y, n, mesh_points):
+    kernel = pnmol.kernels.SquareExponential(input_scale=l)
+    K = kernel(mesh_points[:, None], mesh_points[None, :])
+    return log_likelihood(gram_matrix=K, y=y, n=n)
+
+
+def log_likelihood(*, gram_matrix, y, n):
     a = y @ jnp.linalg.solve(gram_matrix, y)
     b = jnp.log(jnp.linalg.det(gram_matrix))
     c = n * jnp.log(2 * jnp.pi)
     return -0.5 * (a + b + c)
 
 
-def input_scale_to_log_likelihood_general(l, y, n, mesh_points, log_lkld):
-    prior = pnmol.kernels.SquareExponential(input_scale=l)
-    K = prior(mesh_points[:, None], mesh_points[None, :])
-    return log_lkld(K, y, n)
-
-
-def input_scale_mle(*, mesh_points, obj_fun, num_trial_points, scale_to_like):
-    y = obj_fun(mesh_points[:, None]).squeeze()
-    input_scale_to_log_likelihood = jax.vmap(
-        partial(
-            scale_to_like,
-            mesh_points=mesh_points,
-            log_lkld=log_likelihood,
-            y=y,
-            n=num_mesh_points,
-        )
-    )
-    input_scale_trials = jnp.logspace(-3, 3, num_trial_points)
-    log_likelihood_values = input_scale_to_log_likelihood(input_scale_trials)
-    index_max = jnp.argmax(log_likelihood_values)
-    return input_scale_trials[index_max]
-
-
-def input_scale_to_rmse(scale, stencil_size, diffop, mesh, obj_fun, truth_fun):
+def input_scale_to_rmse(scale, stencil_size, *, diffop, mesh, obj_fun, truth_fun):
     kernel = pnmol.kernels.SquareExponential(input_scale=scale)
     l, e = pnmol.discretize.fd_probabilistic(
         diffop=diffop,
@@ -60,14 +64,20 @@ def input_scale_to_rmse(scale, stencil_size, diffop, mesh, obj_fun, truth_fun):
 
 
 def save_array(arr, /, *, suffix, path="experiments/results/figure2/"):
+    _assert_not_nan(arr)
     path_with_suffix = path + suffix
     jnp.save(path_with_suffix, arr)
+
+
+def _assert_not_nan(arr):
+    assert not jnp.any(jnp.isnan(arr))
 
 
 # Define the basic setup: target function, etc.
 obj_fun = jax.vmap(lambda x: jnp.sin(x.dot(x)))
 diffop = pnmol.diffops.laplace()
 truth_fun = jax.vmap(diffop(obj_fun))
+
 
 # Choose a mesh
 num_mesh_points = 25
@@ -78,29 +88,35 @@ mesh = pnmol.mesh.RectangularMesh(
 # Compute the MLE estimate (for comparison)
 scale_mle = input_scale_mle(
     mesh_points=mesh.points.squeeze(),
-    obj_fun=obj_fun,
-    num_trial_points=200,
-    scale_to_like=input_scale_to_log_likelihood_general,
+    obj=obj_fun,
+    num_trial_points=3,  # 20 was good
 )
 
-print(scale_mle)
 
 # Compute all RMSEs
 input_scales = jnp.array([0.2, 0.8, 3.2])
 stencil_sizes = jnp.arange(3, len(mesh), step=2)
-
-scale_to_rmse = partial(
+e = partial(
     input_scale_to_rmse, diffop=diffop, mesh=mesh, obj_fun=obj_fun, truth_fun=truth_fun
 )
-scale_to_rmse_vmapped = jax.vmap(scale_to_rmse, in_axes=(0, None))
-rmse_all = jnp.stack(
-    [scale_to_rmse_vmapped(input_scales, st)[0] for st in stencil_sizes]
-)
 
+# The below can be vmapped (with a bit of tinkering) which makes it _much_ faster,
+# but also kind of unreadable (and in the experiment code, I prefer readability over speed)
+rmse_all = jnp.asarray(
+    [[e(l, s)[0] for l in input_scales] for s in tqdm(stencil_sizes)]
+)
+rmse_all = jnp.nan_to_num(rmse_all, nan=100.0)
 
 # Compute L and E for a number of stencil sizes
-L_sparse, E_sparse = scale_to_rmse(scale=scale_mle, stencil_size=3)[1]
-L_dense, E_dense = scale_to_rmse(scale=scale_mle, stencil_size=300)[1]
+L_sparse, E_sparse = e(scale=scale_mle, stencil_size=3)[1]
+L_dense, E_dense = pnmol.discretize.collocation_global(
+    diffop=diffop,
+    mesh_spatial=mesh,
+    kernel=pnmol.kernels.SquareExponential(input_scale=scale_mle),
+    nugget_cholesky_E=1e-10,
+    nugget_gram_matrix=1e-12,
+    symmetrize_cholesky_E=True,
+)
 
 # Plotting purposes...
 xgrid = jnp.linspace(0, 1, 150)
@@ -114,6 +130,7 @@ save_array(stencil_sizes, suffix="stencil_sizes")
 save_array(L_sparse, suffix="L_sparse")
 save_array(L_dense, suffix="L_dense")
 save_array(E_sparse, suffix="E_sparse")
+save_array(E_dense, suffix="E_dense")
 save_array(xgrid, suffix="xgrid")
 save_array(fx, suffix="fx")
 save_array(dfx, suffix="dfx")

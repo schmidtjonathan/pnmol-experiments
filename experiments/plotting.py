@@ -149,19 +149,23 @@ def figure_2(path=PATH_RESULTS):
     gs = fig.add_gridspec(2, 6)
 
     ax_L_sparse = fig.add_subplot(gs[0, 0])
-    ax_L_dense = fig.add_subplot(gs[0, 1])
-    ax_E_sparse = fig.add_subplot(gs[1, 0])
+    ax_L_dense = fig.add_subplot(gs[1, 0])
+    ax_E_sparse = fig.add_subplot(gs[0, 1])
     ax_E_dense = fig.add_subplot(gs[1, 1])
 
     ax_rmse = fig.add_subplot(gs[:, 2:4])
     ax_curve = fig.add_subplot(gs[:, 4:])
 
     vrange = {"vmin": 0.0}
-    cmap = {"cmap": "copper"}
+    cmap = {"cmap": "Blues"}
     ax_L_sparse.imshow(jnp.abs(L_sparse), **vrange, **cmap, aspect="auto")
     ax_L_dense.imshow(jnp.abs(L_dense), **vrange, **cmap, aspect="auto")
-    ax_E_sparse.imshow(jnp.abs(E_sparse), **cmap, aspect="auto", norm=LogNorm())
-    ax_E_dense.imshow(jnp.abs(E_dense), **cmap, aspect="auto", norm=LogNorm())
+    ax_E_sparse.imshow(
+        jnp.abs(E_sparse @ E_sparse.T), **cmap, aspect="auto", norm=LogNorm()
+    )
+    ax_E_dense.imshow(
+        jnp.abs(E_dense @ E_dense.T), **cmap, aspect="auto", norm=LogNorm()
+    )
 
     for sc, errors in zip(input_scales, rmse_all.T):
         ax_rmse.semilogy(stencil_sizes, errors, "o-", label=rf"$r={sc}$")
@@ -191,8 +195,8 @@ def figure_2(path=PATH_RESULTS):
     ax_E_dense.set_yticks(())
 
     ax_L_sparse.set_title(r"$\bf a.$ " + "D (sparse)", loc="left", fontsize="medium")
-    ax_L_dense.set_title(r"$\bf b.$ " + "D (dense)", loc="left", fontsize="medium")
-    ax_E_sparse.set_title(r"$\bf c.$ " + "E (sparse)", loc="left", fontsize="medium")
+    ax_E_sparse.set_title(r"$\bf b.$ " + "E (sparse)", loc="left", fontsize="medium")
+    ax_L_dense.set_title(r"$\bf c.$ " + "D (dense)", loc="left", fontsize="medium")
     ax_E_dense.set_title(r"$\bf d.$ " + "E (dense)", loc="left", fontsize="medium")
 
     ax_rmse.set_title(r"$\bf e.$ " + "Approximation", loc="left", fontsize="medium")
