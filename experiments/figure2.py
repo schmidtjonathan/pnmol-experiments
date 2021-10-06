@@ -107,7 +107,7 @@ scale_mle = input_scale_mle(
 
 # Compute all RMSEs
 input_scales = jnp.array([0.2, 0.8, 3.2])
-stencil_sizes = jnp.arange(3, len(mesh[:5]), step=2)
+stencil_sizes = jnp.arange(3, len(mesh), step=2)
 e = partial(
     input_scale_to_rmse, diffop=diffop, mesh=mesh, obj_fun=obj_fun, truth_fun=truth_fun
 )
