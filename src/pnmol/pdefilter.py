@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from pnmol import kernels
-from pnmol.ode import init, step
+from pnmol.odetools import init, step
 
 
 class PDEFilterState(

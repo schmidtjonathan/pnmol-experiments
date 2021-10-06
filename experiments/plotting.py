@@ -3,7 +3,9 @@
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 
-plt.style.use(["experiments/lines_and_ticks.mplstyle", "experiments/font.mplstyle"])
+plt.style.use(
+    ["experiments/style/lines_and_ticks.mplstyle", "experiments/style/font.mplstyle"]
+)
 
 PATH_RESULTS = "experiments/results/figure1/"
 

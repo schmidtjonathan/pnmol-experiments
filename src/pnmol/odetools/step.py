@@ -6,7 +6,7 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 
-from pnmol import problems
+from pnmol import pde
 
 
 class StepRule(abc.ABC):
@@ -109,8 +109,8 @@ class Adaptive(StepRule):
     def first_dt(self, discretized_pde):
 
         # This check messes up the import structure...
-        # (The present file should not depend on pnmol.problems.)
-        if isinstance(discretized_pde, problems.LinearPDE):
+        # (The present file should not depend on pnmol.pde.examples.)
+        if not isinstance(discretized_pde, pde.mixins.NonLinearMixIn):
             return propose_first_dt_linear(
                 discretized_pde.L, discretized_pde.t0, discretized_pde.y0
             )
