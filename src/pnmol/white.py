@@ -9,24 +9,9 @@ from pnmol.base import iwp, rv, sqrt
 
 
 class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.P0 = None
-        self.E0 = None
-        self.E1 = None
-
     def initialize(self, pde):
 
-        X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
-
-        self.iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.y0.shape[0],
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
-        )
-        self.E0 = self.iwp.projection_matrix(0)
-        self.E1 = self.iwp.projection_matrix(1)
+        self.iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
         ivp = pde.to_tornadox_ivp()

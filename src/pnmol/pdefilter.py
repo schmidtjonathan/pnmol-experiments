@@ -10,6 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from pnmol import kernels
+from pnmol.base import iwp
 from pnmol.odetools import init, step
 
 
@@ -58,6 +59,10 @@ class PDEFilter(ABC):
         self.spatial_kernel = (
             spatial_kernel or kernels.Matern52() + kernels.WhiteNoise()
         )
+
+        # Different to common ODE filters, we always need those:
+        self.E0 = None
+        self.E1 = None
 
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, initialization={self.init})"
@@ -214,6 +219,20 @@ class PDEFilter(ABC):
     @abstractmethod
     def attempt_step(self, state, dt, pde):
         raise NotImplementedError
+
+    def initialize_iwp(self, pde):
+
+        X = pde.mesh_spatial.points
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        prior = iwp.IntegratedWienerTransition(
+            num_derivatives=self.num_derivatives,
+            wiener_process_dimension=pde.y0.shape[0],
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        )
+        E0 = prior.projection_matrix(0)
+        E1 = prior.projection_matrix(1)
+
+        return prior, E0, E1, diffusion_state_sqrtm
 
 
 class _TimeStopper:

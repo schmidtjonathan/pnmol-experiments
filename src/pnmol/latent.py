@@ -5,64 +5,109 @@ import jax
 import jax.numpy as jnp
 
 from pnmol import pdefilter
-from pnmol.base import iwp, rv, sqrt, stacked_ssm
+from pnmol.base import rv, sqrt, stacked_ssm
 
 
 class _LatentForceEK1Base(pdefilter.PDEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.P0 = None
-        self.E0 = None
-        self.E1 = None
+
+        # Stacked state space model
+        self.ssm = None
+        self.state_iwp = None
+        self.lf_iwp = None
 
     def initialize(self, pde):
 
-        X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
 
-        self.state_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.y0.shape[0],
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
-        )
-        self.lf_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.y0.shape[0],
-            wp_diffusion_sqrtm=pde.E_sqrtm,
-        )
+        self.state_iwp, self.lf_iwp = iwp, iwp
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
-        self.P0 = self.E0 = self.state_iwp.projection_matrix(0)
-        self.E1 = self.state_iwp.projection_matrix(1)
+        # Shorthand access to the shapes of the initial conditions
+        n, d = self.num_derivatives + 1, pde.mesh_spatial.shape[0]
 
-        # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = pde.to_tornadox_ivp()
-        extended_dy0, cov_sqrtm_state = self.init(
-            f=ivp.f,
-            df=ivp.df,
-            y0=ivp.y0,
-            t0=ivp.t0,
-            num_derivatives=self.state_iwp.num_derivatives,
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        # Starting point for the initial conditions
+        # Dont make it a non-zero mean without updating the code below!
+        m0_state_raw = jnp.zeros((n, d))
+        m0_latent_raw = jnp.zeros((n, d))
+        m0_state_raw_flat = m0_state_raw.reshape((-1,), order="F")
+        m0_latent_raw_flat = m0_latent_raw.reshape((-1,), order="F")
+        C0_sqrtm_state_raw = jnp.kron(diffusion_state_sqrtm, jnp.eye(n))
+        C0_sqrtm_latent_raw = jnp.kron(pde.E_sqrtm, jnp.eye(n))
+
+        # Update state on initial condition
+        H, z = self.E0, pde.y0
+        matrix_nugget = 1e-10 * jnp.eye(d)
+        C0_sqrtm_state_y0, kgain_y0, _ = sqrt.update_sqrt(
+            transition_matrix=H,
+            cov_cholesky=C0_sqrtm_state_raw,
+            meascov_sqrtm=matrix_nugget,
         )
-        dy0_padded = jnp.pad(
-            extended_dy0,
-            pad_width=((0, 0), (1, 1)),
-            mode="constant",
-            constant_values=0.0,
+        m0_state_flat_y0 = m0_state_raw_flat - kgain_y0 @ z
+
+        # Stack m0 and e0 together
+        m0_stack = jnp.hstack((m0_state_flat_y0, m0_latent_raw_flat))
+        C0_sqrtm_block = jax.scipy.linalg.block_diag(
+            C0_sqrtm_state_y0, C0_sqrtm_latent_raw
         )
-        initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
-        mean = jnp.concatenate([initmean, jnp.zeros_like(initmean)], -1)
+        assert m0_stack.ndim == 1
+        assert C0_sqrtm_block.ndim == 2
 
-        cov_sqrtm_state_ = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, cov_sqrtm_state)
-
-        cov_sqrtm = jax.scipy.linalg.block_diag(
-            cov_sqrtm_state_,
-            cov_sqrtm_eps,
+        # Evaluate ODE at the initial condition
+        p_empty = jnp.eye(n * d)
+        z, H = self.evaluate_ode(
+            pde=pde,
+            p0=self.E0,
+            p1=self.E1,
+            m_pred=m0_stack,
+            t=pde.t0,
+            p_state=p_empty,
+            p_eps=p_empty,
         )
 
-        y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
+        # U
+        C0_sqrtm_state_latent, kgain, _ = sqrt.update_sqrt_no_meascov(
+            transition_matrix=H, cov_cholesky=C0_sqrtm_block
+        )
+        m0_state_latent = m0_stack + kgain @ (H @ m0_stack - z)
+        m0_state_latent_reshaped = m0_state_latent.reshape((n, 2 * d), order="F")
+
+        y = rv.MultivariateNormal(
+            mean=m0_state_latent_reshaped, cov_sqrtm=C0_sqrtm_state_latent
+        )
+
+        # Todo: calibration!
+
+        #
+        # # This is kind of wrong still... RK init should get the proper diffusion.
+        # ivp = pde.to_tornadox_ivp()
+        # extended_dy0, cov_sqrtm_state = self.init(
+        #     f=ivp.f,
+        #     df=ivp.df,
+        #     y0=ivp.y0,
+        #     t0=ivp.t0,
+        #     num_derivatives=self.state_iwp.num_derivatives,
+        #     wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        # )
+        # dy0_padded = jnp.pad(
+        #     extended_dy0,
+        #     pad_width=((0, 0), (1, 1)),
+        #     mode="constant",
+        #     constant_values=0.0,
+        # )
+        # initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
+        # mean = jnp.concatenate([initmean, jnp.zeros_like(initmean)], -1)
+        #
+        # cov_sqrtm_state_ = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
+        # cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, cov_sqrtm_state)
+        #
+        # cov_sqrtm = jax.scipy.linalg.block_diag(
+        #     cov_sqrtm_state_,
+        #     cov_sqrtm_eps,
+        # )
+        #
+        # y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
 
         return pdefilter.PDEFilterState(
             t=pde.t0,
