@@ -52,8 +52,9 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         m0_latent_raw = jnp.zeros((n, d))
         m0_state_raw_flat = m0_state_raw.reshape((-1,), order="F")
         m0_latent_raw_flat = m0_latent_raw.reshape((-1,), order="F")
-        C0_sqrtm_state_raw = jnp.kron(diffusion_state_sqrtm, jnp.eye(n))
-        C0_sqrtm_latent_raw = jnp.kron(pde.E_sqrtm, jnp.eye(n))
+        c0 = self.diffuse_prior_scale * jnp.eye(n)  # shorthand
+        C0_sqrtm_state_raw = jnp.kron(diffusion_state_sqrtm, c0)
+        C0_sqrtm_latent_raw = jnp.kron(pde.E_sqrtm, c0)
 
         # Update state on initial condition
         z_y0, H_y0 = pde.y0, self.E0
@@ -102,16 +103,16 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         diffusion_squared_local_pde = (
             z_pde @ jnp.linalg.solve(S_pde, z_pde) / z_pde.shape[0]
         )
-        diffusion_squared_local = 0.5 * (
-            diffusion_squared_local_pde + diffusion_squared_local_y0
-        )
 
         return pdefilter.PDEFilterState(
             t=pde.t0,
             y=y,
             error_estimate=None,
             reference_state=None,
-            diffusion_squared_local=diffusion_squared_local,
+            diffusion_squared_local=[
+                diffusion_squared_local_y0,
+                diffusion_squared_local_pde,
+            ],
         )
 
     def attempt_step(self, state, dt, pde):

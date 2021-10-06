@@ -41,6 +41,7 @@ class PDEFilter(ABC):
         num_derivatives=2,
         initialization=None,
         spatial_kernel=None,
+        diffuse_prior_scale=1.0,
     ):
 
         # Step-size selection
@@ -64,6 +65,14 @@ class PDEFilter(ABC):
         self.E0 = None
         self.E1 = None
 
+        # Diffuse priors have an incredibly large initial covariance,
+        # which encodes unknown initial conditions.
+        # For PDE filters, this is governed by the diffuse_prior_scale
+        # parameter, which is multiplied with the initial cov_sqrtm
+        # before clever initialisation procedures.
+        # To make the prior diffuse, choose e.g. 10^3 as a scale.
+        self.diffuse_prior_scale = diffuse_prior_scale
+
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, initialization={self.init})"
 
@@ -80,7 +89,12 @@ class PDEFilter(ABC):
             times.append(state.t)
             means.append(state.y.mean)
             cov_sqrtms.append(state.y.cov_sqrtm)
-            diffusion_squared_list.append(state.diffusion_squared_local)
+
+            # The initialisation procedure yields a list of two local diffusions.
+            if isinstance(state.diffusion_squared_local, list):
+                diffusion_squared_list.extend(state.diffusion_squared_local)
+            else:
+                diffusion_squared_list.append(state.diffusion_squared_local)
 
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
 

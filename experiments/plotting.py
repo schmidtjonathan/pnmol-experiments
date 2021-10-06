@@ -39,7 +39,7 @@ def figure_1(
 
     figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
-        nrows=len(methods),
+        nrows=len(methods) - 1,
         ncols=3,
         dpi=200,
         figsize=figure_size,
@@ -49,7 +49,7 @@ def figure_1(
 
     vmin, vmax = None, None
     pnmol_colorbar = None
-    for axis_row, method, result in zip(axes, methods, results):
+    for axis_row, method, result in zip(axes, methods[:-1], results):
         m, s, t, x = result
         n = jnp.minimum(len(m), len(means_reference))
         T, X = jnp.meshgrid(t[:n], x[:, 0])
@@ -61,7 +61,7 @@ def figure_1(
             vmax = jnp.maximum(vmax_error, vmax_std)
 
         contour_args = {"alpha": 0.8}
-        contour_args_means = {"cmap": "Greys"}
+        contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
         contour_args_errors = {"cmap": "inferno"}
         figure_1_plot_contour(
             axis_row[0], X, T, m[:n].T, **contour_args, **contour_args_means
@@ -71,7 +71,7 @@ def figure_1(
         )
         fig.colorbar(bar, ax=axis_row[1])
 
-        bar = bar_error = figure_1_plot_contour(
+        bar = figure_1_plot_contour(
             axis_row[2], X, T, error.T, **contour_args, **contour_args_errors
         )
         fig.colorbar(bar, ax=axis_row[2])

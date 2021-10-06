@@ -107,8 +107,10 @@ NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
 PROGRESSBAR = True
 
+# todo: input scale MLE.
+
 # Hyperparameters (problem)
-T0, TMAX = 0.0, 10.0
+T0, TMAX = 0.0, 3.0
 DIFFUSION_RATE = 0.035
 
 
@@ -117,7 +119,8 @@ PDE_PNMOL = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX,
-    stencil_size=STENCIL_SIZE,
+    stencil_size_interior=STENCIL_SIZE,
+    stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
     kernel=pnmol.kernels.SquareExponential(),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
@@ -127,7 +130,8 @@ PDE_TORNADOX = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX,
-    stencil_size=STENCIL_SIZE,
+    stencil_size_interior=STENCIL_SIZE,
+    stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
     kernel=pnmol.kernels.SquareExponential(),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
@@ -137,7 +141,8 @@ PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX / HIGH_RES_FACTOR_DX,
-    stencil_size=STENCIL_SIZE,
+    stencil_size_interior=STENCIL_SIZE,
+    stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
     kernel=pnmol.kernels.SquareExponential(),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
