@@ -156,8 +156,8 @@ PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
 )
 
 # Solve the PDE with the different methods
-KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-3)
-KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + KERNEL_NUGGET
+KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-2)
+KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52(input_scale=INPUT_SCALE) + KERNEL_NUGGET
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
     dt=DT,
