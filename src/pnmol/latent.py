@@ -103,6 +103,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             mean=m0_state_latent_reshaped, cov_sqrtm=C0_sqrtm_state_latent
         )
 
+        # Dont forget that the initial data affects the quasi-MLE for the diffusion!
         S_y0, S_pde = S_sqrtm_y0 @ S_sqrtm_y0.T, S_pde @ S_pde.T
         diffusion_squared_local_y0 = z_y0 @ jnp.linalg.solve(S_y0, z_y0) / z_y0.shape[0]
         diffusion_squared_local_pde = (
