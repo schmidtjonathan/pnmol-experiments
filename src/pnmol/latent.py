@@ -92,10 +92,11 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         glued_flat_mean = jnp.concatenate(
             (flat_state_mean, flat_eps_mean)
         )  # (2 * d * (nu + 1),)
-        mp = self.predict_mean(A, glued_flat_mean)
 
         # Pull states into preconditioned space
-        mp, Cl = Pinv @ mp, Pinv @ state.y.cov_sqrtm
+        glued_flat_mean, Cl = Pinv @ glued_flat_mean, Pinv @ state.y.cov_sqrtm
+
+        mp = self.predict_mean(A, glued_flat_mean)
 
         # Measure / calibrate
         z, H = self.evaluate_ode(
