@@ -114,9 +114,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(
-            H, Clp, meascov_sqrtm=jnp.zeros((H.shape[0], H.shape[0]))
-        )
+        Cl_new, K, Sl = sqrt.update_sqrt_no_meascov(H, Clp)
         flat_m_new = mp - K @ z
 
         # Back into non-preconditioned space
