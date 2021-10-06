@@ -80,11 +80,11 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             t=state.t + dt,
         )
         E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, pde.R_sqrtm)
-        sigma, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
-        Clp = sqrt.propagate_cholesky_factor(A @ Cl, sigma * Ql)
+        _, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
+        Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=sigma * E_with_bc_sqrtm)
+        Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=E_with_bc_sqrtm)
         m_new = mp - K @ z
 
         residual_white = jax.scipy.linalg.solve_triangular(Sl.T, z, lower=False)
