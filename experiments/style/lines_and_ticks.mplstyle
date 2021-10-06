@@ -2,7 +2,7 @@
 
 
 # Default linewidth -- the linewidth of the curves is governed by a bunch of global parameters in plotting.py
-lines.linewidth : 0.5
+lines.linewidth : 1.5
 axes.linewidth : 0.5
 patch.linewidth : 0.5
 

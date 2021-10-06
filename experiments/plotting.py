@@ -2,12 +2,17 @@
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
 
-plt.style.use(
-    ["experiments/style/lines_and_ticks.mplstyle", "experiments/style/font.mplstyle"]
-)
+STYLESHEETS = [
+    "experiments/style/lines_and_ticks.mplstyle",
+    "experiments/style/font.mplstyle",
+    "experiments/style/colors.mplstyle",
+    "experiments/style/markers.mplstyle",
+    "experiments/style/bottomleftaxes.mplstyle",
+]
 
-PATH_RESULTS = "experiments/results/figure1/"
+PATH_RESULTS = "experiments/results/"
 
 
 # Extract from the paper template:
@@ -24,13 +29,15 @@ AISTATS_TEXTWIDTH_SINGLE = 3.25
 def figure_1(
     path=PATH_RESULTS, methods=("pnmol_white", "pnmol_latent", "tornadox", "reference")
 ):
+    path = path + "figure1/"
+    plt.style.use(STYLESHEETS)
 
     results = [figure_1_load_results(prefix=method, path=path) for method in methods]
 
     results_reference = results[-1]
     means_reference, *_, x_reference = results_reference
 
-    figure_size = (AISTATS_LINEWIDTH_DOUBLE, AISTATS_TEXTWIDTH_SINGLE)
+    figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
         nrows=len(methods),
         ncols=3,
@@ -100,7 +107,7 @@ def figure_1(
     ax1.set_title(r"$\bf a.$ " + "Mean", loc="left", fontsize="medium")
     ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left", fontsize="medium")
     ax3.set_title(r"$\bf c.$ " + "Error", loc="left", fontsize="medium")
-    plt.savefig(path + "figure1.pdf")
+    plt.savefig(path + "figure.pdf")
     plt.show()
 
 
@@ -120,3 +127,125 @@ def figure_1_plot_contour(ax, /, *args, **kwargs):
     """Contour lines with fill color and sharp edges."""
     ax.contour(*args, **kwargs)
     return ax.contourf(*args, **kwargs)
+
+
+def figure_2(path=PATH_RESULTS):
+    path = path + "figure2/"
+    plt.style.use(STYLESHEETS)
+
+    rmse_all = jnp.load(path + "rmse_all.npy")
+    input_scales = jnp.load(path + "input_scales.npy")
+    stencil_sizes = jnp.load(path + "stencil_sizes.npy")
+    L_sparse = jnp.load(path + "L_sparse.npy")
+    L_dense = jnp.load(path + "L_dense.npy")
+    E_sparse = jnp.load(path + "E_sparse.npy")
+    E_dense = jnp.load(path + "E_dense.npy")
+    x = jnp.load(path + "xgrid.npy")
+    fx = jnp.load(path + "fx.npy")
+    dfx = jnp.load(path + "dfx.npy")
+    # s1 = jnp.load(path + "s1.npy")  # not shown, thus not loaded
+    s2 = jnp.load(path + "s2.npy")
+    s3 = jnp.load(path + "s3.npy")
+
+    figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
+    fig = plt.figure(constrained_layout=True, figsize=figsize, dpi=200)
+    gs = fig.add_gridspec(2, 6)
+
+    ax_L_sparse = fig.add_subplot(gs[0, 0])
+    ax_L_dense = fig.add_subplot(gs[1, 0])
+    ax_E_sparse = fig.add_subplot(gs[0, 1])
+    ax_E_dense = fig.add_subplot(gs[1, 1])
+
+    ax_rmse = fig.add_subplot(gs[:, 2:4])
+    ax_curve = fig.add_subplot(gs[:, 4:])
+
+    clip_value = 1e-12
+    cmap = {"cmap": "Blues"}
+    ax_L_sparse.imshow(jnp.abs(L_sparse) + clip_value, **cmap, aspect="auto")
+    ax_L_dense.imshow(
+        jnp.abs(L_dense) + clip_value,
+        vmax=7 * jnp.median(jnp.abs(L_dense)),
+        **cmap,
+        aspect="auto",
+    )
+
+    # Add 1e-12 for a reasonable log-norm
+    ax_E_sparse.imshow(
+        jnp.abs(E_sparse @ E_sparse.T) + clip_value,
+        **cmap,
+        aspect="auto",
+        norm=LogNorm(),
+    )
+    ax_E_dense.imshow(
+        jnp.abs(E_dense @ E_dense.T) + clip_value, **cmap, aspect="auto", norm=LogNorm()
+    )
+
+    s1_style = {
+        "color": "C1",
+        "linestyle": "-",
+    }
+    s1_label = {"label": rf"$r={input_scales[1]}$ (~MLE)"}
+    s2_style = {
+        "color": "C0",
+        "linestyle": "dashdot",
+    }
+    s2_label = {"label": rf"$r={input_scales[2]}$"}
+
+    ax_rmse.semilogy(stencil_sizes, rmse_all.T[1], **s1_style, **s1_label, marker="o")
+    ax_rmse.semilogy(stencil_sizes, rmse_all.T[2], **s2_style, **s2_label, marker="s")
+    ax_rmse.set_xlabel("Stencil size")
+    ax_rmse.set_ylabel("RMSE")
+    ax_rmse.legend(
+        loc="center right", fancybox=False, edgecolor="black"
+    ).get_frame().set_linewidth(0.5)
+
+    ax_curve.plot(x, fx, label="u(x)", color="black", linestyle="dashed")
+    ax_curve.plot(x, dfx, label="$\Delta u(x)$", color="black")
+    ax_curve.plot(x, s2, **s1_style, alpha=0.6)
+    ax_curve.plot(x, s3, **s2_style, alpha=0.6)
+
+    endmarker_style = {
+        "marker": "o",
+        "markerfacecolor": "white",
+        "markeredgecolor": "auto",
+        "markeredgewidth": 1.0,
+        "markersize": 2.5,
+    }
+    ax_curve.plot(x[0], fx[0], **endmarker_style, color="black")
+    ax_curve.plot(x[-1], fx[-1], **endmarker_style, color="black")
+    ax_curve.plot(x[0], dfx[0], **endmarker_style, color="black")
+    ax_curve.plot(x[-1], dfx[-1], **endmarker_style, color="black")
+    ax_curve.plot(x[0, None], s2[None, 0], **endmarker_style, **s1_style)
+    ax_curve.plot(x[-1, None], s2[None, -1], **endmarker_style, **s1_style)
+    ax_curve.plot(x[0, None], s3[None, 0], **endmarker_style, **s2_style)
+    ax_curve.plot(x[-1, None], s3[None, -1], **endmarker_style, **s2_style)
+
+    ax_curve.set_xlabel("x")
+    ax_curve.set_ylabel("u(x)")
+    ax_curve.legend(
+        loc="lower center", fancybox=False, edgecolor="black"
+    ).get_frame().set_linewidth(0.5)
+
+    ax_L_dense.set_xticks(())
+    ax_L_dense.set_yticks(())
+    ax_L_sparse.set_xticks(())
+    ax_L_sparse.set_yticks(())
+    ax_E_sparse.set_xticks(())
+    ax_E_sparse.set_yticks(())
+    ax_E_dense.set_xticks(())
+    ax_E_dense.set_yticks(())
+
+    ax_L_sparse.set_title(r"$\bf a.$ " + "$D$ (sparse)", loc="left", fontsize="medium")
+    ax_E_sparse.set_title(r"$\bf b.$ " + "$E$ (sparse)", loc="left", fontsize="medium")
+    ax_L_dense.set_title(r"$\bf c.$ " + "$D$ (dense)", loc="left", fontsize="medium")
+    ax_E_dense.set_title(r"$\bf d.$ " + "$E$ (dense)", loc="left", fontsize="medium")
+
+    ax_rmse.set_title(
+        r"$\bf e.$ " + "RMSE vs. Stencil Size", loc="left", fontsize="medium"
+    )
+    ax_curve.set_title(
+        r"$\bf f.$ " + "Solution / Laplacian / Samples", loc="left", fontsize="medium"
+    )
+
+    plt.savefig(path + "figure.pdf", dpi=300)
+    plt.show()

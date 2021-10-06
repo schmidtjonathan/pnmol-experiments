@@ -163,3 +163,38 @@ def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
     uncertainty = LL_k(x, x).reshape(()) - weights @ diffop_at_point
 
     return weights, uncertainty
+
+
+def collocation_global(
+    diffop,
+    mesh_spatial,
+    kernel=None,
+    nugget_gram_matrix=0.0,
+    nugget_cholesky_E=0.0,
+    symmetrize_cholesky_E=False,
+):
+    """Discretize a differential operator with global, unsymmetric collocation."""
+
+    if kernel is None:
+        kernel = kernels.SquareExponential(input_scale=1.0, output_scale=1.0)
+
+    # Differentiate kernel
+    k = kernel
+    L_kx = kernels.Lambda(diffop(k.pairwise, argnums=0))
+    LL_kx = kernels.Lambda(diffop(L_kx.pairwise, argnums=1))
+
+    # Assemble Gram matrices
+    gram_matrix_k = kernel(mesh_spatial.points, mesh_spatial.points.T)
+    gram_matrix_k += nugget_gram_matrix * jnp.eye(mesh_spatial.shape[0])
+    gram_matrix_Lk = L_kx(mesh_spatial.points, mesh_spatial.points.T)
+    gram_matrix_LLk = LL_kx(mesh_spatial.points, mesh_spatial.points.T)
+
+    # Compute differentiation matrix and error covariance matrix
+    D = jnp.linalg.solve(gram_matrix_k, gram_matrix_Lk.T).T
+    E = gram_matrix_LLk - D @ gram_matrix_Lk.T
+
+    # Symmetrize and add nugget
+    if symmetrize_cholesky_E:
+        E = 0.5 * (E + E.T)
+    E += nugget_cholesky_E * jnp.eye(mesh_spatial.shape[0])
+    return D, jnp.linalg.cholesky(E)

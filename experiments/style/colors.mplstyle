@@ -1,0 +1,4 @@
+# Retro color style
+
+# Set color cycle
+axes.prop_cycle: cycler('color', ['steelblue', 'darksalmon', 'forestgreen'])
