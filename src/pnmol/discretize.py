@@ -13,7 +13,8 @@ def fd_probabilistic(
     diffop,
     mesh_spatial,
     kernel=None,
-    stencil_size=3,
+    stencil_size_interior=3,
+    stencil_size_boundary=3,
     nugget_gram_matrix=0.0,
 ):
     """
@@ -58,36 +59,58 @@ def fd_probabilistic(
     )
     fd_coeff_fun_batched = jax.jit(jax.vmap(fd_coeff_fun_partial))
 
+    # Select points on the boundary and in the interior
+    points_interior, _, indices_interior = mesh_spatial.interior
+    points_boundary, _, indices_boundary = mesh_spatial.boundary
+
     # Read off all neighbors in a single batch (the underlying KDTree is vectorized)
-    neighbors_all, neighbor_indices_all = mesh_spatial.neighbours(
-        point=mesh_spatial.points, num=stencil_size
+    neighbors_interior, neighbor_indices_interior = mesh_spatial.neighbours(
+        point=points_interior, num=stencil_size_interior
+    )
+    neighbors_boundary, neighbor_indices_boundary = mesh_spatial.neighbours(
+        point=points_boundary, num=stencil_size_boundary
     )
 
     # Compute all FD coefficients in a single batch
-    weights_all, uncertainties_all = fd_coeff_fun_batched(
-        x=mesh_spatial.points, neighbors=neighbors_all
+    weights_interior, uncertainties_interior = fd_coeff_fun_batched(
+        x=points_interior, neighbors=neighbors_interior
+    )
+    weights_boundary, uncertainties_boundary = fd_coeff_fun_batched(
+        x=points_boundary, neighbors=neighbors_boundary
     )
 
     # Stack the resulting weights and uncertainties into a matrix
-    return _weights_to_matrix(
-        weights_all,
-        uncertainties_all,
-        neighbor_indices_all,
+    L = jnp.zeros((mesh_spatial.shape[0], mesh_spatial.shape[0]), dtype=jnp.float64)
+    E_sqrtm = jnp.zeros(
+        (mesh_spatial.shape[0], mesh_spatial.shape[0]), dtype=jnp.float64
     )
+    L_boundary_weights, E_sqrtm_boundary_weights = _weights_to_matrix(
+        L=L,
+        E_sqrtm=E_sqrtm,
+        weights=weights_boundary,
+        uncertainties=uncertainties_boundary,
+        indices_column=neighbor_indices_boundary,
+        indices_row=indices_boundary[:, None],
+    )
+    L_all_weights, E_sqrtm_all_weights = _weights_to_matrix(
+        L=L_boundary_weights,
+        E_sqrtm=E_sqrtm_boundary_weights,
+        weights=weights_interior,
+        uncertainties=uncertainties_interior,
+        indices_column=neighbor_indices_interior,
+        indices_row=indices_interior[:, None],
+    )
+    return L_all_weights, E_sqrtm_all_weights
 
 
 @jax.jit
-def _weights_to_matrix(weights_all, uncertainties_all, neighbor_indices_all):
+def _weights_to_matrix(L, E_sqrtm, weights, uncertainties, indices_column, indices_row):
     """Stack the FD weights (and uncertainties) into a differentiation matrix."""
-    num_mesh_points = weights_all.shape[0]
-    L_empty = jnp.zeros((num_mesh_points, num_mesh_points))
-    indices_col = neighbor_indices_all
-    indices_row = jnp.full(
-        weights_all.shape, fill_value=jnp.arange(num_mesh_points)[:, None]
+    L_new = jax.ops.index_update(x=L, idx=(indices_row, indices_column), y=weights)
+    E_sqrtm_new = jax.ops.index_update(
+        x=E_sqrtm, idx=(indices_row.squeeze(), indices_row.squeeze()), y=uncertainties
     )
-    L = jax.ops.index_update(x=L_empty, idx=(indices_row, indices_col), y=weights_all)
-    E_sqrtm = jnp.diag(uncertainties_all)
-    return L, jnp.sqrt(jnp.abs(E_sqrtm))
+    return L_new, E_sqrtm_new
 
 
 def fd_probabilistic_neumann_1d(

@@ -54,7 +54,8 @@ def input_scale_to_rmse(scale, stencil_size, *, diffop, mesh, obj_fun, truth_fun
         diffop=diffop,
         mesh_spatial=mesh,
         kernel=kernel,
-        stencil_size=stencil_size,
+        stencil_size_interior=stencil_size,
+        stencil_size_boundary=stencil_size,
     )
     x = mesh.points
     fx = obj_fun(x).squeeze()
@@ -92,7 +93,8 @@ truth_fun = jax.vmap(diffop(obj_fun))
 # Choose a mesh
 num_mesh_points = 25
 mesh = pnmol.mesh.RectangularMesh(
-    jnp.linspace(0, 1, num_mesh_points, endpoint=True)[:, None], bbox=[0.0, 1.0]
+    jnp.linspace(0, 1, num_mesh_points, endpoint=True)[:, None],
+    bbox=jnp.asarray([0.0, 1.0])[:, None],
 )
 
 # Compute the MLE estimate (for comparison)

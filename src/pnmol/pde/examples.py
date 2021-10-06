@@ -11,9 +11,11 @@ from pnmol.pde import problems
 
 
 def heat_1d_discretized(
+    *,
     bbox=None,
     dx=0.05,
-    stencil_size=3,
+    stencil_size_interior=3,
+    stencil_size_boundary=3,
     t0=0.0,
     tmax=5.0,
     y0_fun=None,
@@ -38,14 +40,15 @@ def heat_1d_discretized(
     heat.discretize(
         mesh_spatial=mesh_spatial,
         kernel=kernel,
-        stencil_size=stencil_size,
+        stencil_size_interior=stencil_size_interior,
+        stencil_size_boundary=stencil_size_boundary,
         nugget_gram_matrix=nugget_gram_matrix_fd,
     )
     return heat
 
 
 def heat_1d(
-    bbox=None, t0=0.0, tmax=5.0, y0_fun=None, diffusion_rate=0.05, bcond="dirichlet"
+    *, bbox=None, t0=0.0, tmax=5.0, y0_fun=None, diffusion_rate=0.05, bcond="dirichlet"
 ):
     laplace = diffops.laplace()
 
@@ -79,6 +82,7 @@ def heat_1d(
 
 
 def sir_1d_discretized(
+    *,
     bbox=None,
     dx=0.05,
     t0=0.0,
@@ -91,7 +95,8 @@ def sir_1d_discretized(
     diffusion_rate_R=0.1,
     kernel=None,
     nugget_gram_matrix_fd=0.0,
-    stencil_size=3,
+    stencil_size_interior=3,
+    stencil_size_boundary=3,
 ):
     sir = sir_1d(
         bbox=bbox,
@@ -112,13 +117,15 @@ def sir_1d_discretized(
     sir.discretize_system(
         mesh_spatial=mesh_spatial,
         kernel=kernel,
-        stencil_size=stencil_size,
+        stencil_size_interior=stencil_size_interior,
+        stencil_size_boundary=stencil_size_boundary,
         nugget_gram_matrix=nugget_gram_matrix_fd,
     )
     return sir
 
 
 def sir_1d(
+    *,
     bbox=None,
     t0=0.0,
     tmax=50.0,
@@ -172,6 +179,7 @@ def sir_1d(
 
 
 def spruce_budworm_1d_discretized(
+    *,
     bbox=None,
     t0=0.0,
     tmax=10.0,
@@ -180,7 +188,8 @@ def spruce_budworm_1d_discretized(
     dx=0.1,
     kernel=None,
     nugget_gram_matrix_fd=0.0,
-    stencil_size=3,
+    stencil_size_interior=3,
+    stencil_size_boundary=3,
     bcond="dirichlet",
     growth_rate=1.0,
 ):
@@ -201,13 +210,15 @@ def spruce_budworm_1d_discretized(
     spruce.discretize(
         mesh_spatial=mesh_spatial,
         kernel=kernel,
-        stencil_size=stencil_size,
+        stencil_size_interior=stencil_size_interior,
+        stencil_size_boundary=stencil_size_boundary,
         nugget_gram_matrix=nugget_gram_matrix_fd,
     )
     return spruce
 
 
 def spruce_budworm_1d(
+    *,
     bbox=None,
     t0=0.0,
     tmax=10.0,

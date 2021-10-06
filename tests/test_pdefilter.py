@@ -35,7 +35,8 @@ def pde_linear(bcond, kernel):
     heat = pnmol.pde.examples.heat_1d_discretized(
         tmax=1.0,
         dx=0.2,
-        stencil_size=3,
+        stencil_size_interior=3,
+        stencil_size_boundary=3,
         diffusion_rate=0.05,
         kernel=kernel,
         nugget_gram_matrix_fd=0.0,
@@ -71,7 +72,8 @@ def pde_semilinear(bcond, kernel):
     return pnmol.pde.examples.spruce_budworm_1d_discretized(
         tmax=1.0,
         dx=0.2,
-        stencil_size=3,
+        stencil_size_interior=3,
+        stencil_size_boundary=3,
         diffusion_rate=0.05,
         kernel=kernel,
         nugget_gram_matrix_fd=0.0,
