@@ -73,16 +73,31 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         )
 
     def attempt_step(self, state, dt, pde):
-        A, Ql = self.ssm.non_preconditioned_discretize(dt)
+
+        P, Pinv = self.ssm.nordsieck_preconditioner(dt=dt)
+        P_state, Pinv_state = self.state_iwp.nordsieck_preconditioner(dt=dt)
+        P_eps, Pinv_eps = self.lf_iwp.nordsieck_preconditioner(dt=dt)
+
+        A, Ql = self.ssm.preconditioned_discretize
         n, d = self.num_derivatives + 1, self.state_iwp.wiener_process_dimension
 
         # [Predict]
-        glued_batched_mean = state.y.mean
-        batched_state_mean, batched_eps_mean = jnp.split(glued_batched_mean, 2, axis=-1)
+        glued_batched_mean = state.y.mean  # (nu + 1, 2 * d)
+        batched_state_mean, batched_eps_mean = jnp.split(
+            glued_batched_mean, 2, axis=-1
+        )  # [(nu + 1, 2 * d), (nu + 1, 2 * d)]
 
-        flat_state_mean = batched_state_mean.reshape((-1,), order="F")
-        flat_eps_mean = batched_eps_mean.reshape((-1,), order="F")
-        glued_flat_mean = jnp.concatenate((flat_state_mean, flat_eps_mean))
+        flat_state_mean = batched_state_mean.reshape(
+            (-1,), order="F"
+        )  # (d * (nu + 1), )
+        flat_eps_mean = batched_eps_mean.reshape((-1,), order="F")  # (d * (nu + 1), )
+        glued_flat_mean = jnp.concatenate(
+            (flat_state_mean, flat_eps_mean)
+        )  # (2 * d * (nu + 1),)
+
+        # Pull states into preconditioned space
+        glued_flat_mean, Cl = Pinv @ glued_flat_mean, Pinv @ state.y.cov_sqrtm
+
         mp = self.predict_mean(A, glued_flat_mean)
 
         # Measure / calibrate
@@ -92,9 +107,10 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             p1=self.E1,
             m_pred=mp,
             t=state.t + dt,
+            p_state=P_state,
+            p_eps=P_eps,
         )
 
-        Cl = state.y.cov_sqrtm
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
 
         # [Update]
@@ -102,6 +118,9 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             H, Clp, meascov_sqrtm=jnp.zeros((H.shape[0], H.shape[0]))
         )
         flat_m_new = mp - K @ z
+
+        # Back into non-preconditioned space
+        flat_m_new, Cl_new = P @ flat_m_new, P @ Cl_new
 
         # Calibrate local diffusion
         residual_white = jax.scipy.linalg.solve_triangular(Sl.T, z, lower=False)
@@ -113,7 +132,9 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         batched_state_m_new = flat_state_m_new.reshape((n, d), order="F")
         batched_eps_m_new = flat_eps_m_new.reshape((n, d), order="F")
 
-        glued_new_mean = jnp.concatenate([batched_state_m_new, batched_eps_m_new], -1)
+        glued_new_mean = jnp.concatenate(
+            [batched_state_m_new, batched_eps_m_new], axis=-1
+        )
 
         new_state = pdefilter.PDEFilterState(
             t=state.t + dt,
@@ -137,11 +158,12 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
 class LinearLatentForceEK1(_LatentForceEK1Base):
     @staticmethod
-    def evaluate_ode(pde, p0, p1, m_pred, t):
+    def evaluate_ode(pde, p0, p1, m_pred, t, p_state, p_eps):
         L = pde.L
 
-        E0_state = E0_eps = p0
-        E1_state = p1
+        E0_state = p0 @ p_state
+        E0_eps = p0 @ p_eps
+        E1_state = p1 @ p_state
         E0_stacked = jax.scipy.linalg.block_diag(E0_state, E0_eps)
 
         m_at = E0_stacked @ m_pred  # Project to first derivatives
