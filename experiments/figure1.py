@@ -100,7 +100,7 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.0125
+DT = 0.05
 DX = 0.2
 HIGH_RES_FACTOR_DX = 10
 HIGH_RES_FACTOR_DT = 10
@@ -112,6 +112,8 @@ PROGRESSBAR = True
 # todo: input scale MLE.
 # todo (cont.): the functionality is there, but where should it happen?
 # todo (cont.): in each problem example maybe?
+INPUT_SCALE = 1.0
+
 
 # Hyperparameters (problem)
 T0, TMAX = 0.0, 3.0
@@ -126,7 +128,7 @@ PDE_PNMOL = pnmol.pde.examples.heat_1d_discretized(
     stencil_size_interior=STENCIL_SIZE,
     stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.SquareExponential(),
+    kernel=pnmol.kernels.SquareExponential(input_scale=INPUT_SCALE),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
@@ -137,7 +139,7 @@ PDE_TORNADOX = pnmol.pde.examples.heat_1d_discretized(
     stencil_size_interior=STENCIL_SIZE,
     stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.SquareExponential(),
+    kernel=pnmol.kernels.SquareExponential(input_scale=INPUT_SCALE),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
@@ -148,7 +150,7 @@ PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
     stencil_size_interior=STENCIL_SIZE,
     stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.SquareExponential(),
+    kernel=pnmol.kernels.SquareExponential(input_scale=INPUT_SCALE),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
