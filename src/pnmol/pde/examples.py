@@ -11,6 +11,7 @@ from pnmol.pde import problems
 
 
 def heat_1d_discretized(
+    *,
     bbox=None,
     dx=0.05,
     stencil_size_interior=3,
@@ -47,7 +48,7 @@ def heat_1d_discretized(
 
 
 def heat_1d(
-    bbox=None, t0=0.0, tmax=5.0, y0_fun=None, diffusion_rate=0.05, bcond="dirichlet"
+    *, bbox=None, t0=0.0, tmax=5.0, y0_fun=None, diffusion_rate=0.05, bcond="dirichlet"
 ):
     laplace = diffops.laplace()
 
@@ -81,6 +82,7 @@ def heat_1d(
 
 
 def sir_1d_discretized(
+    *,
     bbox=None,
     dx=0.05,
     t0=0.0,
@@ -123,6 +125,7 @@ def sir_1d_discretized(
 
 
 def sir_1d(
+    *,
     bbox=None,
     t0=0.0,
     tmax=50.0,
@@ -176,6 +179,7 @@ def sir_1d(
 
 
 def spruce_budworm_1d_discretized(
+    *,
     bbox=None,
     t0=0.0,
     tmax=10.0,
@@ -214,6 +218,7 @@ def spruce_budworm_1d_discretized(
 
 
 def spruce_budworm_1d(
+    *,
     bbox=None,
     t0=0.0,
     tmax=10.0,
