@@ -187,11 +187,12 @@ class LinearLatentForceEK1(_LatentForceEK1Base):
 
 class SemiLinearLatentForceEK1(_LatentForceEK1Base):
     @staticmethod
-    def evaluate_ode(pde, p0, p1, m_pred, t):
+    def evaluate_ode(pde, p0, p1, m_pred, t, p_state, p_eps):
         L = pde.L
 
-        E0_state = E0_eps = p0
-        E1_state = p1
+        E0_state = p0 @ p_state
+        E0_eps = p0 @ p_eps
+        E1_state = p1 @ p_state
         E0_stacked = jax.scipy.linalg.block_diag(E0_state, E0_eps)
 
         m_at = E0_stacked @ m_pred  # Project to first derivatives
