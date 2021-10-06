@@ -126,3 +126,20 @@ class TestDuplicate:
 
         n = X.shape[0]
         assert matrix_gram.shape == (num_duplicates * n,)
+
+
+def test_input_scale_mle():
+
+    mesh_points = jnp.linspace(0, 1, 10)
+    f = lambda x: x ** 2
+    data = f(mesh_points)
+    kernel_type = kernels.Matern52
+    input_scale_trials = jnp.logspace(-2, 2, 10)
+
+    mle = kernels.mle_input_scale(
+        mesh_points=mesh_points[:, None],
+        data=data,
+        kernel_type=kernel_type,
+        input_scale_trials=input_scale_trials,
+    )
+    assert mle > 0.0  # catches things like NaNs, non-scalars, etc.

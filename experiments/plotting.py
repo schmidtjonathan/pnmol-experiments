@@ -61,20 +61,24 @@ def figure_1(
             vmax = jnp.maximum(vmax_error, vmax_std)
 
         contour_args = {"alpha": 0.8}
-        contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
-        contour_args_errors = {"vmin": 0.0, "vmax": 0.5, "cmap": "inferno"}
+        contour_args_means = {"cmap": "Greys"}
+        contour_args_errors = {"cmap": "inferno"}
         figure_1_plot_contour(
             axis_row[0], X, T, m[:n].T, **contour_args, **contour_args_means
         )
-        figure_1_plot_contour(
+        bar = figure_1_plot_contour(
             axis_row[1], X, T, s[:n].T, **contour_args, **contour_args_errors
         )
-        bar_error = figure_1_plot_contour(
+        fig.colorbar(bar, ax=axis_row[1])
+
+        bar = bar_error = figure_1_plot_contour(
             axis_row[2], X, T, error.T, **contour_args, **contour_args_errors
         )
-        if pnmol_colorbar is None:
-            fig.colorbar(bar_error, ax=axes[:, -1].ravel().tolist())
-            pnmol_colorbar = 1
+        fig.colorbar(bar, ax=axis_row[2])
+
+        # if pnmol_colorbar is None:
+        #     fig.colorbar(bar_error, ax=axes[:, -1].ravel().tolist())
+        #     pnmol_colorbar = 1
 
         for ax in axis_row:
             ax.set_yticks(t[:n:4])
