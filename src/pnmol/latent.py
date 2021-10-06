@@ -18,11 +18,27 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         self.lf_iwp = None
 
     def initialize(self, pde):
+        # The initialization of latent PDE filters is a bit complicated...
+        # It starts with assembling the state space components.
+        # Then, m0 and C0 are chosen as a standard Normal RV.
+        # Then, the state RV is updated on the PDE initial condition.
+        # This requires a tiny nugget, because we will continue conditioning the same RV.
+        # Then, the state RV and the latent RV are stacked together.
+        # The ODE is evaluated, and the stack of state and latent force
+        # is updated on an EK1-linearised PDE measurement (which includes the BCs).
+        # Altogether, this would be equivalent to initialising (y, \dot y0) accurately,
+        # and the rest with standard-normals.
+        # The specialty herein is that the BCs are used faithfully.
+        #
+        # To faithfully compare with e.g. tornadox,
+        # use the tornadox.Stack(use_df=False) initialization for the ODE filters.
 
+        # [Initialize state-space model]
         iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
-
         self.state_iwp, self.lf_iwp = iwp, iwp
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
+
+        # [Initialize random variables]
 
         # Shorthand access to the shapes of the initial conditions
         n, d = self.num_derivatives + 1, pde.mesh_spatial.shape[0]
@@ -37,14 +53,14 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         C0_sqrtm_latent_raw = jnp.kron(pde.E_sqrtm, jnp.eye(n))
 
         # Update state on initial condition
-        H, z = self.E0, pde.y0
+        z_y0, H_y0 = pde.y0, self.E0
         matrix_nugget = 1e-10 * jnp.eye(d)
-        C0_sqrtm_state_y0, kgain_y0, _ = sqrt.update_sqrt(
-            transition_matrix=H,
+        C0_sqrtm_state_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt(
+            transition_matrix=H_y0,
             cov_cholesky=C0_sqrtm_state_raw,
             meascov_sqrtm=matrix_nugget,
         )
-        m0_state_flat_y0 = m0_state_raw_flat - kgain_y0 @ z
+        m0_state_flat_y0 = m0_state_raw_flat - kgain_y0 @ z_y0
 
         # Stack m0 and e0 together
         m0_stack = jnp.hstack((m0_state_flat_y0, m0_latent_raw_flat))
@@ -56,7 +72,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
         # Evaluate ODE at the initial condition
         p_empty = jnp.eye(n * d)
-        z, H = self.evaluate_ode(
+        z_pde, H_pde = self.evaluate_ode(
             pde=pde,
             p0=self.E0,
             p1=self.E1,
@@ -66,11 +82,11 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             p_eps=p_empty,
         )
 
-        # U
-        C0_sqrtm_state_latent, kgain, _ = sqrt.update_sqrt_no_meascov(
-            transition_matrix=H, cov_cholesky=C0_sqrtm_block
+        # Update the stack of state and latent force on the PDE measurement.
+        C0_sqrtm_state_latent, kgain, S_pde = sqrt.update_sqrt_no_meascov(
+            transition_matrix=H_pde, cov_cholesky=C0_sqrtm_block
         )
-        m0_state_latent = m0_stack + kgain @ (H @ m0_stack - z)
+        m0_state_latent = m0_stack + kgain @ (H_pde @ m0_stack - z_pde)
         m0_state_latent_reshaped = m0_state_latent.reshape((n, 2 * d), order="F")
 
         y = rv.MultivariateNormal(
@@ -78,43 +94,21 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         )
 
         # Todo: calibration!
-
-        #
-        # # This is kind of wrong still... RK init should get the proper diffusion.
-        # ivp = pde.to_tornadox_ivp()
-        # extended_dy0, cov_sqrtm_state = self.init(
-        #     f=ivp.f,
-        #     df=ivp.df,
-        #     y0=ivp.y0,
-        #     t0=ivp.t0,
-        #     num_derivatives=self.state_iwp.num_derivatives,
-        #     wp_diffusion_sqrtm=diffusion_state_sqrtm,
-        # )
-        # dy0_padded = jnp.pad(
-        #     extended_dy0,
-        #     pad_width=((0, 0), (1, 1)),
-        #     mode="constant",
-        #     constant_values=0.0,
-        # )
-        # initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
-        # mean = jnp.concatenate([initmean, jnp.zeros_like(initmean)], -1)
-        #
-        # cov_sqrtm_state_ = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
-        # cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, cov_sqrtm_state)
-        #
-        # cov_sqrtm = jax.scipy.linalg.block_diag(
-        #     cov_sqrtm_state_,
-        #     cov_sqrtm_eps,
-        # )
-        #
-        # y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
+        S_y0, S_pde = S_sqrtm_y0 @ S_sqrtm_y0.T, S_pde @ S_pde.T
+        diffusion_squared_local_y0 = z_y0 @ jnp.linalg.solve(S_y0, z_y0) / z_y0.shape[0]
+        diffusion_squared_local_pde = (
+            z_pde @ jnp.linalg.solve(S_pde, z_pde) / z_pde.shape[0]
+        )
+        diffusion_squared_local = 0.5 * (
+            diffusion_squared_local_pde + diffusion_squared_local_y0
+        )
 
         return pdefilter.PDEFilterState(
             t=pde.t0,
             y=y,
             error_estimate=None,
             reference_state=None,
-            diffusion_squared_local=0.0,
+            diffusion_squared_local=diffusion_squared_local,
         )
 
     def attempt_step(self, state, dt, pde):
