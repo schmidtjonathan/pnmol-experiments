@@ -32,6 +32,9 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         #
         # To faithfully compare with e.g. tornadox,
         # use the tornadox.Stack(use_df=False) initialization for the ODE filters.
+        #
+        # One thing that should not be discarded is that due to the updating nature here,
+        # the global diffusion MLE is affected (y0 and the PDE measurement are data).
 
         # [Initialize state-space model]
         iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
