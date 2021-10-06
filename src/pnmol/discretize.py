@@ -108,7 +108,7 @@ def _weights_to_matrix(L, E_sqrtm, weights, uncertainties, indices_column, indic
     """Stack the FD weights (and uncertainties) into a differentiation matrix."""
     L_new = jax.ops.index_update(x=L, idx=(indices_row, indices_column), y=weights)
     E_sqrtm_new = jax.ops.index_update(
-        x=E_sqrtm, idx=(indices_row, indices_row.T), y=uncertainties
+        x=E_sqrtm, idx=(indices_row.squeeze(), indices_row.squeeze()), y=uncertainties
     )
     return L_new, E_sqrtm_new
 

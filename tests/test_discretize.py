@@ -95,6 +95,11 @@ class TestFDProbabilistic:
         n = mesh_spatial_1d.shape[0]
         assert E_sqrtm.shape == (n, n)
 
+    @staticmethod
+    def test_E_sqrtm_diagonal(fd_approximation):
+        _, E_sqrtm = fd_approximation
+        assert jnp.allclose(E_sqrtm, jnp.diag(jnp.diag(E_sqrtm)))
+
 
 class TestCollocationGlobal:
     @staticmethod
