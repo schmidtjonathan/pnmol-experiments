@@ -75,6 +75,8 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
     def attempt_step(self, state, dt, pde):
 
         P, Pinv = self.ssm.nordsieck_preconditioner(dt=dt)
+        P_state, Pinv_state = self.state_iwp.nordsieck_preconditioner(dt=dt)
+        P_eps, Pinv_eps = self.lf_iwp.nordsieck_preconditioner(dt=dt)
 
         A, Ql = self.ssm.preconditioned_discretize
         n, d = self.num_derivatives + 1, self.state_iwp.wiener_process_dimension
@@ -105,6 +107,8 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             p1=self.E1,
             m_pred=mp,
             t=state.t + dt,
+            p_state=P_state,
+            p_eps=P_eps,
         )
 
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
@@ -154,11 +158,12 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
 class LinearLatentForceEK1(_LatentForceEK1Base):
     @staticmethod
-    def evaluate_ode(pde, p0, p1, m_pred, t):
+    def evaluate_ode(pde, p0, p1, m_pred, t, p_state, p_eps):
         L = pde.L
 
-        E0_state = E0_eps = p0
-        E1_state = p1
+        E0_state = p0 @ p_state
+        E0_eps = p0 @ p_eps
+        E1_state = p1 @ p_state
         E0_stacked = jax.scipy.linalg.block_diag(E0_state, E0_eps)
 
         m_at = E0_stacked @ m_pred  # Project to first derivatives
