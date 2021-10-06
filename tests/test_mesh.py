@@ -31,13 +31,13 @@ class TestRectangularMesh(unittest.TestCase):
         self.mesh = mesh.RectangularMesh(points=SET)
 
     def test_boundary(self):
-        boundary_pts, indices = self.mesh.boundary
+        boundary_pts, indices, _ = self.mesh.boundary
         discrepancy = jnp.linalg.norm(SET[SET_BOUNDARY] - boundary_pts)
         self.assertLess(discrepancy, 1e-14)
         self.assertEqual(jnp.all(indices == SET_BOUNDARY), True)
 
     def test_interior(self):
-        interior_pts, indices = self.mesh.interior
+        interior_pts, indices, _ = self.mesh.interior
         discrepancy = jnp.linalg.norm(SET[SET_INTERIOR] - interior_pts)
         self.assertLess(discrepancy, 1e-14)
         self.assertEqual(jnp.all(indices == SET_INTERIOR), True)
@@ -81,7 +81,7 @@ class TestRectangularMesh(unittest.TestCase):
         grid = mesh.RectangularMesh.from_bbox_1d(bbox=[0.0, 1.0], step=0.1)
         B = grid.boundary_projection_matrix
 
-        boundary_points, _ = grid.boundary
+        boundary_points, *_ = grid.boundary
         for (exp, rec) in zip(B @ grid.points, boundary_points):
             self.assertEqual(exp, rec)
 
@@ -91,7 +91,7 @@ class TestRectangularMesh(unittest.TestCase):
         )
         B = grid.boundary_projection_matrix
 
-        boundary_points, _ = grid.boundary
+        boundary_points, *_ = grid.boundary
         for (exp, rec) in zip(B @ grid.points, boundary_points):
             for e, r in zip(exp, rec):
                 self.assertEqual(e, r)

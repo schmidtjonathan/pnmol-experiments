@@ -151,7 +151,7 @@ class RectangularMesh(Mesh):
                 self.points[:, d] == self.bbox[d, 1],
             )
             is_boundary = jnp.logical_or(is_boundary, this_dim)
-        return self.points[is_boundary], is_boundary
+        return self.points[is_boundary], is_boundary, jnp.nonzero(is_boundary)[0]
 
     @cached_property
     def interior(self):
@@ -166,12 +166,12 @@ class RectangularMesh(Mesh):
                 self.points[:, d] != self.bbox[d, 1],
             )
             is_boundary = jnp.logical_and(is_boundary, this_dim)
-        return self.points[is_boundary], is_boundary
+        return self.points[is_boundary], is_boundary, jnp.nonzero(is_boundary)[0]
 
     @cached_property
     def boundary_projection_matrix(self):
         E = jnp.eye(self.points.shape[0])
-        _, indices = self.boundary
+        _, indices, _ = self.boundary
         return E[indices, :]
 
 

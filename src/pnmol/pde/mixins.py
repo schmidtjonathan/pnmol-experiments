@@ -16,12 +16,21 @@ from pnmol import diffops, discretize, kernels, mesh
 class DiscretizationMixIn:
     """Add functionality for discretization of PDEs to the PDE class."""
 
-    def discretize(self, *, mesh_spatial, kernel, stencil_size, nugget_gram_matrix=0.0):
+    def discretize(
+        self,
+        *,
+        mesh_spatial,
+        kernel,
+        stencil_size_interior,
+        stencil_size_boundary,
+        nugget_gram_matrix=0.0
+    ):
         L, E_sqrtm = discretize.fd_probabilistic(
             self.diffop,
             mesh_spatial=mesh_spatial,
             kernel=kernel,
-            stencil_size=stencil_size,
+            stencil_size_interior=stencil_size_interior,
+            stencil_size_boundary=stencil_size_boundary,
             nugget_gram_matrix=nugget_gram_matrix,
         )
 
@@ -55,14 +64,21 @@ class SystemDiscretizationMixIn:
 
     # Overwrite the discretization functionality
     def discretize_system(
-        self, *, mesh_spatial, kernel, stencil_size, nugget_gram_matrix=0.0
+        self,
+        *,
+        mesh_spatial,
+        kernel,
+        stencil_size_interior,
+        stencil_size_boundary,
+        nugget_gram_matrix=0.0
     ):
 
         fd = functools.partial(
             discretize.fd_probabilistic,
             mesh_spatial=mesh_spatial,
             kernel=kernel,
-            stencil_size=stencil_size,
+            stencil_size_interior=stencil_size_interior,
+            stencil_size_boundary=stencil_size_boundary,
             nugget_gram_matrix=nugget_gram_matrix,
         )
 

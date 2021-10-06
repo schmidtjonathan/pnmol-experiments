@@ -78,7 +78,8 @@ class TestFDProbabilistic:
         return discretize.fd_probabilistic(
             diffop=diffop,
             mesh_spatial=mesh_spatial_1d,
-            stencil_size=3,
+            stencil_size_interior=3,
+            stencil_size_boundary=3,
             nugget_gram_matrix=0.0,
         )
 

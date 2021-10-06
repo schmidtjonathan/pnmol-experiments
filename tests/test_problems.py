@@ -176,14 +176,23 @@ def test_pde_system():
 
     mesh = pnmol.mesh.RectangularMesh.from_bbox_1d([0.0, 1.0], step=0.1)
     pde1.discretize(
-        mesh_spatial=mesh, kernel=pnmol.kernels.SquareExponential(), stencil_size=3
+        mesh_spatial=mesh,
+        kernel=pnmol.kernels.SquareExponential(),
+        stencil_size_interior=3,
+        stencil_size_boundary=3,
     )
     pde2.discretize(
-        mesh_spatial=mesh, kernel=pnmol.kernels.SquareExponential(), stencil_size=3
+        mesh_spatial=mesh,
+        kernel=pnmol.kernels.SquareExponential(),
+        stencil_size_interior=3,
+        stencil_size_boundary=3,
     )
 
     pde.discretize_system(
-        mesh_spatial=mesh, kernel=pnmol.kernels.SquareExponential(), stencil_size=3
+        mesh_spatial=mesh,
+        kernel=pnmol.kernels.SquareExponential(),
+        stencil_size_interior=3,
+        stencil_size_boundary=3,
     )
 
     L_expected = jax.scipy.linalg.block_diag(pde1.L, pde2.L)
