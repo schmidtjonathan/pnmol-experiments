@@ -181,3 +181,31 @@ def duplicate(kernel, num):
     The blocks are all identical.
     """
     return _StackedKernel(kernel_list=[kernel] * num)
+
+
+def mle_input_scale(*, mesh_points, data, kernel_type, input_scale_trials):
+    scale_to_log_lklhd = partial(
+        input_scale_to_log_likelihood,
+        data=data,
+        kernel_type=kernel_type,
+        mesh_points=mesh_points,
+    )
+    scale_to_log_lklhd_optimised = jax.jit(jax.vmap(scale_to_log_lklhd))
+    log_likelihood_values = scale_to_log_lklhd_optimised(input_scale=input_scale_trials)
+    index_max = jnp.argmax(log_likelihood_values)
+    return input_scale_trials[index_max]
+
+
+@partial(jax.jit, static_argnums=3)
+def input_scale_to_log_likelihood(input_scale, mesh_points, data, kernel_type):
+    kernel = kernel_type(input_scale=input_scale)
+    K = kernel(mesh_points, mesh_points.T)
+    return log_likelihood(gram_matrix=K, y=data, n=data.shape[0])
+
+
+@jax.jit
+def log_likelihood(gram_matrix, y, n):
+    a = y @ jnp.linalg.solve(gram_matrix, y)
+    b = jnp.log(jnp.linalg.det(gram_matrix))
+    c = n * jnp.log(2 * jnp.pi)
+    return -0.5 * (a + b + c)
