@@ -39,7 +39,9 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     steprule = tornadox.step.ConstantSteps(dt)
     ivp = pde.to_tornadox_ivp()
     ek1 = tornadox.ek1.ReferenceEK1(
-        num_derivatives=nu, steprule=steprule, initialization=tornadox.init.RungeKutta()
+        num_derivatives=nu,
+        steprule=steprule,
+        initialization=tornadox.init.Stack(use_df=False),
     )
     sol = ek1.solve(ivp, progressbar=progressbar)
     E0 = ek1.iwp.projection_matrix(0)
@@ -98,8 +100,8 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 
 # Hyperparameters (method)
-DT = 0.05
-DX = 0.1
+DT = 0.0125
+DX = 0.2
 HIGH_RES_FACTOR_DX = 10
 HIGH_RES_FACTOR_DT = 10
 NUM_DERIVATIVES = 2
@@ -108,6 +110,8 @@ STENCIL_SIZE = 3
 PROGRESSBAR = True
 
 # todo: input scale MLE.
+# todo (cont.): the functionality is there, but where should it happen?
+# todo (cont.): in each problem example maybe?
 
 # Hyperparameters (problem)
 T0, TMAX = 0.0, 3.0

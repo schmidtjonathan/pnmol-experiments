@@ -58,21 +58,17 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
 
         # Update state on initial condition
         z_y0, H_y0 = pde.y0, self.E0
-        matrix_nugget = 1e-10 * jnp.eye(d)
-        C0_sqrtm_state_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt(
+        C0_sqrtm_state_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt_no_meascov(
             transition_matrix=H_y0,
             cov_cholesky=C0_sqrtm_state_raw,
-            meascov_sqrtm=matrix_nugget,
         )
-        m0_state_flat_y0 = m0_state_raw_flat - kgain_y0 @ z_y0
+        m0_state_flat_y0 = kgain_y0 @ z_y0  # prior mean was zero
 
         # Stack m0 and e0 together
         m0_stack = jnp.hstack((m0_state_flat_y0, m0_latent_raw_flat))
         C0_sqrtm_block = jax.scipy.linalg.block_diag(
             C0_sqrtm_state_y0, C0_sqrtm_latent_raw
         )
-        assert m0_stack.ndim == 1
-        assert C0_sqrtm_block.ndim == 2
 
         # Evaluate ODE at the initial condition
         p_empty = jnp.eye(n * d)
@@ -87,21 +83,32 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         )
 
         # Update the stack of state and latent force on the PDE measurement.
-        C0_sqrtm_state_latent, kgain, S_pde = sqrt.update_sqrt_no_meascov(
-            transition_matrix=H_pde, cov_cholesky=C0_sqrtm_block
+        matrix_nugget = 1e-10 * jnp.eye(d + pde.B.shape[0])
+        C0_sqrtm_state_latent, kgain, S_pde = sqrt.update_sqrt(
+            transition_matrix=H_pde,
+            cov_cholesky=C0_sqrtm_block,
+            meascov_sqrtm=matrix_nugget,
         )
-        m0_state_latent = m0_stack + kgain @ (H_pde @ m0_stack - z_pde)
-        m0_state_latent_reshaped = m0_state_latent.reshape((n, 2 * d), order="F")
+        m0_state_latent = m0_stack - kgain @ (H_pde @ m0_stack - z_pde)
+
+        # Reshape carefully
+        m0_state, m0_latent = jnp.split(m0_state_latent, 2)
+        m0_state_reshaped = m0_state.reshape((n, d), order="F")
+        m0_latent_reshaped = m0_latent.reshape((n, d), order="F")
+        m0_state_latent_reshaped = jnp.concatenate(
+            (m0_state_reshaped, m0_latent_reshaped), axis=1
+        )
 
         y = rv.MultivariateNormal(
             mean=m0_state_latent_reshaped, cov_sqrtm=C0_sqrtm_state_latent
         )
 
-        # Todo: calibration!
         S_y0, S_pde = S_sqrtm_y0 @ S_sqrtm_y0.T, S_pde @ S_pde.T
         diffusion_squared_local_y0 = z_y0 @ jnp.linalg.solve(S_y0, z_y0) / z_y0.shape[0]
         diffusion_squared_local_pde = (
-            z_pde @ jnp.linalg.solve(S_pde, z_pde) / z_pde.shape[0]
+            (H_pde @ m0_stack - z_pde)
+            @ jnp.linalg.solve(S_pde, (H_pde @ m0_stack - z_pde))
+            / z_pde.shape[0]
         )
 
         return pdefilter.PDEFilterState(

@@ -67,12 +67,12 @@ def figure_1(
             axis_row[0], X, T, m[:n].T, **contour_args, **contour_args_means
         )
         bar = figure_1_plot_contour(
-            axis_row[1], X, T, s[:n].T, **contour_args, **contour_args_errors
+            axis_row[1], X, T, s[:n].T + 1e-12, **contour_args, **contour_args_errors
         )
         fig.colorbar(bar, ax=axis_row[1])
 
         bar = figure_1_plot_contour(
-            axis_row[2], X, T, error.T, **contour_args, **contour_args_errors
+            axis_row[2], X, T, error.T + 1e-12, **contour_args, **contour_args_errors
         )
         fig.colorbar(bar, ax=axis_row[2])
 
