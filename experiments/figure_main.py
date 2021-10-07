@@ -2,8 +2,10 @@
 
 import itertools
 import pathlib
+import time
 
 import jax.numpy as jnp
+import numpy
 import plotting
 import scipy.integrate
 import tornadox
@@ -28,7 +30,7 @@ def solve_pde_reference(pde, *, dt, high_res_factor_dx, high_res_factor_dt):
         ::high_res_factor_dt, ::high_res_factor_dx
     ]
 
-    return means, stds, t_eval[0], pde.mesh_spatial.points[::high_res_factor_dx], -1
+    return means, stds, -1
 
 
 def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
@@ -36,23 +38,15 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
     ek1 = pnmol.white.LinearWhiteNoiseEK1(
         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
     )
-    final_state, info = ek1.simulate_final_state(pde, progressbar=progressbar)
+
+    start = time.time()
+    final_state, _ = ek1.simulate_final_state(pde, progressbar=progressbar)
+    elapsed_time = time.time() - start
+
     E0 = ek1.iwp.projection_matrix(0)
     mean, std = read_mean_and_std(final_state, E0)
 
-    return mean, std, final_state.t, pde.mesh_spatial.points, info["num_steps"]
-
-
-# def solve_pde_pnmol_latent(pde, *, dt, nu, progressbar, kernel):
-#     steprule = pnmol.odetools.step.Constant(dt)
-#     ek1 = pnmol.latent.LinearLatentForceEK1(
-#         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
-#     )
-#     final_state, info = ek1.simulate_final_state(pde, progressbar=progressbar)
-#     E0 = ek1.state_iwp.projection_matrix(0)
-#     mean, std = read_mean_and_std_latent(final_state, E0)
-
-#     return mean, std, final_state.t, pde.mesh_spatial.points, info["num_steps"]
+    return mean, std, elapsed_time
 
 
 def solve_pde_tornadox(pde, *, dt, nu, progressbar):
@@ -61,13 +55,18 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     ek1 = tornadox.ek1.ReferenceEK1(
         num_derivatives=nu, steprule=steprule, initialization=tornadox.init.RungeKutta()
     )
+
+    start = time.time()
     final_state, info = ek1.simulate_final_state(ivp, progressbar=progressbar)
+    elapsed_time = time.time() - start
+
     E0 = ek1.iwp.projection_matrix(0)
     mean, std = read_mean_and_std(final_state, E0)
 
-    mean = jnp.pad(mean, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
-    std = jnp.pad(std, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
-    return mean, std, final_state.t, pde.mesh_spatial.points, info["num_steps"]
+    mean = jnp.pad(mean, pad_width=1, mode="constant", constant_values=0.0)
+    std = jnp.pad(std, pad_width=1, mode="constant", constant_values=0.0)
+
+    return mean, std, elapsed_time
 
 
 def read_mean_and_std(final_state, E0):
@@ -94,32 +93,23 @@ def save_result(result, /, *, prefix, path="experiments/results"):
     if not path.is_dir():
         path.mkdir(parents=True)
 
-    means = {k: v[0] for (k, v) in result.items()}
-    stds = {k: v[1] for (k, v) in result.items()}
-    ts = {k: v[2] for (k, v) in result.items()}
-    xs = {k: v[3] for (k, v) in result.items()}
-    n_steps = {k: v[4] for (k, v) in result.items()}
+    path_error = path / (prefix + "_error.npy")
+    path_std = path / (prefix + "_std.npy")
+    path_runtime = path / (prefix + "_runtime.npy")
 
-    path_means = path / (prefix + "_means.npy")
-    path_stds = path / (prefix + "_stds.npy")
-    path_ts = path / (prefix + "_ts.npy")
-    path_xs = path / (prefix + "_xs.npy")
-    path_nsteps = path / (prefix + "_numsteps.npy")
-    jnp.save(path_means, means)
-    jnp.save(path_stds, stds)
-    jnp.save(path_ts, ts)
-    jnp.save(path_xs, xs)
-    jnp.save(path_nsteps, n_steps)
+    jnp.save(path_error, result["error"])
+    jnp.save(path_std, result["std"])
+    jnp.save(path_runtime, result["runtime"])
 
 
 # Ranges
-DTs = [0.1, 0.2, 0.5]  # [0.01, 0.05, 0.1, 0.2, 0.5]
-DXs = [0.1, 0.2, 0.5]  # [0.01, 0.05, 0.1, 0.2, 0.5]
+DTs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
+DXs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
 
 # Hyperparameters (method)
 
-HIGH_RES_FACTOR_DX = 10
-HIGH_RES_FACTOR_DT = 10
+HIGH_RES_FACTOR_DX = 5
+HIGH_RES_FACTOR_DT = 5
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
@@ -130,73 +120,94 @@ T0, TMAX = 0.0, 4.0
 DIFFUSION_RATE = 0.035
 
 
-RESULT_PNMOL_WHITE, RESULT_TORNADOX, RESULT_REFERENCE = {}, {}, {}
+RESULT_WHITE, RESULT_TORNADOX = [
+    {
+        "error": numpy.zeros((len(DXs), len(DTs))),
+        "std": numpy.zeros((len(DXs), len(DTs))),
+        "runtime": numpy.zeros((len(DXs), len(DTs))),
+    }
+    for _ in range(2)
+]
+
+i_exp = 0
+num_exp_total = len(DXs) * len(DTs)
+
+for i_dx, dx in enumerate(DXs):
+    for i_dt, dt in enumerate(DTs):
+        i_exp = i_exp + 1
+
+        print(
+            f"\n======| Experiment {i_exp} of {num_exp_total} +++ dt={dt}, dx={dx} \n"
+        )
+
+        # PDE problems
+        PDE_PNMOL = pnmol.pde.examples.heat_1d_discretized(
+            t0=T0,
+            tmax=TMAX,
+            dx=dx,
+            stencil_size=STENCIL_SIZE,
+            diffusion_rate=DIFFUSION_RATE,
+            kernel=pnmol.kernels.SquareExponential(),
+            nugget_gram_matrix_fd=NUGGET_COV_FD,
+            bcond="dirichlet",
+        )
+        PDE_TORNADOX = pnmol.pde.examples.heat_1d_discretized(
+            t0=T0,
+            tmax=TMAX,
+            dx=dx,
+            stencil_size=STENCIL_SIZE,
+            diffusion_rate=DIFFUSION_RATE,
+            kernel=pnmol.kernels.SquareExponential(),
+            nugget_gram_matrix_fd=NUGGET_COV_FD,
+            bcond="dirichlet",
+        )
+        PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
+            t0=T0,
+            tmax=TMAX,
+            dx=dx / HIGH_RES_FACTOR_DX,
+            stencil_size=STENCIL_SIZE,
+            diffusion_rate=DIFFUSION_RATE,
+            kernel=pnmol.kernels.SquareExponential(),
+            nugget_gram_matrix_fd=NUGGET_COV_FD,
+            bcond="dirichlet",
+        )
+
+        # Solve the PDE with the different methods
+        KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-3)
+        KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + KERNEL_NUGGET
+
+        mean_white, std_white, elapsed_time_white = solve_pde_pnmol_white(
+            PDE_PNMOL,
+            dt=dt,
+            nu=NUM_DERIVATIVES,
+            progressbar=PROGRESSBAR,
+            kernel=KERNEL_DIFFUSION_PNMOL,
+        )
+
+        mean_tornadox, std_tornadox, elapsed_time_tornadox = solve_pde_tornadox(
+            PDE_TORNADOX, dt=dt, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
+        )
+        mean_reference, std_reference, elapsed_time_reference = solve_pde_reference(
+            PDE_REFERENCE,
+            dt=dt / HIGH_RES_FACTOR_DT,
+            high_res_factor_dt=HIGH_RES_FACTOR_DT,
+            high_res_factor_dx=HIGH_RES_FACTOR_DX,
+        )
+
+        error_white = jnp.mean(jnp.abs(mean_white - mean_reference))
+        error_tornadox = jnp.mean(jnp.abs(mean_tornadox - mean_reference))
+
+        mean_std_white = jnp.mean(std_white)
+        mean_std_tornadox = jnp.mean(std_tornadox)
+
+        RESULT_WHITE["error"][i_dx, i_dt] = error_white
+        RESULT_WHITE["std"][i_dx, i_dt] = mean_std_white
+        RESULT_WHITE["runtime"][i_dx, i_dt] = elapsed_time_white
+
+        RESULT_TORNADOX["error"][i_dx, i_dt] = error_tornadox
+        RESULT_TORNADOX["std"][i_dx, i_dt] = mean_std_tornadox
+        RESULT_TORNADOX["runtime"][i_dx, i_dt] = elapsed_time_tornadox
 
 
-for exp_i, (dt, dx) in enumerate(itertools.product(DTs, DXs), start=1):
-
-    print(f"\n======| Experiment {exp_i}: dt={dt}, dx={dx} \n")
-
-    # PDE problems
-    PDE_PNMOL = pnmol.pde.examples.heat_1d_discretized(
-        t0=T0,
-        tmax=TMAX,
-        dx=dx,
-        stencil_size=STENCIL_SIZE,
-        diffusion_rate=DIFFUSION_RATE,
-        kernel=pnmol.kernels.SquareExponential(),
-        nugget_gram_matrix_fd=NUGGET_COV_FD,
-        bcond="dirichlet",
-    )
-    PDE_TORNADOX = pnmol.pde.examples.heat_1d_discretized(
-        t0=T0,
-        tmax=TMAX,
-        dx=dx,
-        stencil_size=STENCIL_SIZE,
-        diffusion_rate=DIFFUSION_RATE,
-        kernel=pnmol.kernels.SquareExponential(),
-        nugget_gram_matrix_fd=NUGGET_COV_FD,
-        bcond="dirichlet",
-    )
-    PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
-        t0=T0,
-        tmax=TMAX,
-        dx=dx / HIGH_RES_FACTOR_DX,
-        stencil_size=STENCIL_SIZE,
-        diffusion_rate=DIFFUSION_RATE,
-        kernel=pnmol.kernels.SquareExponential(),
-        nugget_gram_matrix_fd=NUGGET_COV_FD,
-        bcond="dirichlet",
-    )
-
-    # Solve the PDE with the different methods
-    KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-3)
-    KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + KERNEL_NUGGET
-    res_white = solve_pde_pnmol_white(
-        PDE_PNMOL,
-        dt=dt,
-        nu=NUM_DERIVATIVES,
-        progressbar=PROGRESSBAR,
-        kernel=KERNEL_DIFFUSION_PNMOL,
-    )
-
-    res_tornadox = solve_pde_tornadox(
-        PDE_TORNADOX, dt=dt, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
-    )
-    res_reference = solve_pde_reference(
-        PDE_REFERENCE,
-        dt=dt / HIGH_RES_FACTOR_DT,
-        high_res_factor_dt=HIGH_RES_FACTOR_DT,
-        high_res_factor_dx=HIGH_RES_FACTOR_DX,
-    )
-
-    print(res_white[2], res_tornadox[2], res_reference[2])
-
-    RESULT_PNMOL_WHITE[(dt, dx)] = res_white
-    RESULT_TORNADOX[(dt, dx)] = res_tornadox
-    RESULT_REFERENCE[(dt, dx)] = res_reference
-
-
-save_result(RESULT_PNMOL_WHITE, prefix="pnmol_white")
+save_result(RESULT_WHITE, prefix="pnmol_white")
 save_result(RESULT_TORNADOX, prefix="tornadox")
-save_result(RESULT_REFERENCE, prefix="reference")

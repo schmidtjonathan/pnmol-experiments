@@ -468,3 +468,86 @@ def figure_2(path=PATH_RESULTS):
 
     plt.savefig(path + "figure.pdf", dpi=300)
     plt.show()
+
+
+# "MAIN" EXPERIMENT FIGURE
+
+
+def figure_main(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
+    path = path + "figure_main/"
+    plt.style.use(STYLESHEETS)
+
+    results = [figure_main_load_results(prefix=method, path=path) for method in methods]
+
+    figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
+    fig, axes = plt.subplots(
+        nrows=len(methods),
+        ncols=3,
+        dpi=200,
+        figsize=figure_size,
+        sharex=True,
+        sharey=True,
+    )
+
+    DTs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
+    DXs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
+
+    for axis_row, result in zip(axes, results):
+        err_mat, std_mat, runtime_mat = result
+        # axis_row[0].contour(DTs, DXs, err_mat)
+        # axis_row[1].contour(DTs, DXs, std_mat)
+        # axis_row[2].contour(DTs, DXs, runtime_mat)
+        axis_row[0].matshow(
+            err_mat,
+            aspect="auto",
+            norm=LogNorm(),
+        )
+        axis_row[1].matshow(
+            std_mat,
+            aspect="auto",
+            norm=LogNorm(),
+        )
+        axis_row[2].matshow(
+            runtime_mat,
+            aspect="auto",
+            norm=LogNorm(),
+        )
+
+        # axis_row[0].set_xticks(DTs)
+        # axis_row[0].set_yticks(DXs)
+        # axis_row[1].set_xticks(DTs)
+        # axis_row[1].set_yticks(DXs)
+        # axis_row[2].set_xticks(DTs)
+        # axis_row[2].set_yticks(DXs)
+
+    axes[0, 0].set_title("Error")
+    axes[0, 1].set_title("STD")
+    axes[0, 2].set_title("Runtime")
+    axes[0, 0].set_ylabel("PNMOL\ndx")
+    axes[1, 0].set_ylabel("PN+MOL\ndx")
+    for bottom_ax in axes[-1, :]:
+        bottom_ax.set_xlabel("dt")
+
+    plt.savefig(path + "figure.pdf")
+    plt.show()
+
+
+def figure_main_load_results(*, prefix, path=PATH_RESULTS):
+    path_error = path + prefix + "_error.npy"
+    path_std = path + prefix + "_std.npy"
+    path_runtime = path + prefix + "_runtime.npy"
+
+    error = jnp.load(path_error)
+    std = jnp.load(path_std)
+    runtime = jnp.load(path_runtime)
+    return error, std, runtime
+
+
+def figure_main_plot_contour(ax, /, *args, **kwargs):
+    """Contour lines with fill color and sharp edges."""
+    ax.contour(*args, **kwargs)
+    return ax.contourf(*args, **kwargs)
+
+
+if __name__ == "__main__":
+    figure_main()
