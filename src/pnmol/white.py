@@ -14,7 +14,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         self.iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
 
         # Shorthand access to the shapes of the initial conditions
-        n, d = self.num_derivatives + 1, pde.mesh_spatial.shape[0]
+        n, d = self.num_derivatives + 1, pde.L.shape[0]
 
         # Starting point for the initial conditions
         # Dont make it a non-zero mean without updating the code below!
@@ -95,6 +95,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         )
         _, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
+        error = error[: -pde.B.shape[0]]
 
         # [Update]
         Cl_new, K, Sl = sqrt.update_sqrt(H, Clp, meascov_sqrtm=E_with_bc_sqrtm)
@@ -130,11 +131,13 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
     @staticmethod
     @jax.jit
     def estimate_error(ql, z, h, E_sqrtm):
-        # print(h.shape, ql.shape, E_sqrtm.shape)
-        S = h @ ql @ ql.T @ h.T + E_sqrtm @ E_sqrtm.T
+        q = ql @ ql.T
+        s_no_e = h @ q @ h.T
+        e = E_sqrtm @ E_sqrtm.T
+        S = s_no_e + e
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
-        error = jnp.sqrt(jnp.diag(S)) * sigma
+        error = jnp.sqrt(jnp.diag(S))
         return sigma, error
 
     @abc.abstractstaticmethod
