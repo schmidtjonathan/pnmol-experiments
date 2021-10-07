@@ -102,9 +102,25 @@ def save_result(result, /, *, prefix, path="experiments/results"):
     jnp.save(path_runtime, result["runtime"])
 
 
+def save_dtdx(path="experiments/results"):
+    path = pathlib.Path(path) / "figure_main"
+    if not path.is_dir():
+        path.mkdir(parents=True)
+
+    dtdxsavepath = path / "dtdx.npy"
+    dtdx_array = jnp.stack((DTs, DXs))
+    jnp.save(dtdxsavepath, dtdx_array)
+    print(f"Saved dtdx of shape {dtdx_array.shape} to {dtdxsavepath}")
+
+
 # Ranges
-DTs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
-DXs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
+DTs = jnp.logspace(
+    numpy.log10(0.001), numpy.log10(0.01), num=15, endpoint=True, base=10
+)  # jnp.logspace(-2, 0, num=25)
+DXs = jnp.logspace(
+    numpy.log10(0.1), numpy.log10(0.25), num=15, endpoint=True, base=10
+)  # jnp.logspace(-2, 0, num=25)
+
 
 # Hyperparameters (method)
 
@@ -131,6 +147,9 @@ RESULT_WHITE, RESULT_TORNADOX = [
 
 i_exp = 0
 num_exp_total = len(DXs) * len(DTs)
+
+
+save_dtdx()
 
 for i_dx, dx in enumerate(DXs):
     for i_dt, dt in enumerate(DTs):
