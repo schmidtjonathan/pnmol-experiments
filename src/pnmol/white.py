@@ -13,34 +13,63 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
 
         self.iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
 
-        # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = pde.to_tornadox_ivp()
-        extended_dy0, cov_sqrtm = self.init(
-            f=ivp.f,
-            df=ivp.df,
-            y0=ivp.y0,
-            t0=ivp.t0,
-            num_derivatives=self.iwp.num_derivatives,
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        # Shorthand access to the shapes of the initial conditions
+        n, d = self.num_derivatives + 1, pde.mesh_spatial.shape[0]
+
+        # Starting point for the initial conditions
+        # Dont make it a non-zero mean without updating the code below!
+        m0_raw = jnp.zeros((n, d))
+        m0_raw_flat = m0_raw.reshape((-1,), order="F")
+        c0 = self.diffuse_prior_scale * jnp.eye(n)  # shorthand
+        C0_sqrtm_raw = jnp.kron(diffusion_state_sqrtm, c0)
+
+        # Update state on initial condition
+        z_y0, H_y0 = pde.y0, self.E0
+        C0_sqrtm_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt_no_meascov(
+            transition_matrix=H_y0,
+            cov_cholesky=C0_sqrtm_raw,
         )
-        dy0_padded = jnp.pad(
-            extended_dy0,
-            pad_width=((0, 0), (1, 1)),
-            mode="constant",
-            constant_values=0.0,
+        m0_flat_y0 = kgain_y0 @ z_y0  # prior mean was zero
+
+        # Evaluate ODE at the initial condition
+        z_pde, H_pde, E_sqrtm_pde = self.evaluate_ode(
+            pde=pde,
+            p0=self.E0,
+            p1=self.E1,
+            m_pred=m0_flat_y0,
+            t=pde.t0,
         )
 
-        initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
-        y = rv.MultivariateNormal(
-            mean=initmean,
-            cov_sqrtm=jnp.kron(diffusion_state_sqrtm, cov_sqrtm),
+        # Update the stack of state and latent force on the PDE measurement.
+        matrix_nugget = 1e-10 * jnp.eye(d + pde.B.shape[0])
+        C0_sqrtm, kgain, S_pde = sqrt.update_sqrt(
+            transition_matrix=H_pde,
+            cov_cholesky=C0_sqrtm_y0,
+            meascov_sqrtm=E_sqrtm_pde + matrix_nugget,
         )
+        residual_pde = H_pde @ m0_flat_y0 - z_pde
+        m0 = m0_flat_y0 - kgain @ residual_pde
+
+        # Reshape and initialise the RV
+        m0_reshaped = m0.reshape((n, d), order="F")
+        y = rv.MultivariateNormal(mean=m0_reshaped, cov_sqrtm=C0_sqrtm)
+
+        # Dont forget that the initial data affects the quasi-MLE for the diffusion!
+        S_y0, S_pde = S_sqrtm_y0 @ S_sqrtm_y0.T, S_pde @ S_pde.T
+        diffusion_squared_local_y0 = z_y0 @ jnp.linalg.solve(S_y0, z_y0) / z_y0.shape[0]
+        diffusion_squared_local_pde = (
+            residual_pde @ jnp.linalg.solve(S_pde, residual_pde) / residual_pde.shape[0]
+        )
+
         return pdefilter.PDEFilterState(
             t=pde.t0,
             y=y,
             error_estimate=None,
             reference_state=None,
-            diffusion_squared_local=0.0,
+            diffusion_squared_local=[
+                diffusion_squared_local_y0,
+                diffusion_squared_local_pde,
+            ],
         )
 
     def attempt_step(self, state, dt, pde):

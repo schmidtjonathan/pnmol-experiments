@@ -39,7 +39,6 @@ class PDEFilter(ABC):
         *,
         steprule=None,
         num_derivatives=2,
-        initialization=None,
         spatial_kernel=None,
         diffuse_prior_scale=1.0,
     ):
@@ -52,9 +51,6 @@ class PDEFilter(ABC):
 
         # IWP(nu) prior -- will be assembled in initialize()
         self.iwp = None
-
-        # Initialization strategy
-        self.init = initialization or init.RungeKutta()
 
         # Spatial covariance kernel
         self.spatial_kernel = (

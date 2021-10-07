@@ -137,13 +137,6 @@ def figure_1_singlerow(
         sharey=True,
         constrained_layout=True,
     )
-    #
-    # for ax in axes:
-    #     ax.set_xlabel("Space", fontsize="small")
-    #
-    # axes[3].set_ylabel("Time", fontsize="small")
-    # axes[2].set_ylabel("Time", fontsize="small")
-    # axes[2].yaxis.set_label_position("right")
 
     axes = np.flip(axes)
     ax_mol_error, ax_mol_std, ax_mol_mean = axes[:3]
@@ -176,7 +169,7 @@ def figure_1_singlerow(
         **contour_args_errors,
         cmap=cmap_pnmol,
         vmin=0.0,
-        vmax=10.0,
+        vmax=5.0,
         # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
     )
     fig.colorbar(bar_pnmol, ax=ax_pnmol_error, location="left", ticks=(0, 2.5, 5.0))
@@ -204,11 +197,11 @@ def figure_1_singlerow(
     )
 
     title_style = {"loc": "left", "fontsize": "small"}
-    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Calibration", **title_style)
+    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Error/Unc.", **title_style)
     ax_mol_std.set_title(r"$\bf MOL/2$. " + "Uncertainty", **title_style)
     ax_mol_mean.set_title(r"$\bf MOL/3$. " + "Estimate", **title_style)
 
-    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Calibration", **title_style)
+    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Error/Unc.", **title_style)
     ax_pnmol_std.set_title(r"$\bf PN/2$. " + "Uncertainty", **title_style)
     ax_pnmol_mean.set_title(r"$\bf PN/3$. " + "Estimate", **title_style)
 
