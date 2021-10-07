@@ -1,5 +1,7 @@
 """Plotting code for the PNMOL experiments."""
 
+import pathlib
+
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy as np
@@ -489,29 +491,28 @@ def figure_main(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         sharey=True,
     )
 
-    DTs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
-    DXs = jnp.linspace(0.05, 0.25, num=10, endpoint=True)  # jnp.logspace(-2, 0, num=25)
+    DTDX = jnp.load(pathlib.Path(path) / "dtdx.npy")
+    DTs, DXs = jnp.split(DTDX, 2, axis=0)
+    extents = [float(DTs.min()), float(DTs.max()), float(DXs.max()), float(DXs.min())]
 
     for axis_row, result in zip(axes, results):
         err_mat, std_mat, runtime_mat = result
         # axis_row[0].contour(DTs, DXs, err_mat)
         # axis_row[1].contour(DTs, DXs, std_mat)
         # axis_row[2].contour(DTs, DXs, runtime_mat)
-        axis_row[0].matshow(
-            err_mat,
-            aspect="auto",
-            norm=LogNorm(),
+        im_err = axis_row[0].imshow(
+            err_mat, aspect="auto", norm=LogNorm(), extent=extents
         )
-        axis_row[1].matshow(
-            std_mat,
-            aspect="auto",
-            norm=LogNorm(),
+        im_std = axis_row[1].imshow(
+            std_mat, aspect="auto", norm=LogNorm(), extent=extents
         )
-        axis_row[2].matshow(
-            runtime_mat,
-            aspect="auto",
-            norm=LogNorm(),
+        im_rt = axis_row[2].imshow(
+            runtime_mat, aspect="auto", norm=LogNorm(), extent=extents
         )
+
+        fig.colorbar(im_err, ax=axis_row[0])
+        fig.colorbar(im_std, ax=axis_row[1])
+        fig.colorbar(im_rt, ax=axis_row[2])
 
         # axis_row[0].set_xticks(DTs)
         # axis_row[0].set_yticks(DXs)
@@ -540,6 +541,7 @@ def figure_main_load_results(*, prefix, path=PATH_RESULTS):
     error = jnp.load(path_error)
     std = jnp.load(path_std)
     runtime = jnp.load(path_runtime)
+
     return error, std, runtime
 
 
