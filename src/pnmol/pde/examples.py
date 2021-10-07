@@ -222,7 +222,7 @@ def spruce_budworm_1d(
     bbox=None,
     t0=0.0,
     tmax=10.0,
-    diffusion_rate=1.0,
+    diffusion_rate=0.1,
     y0_fun=None,
     bcond="dirichlet",
     growth_rate=1.0,
@@ -233,7 +233,7 @@ def spruce_budworm_1d(
     bbox = jnp.asarray(bbox)
 
     if y0_fun is None:
-        y0_fun = functools.partial(gaussian_bell_1d_centered, bbox=bbox, width=1.0)
+        y0_fun = sin_bell_1d
 
     def f_spruce_general(_, x, c):
         return c * x * (1.0 - x)
@@ -281,4 +281,4 @@ def gaussian_bell_1d(x):
 
 
 def sin_bell_1d(x):
-    return jnp.sin(jnp.pi * x)
+    return 0.1 * jnp.sin(jnp.pi * x)

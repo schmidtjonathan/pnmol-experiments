@@ -70,7 +70,7 @@ class PDEFilter(ABC):
         self.diffuse_prior_scale = diffuse_prior_scale
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, initialization={self.init})"
+        return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, spatial_kernel={self.spatial_kernel})"
 
     def solve(self, *args, **kwargs):
         solution_generator = self.solution_generator(*args, **kwargs)
