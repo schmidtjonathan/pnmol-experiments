@@ -2,6 +2,7 @@
 
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+import numpy as np
 from matplotlib.colors import LogNorm
 
 STYLESHEETS = [
@@ -115,6 +116,227 @@ def figure_1(
     plt.show()
 
 
+def figure_1_singlerow(
+    path=PATH_RESULTS, methods=("pnmol_white", "pnmol_latent", "tornadox", "reference")
+):
+    path = path + "figure1/"
+    plt.style.use(STYLESHEETS)
+
+    results = [figure_1_load_results(prefix=method, path=path) for method in methods]
+
+    results_reference = results[-1]
+    means_reference, *_, x_reference = results_reference
+
+    figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.4 * AISTATS_TEXTWIDTH_SINGLE)
+    fig, axes = plt.subplots(
+        nrows=1,
+        ncols=6,
+        dpi=200,
+        figsize=figure_size,
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
+    )
+    #
+    # for ax in axes:
+    #     ax.set_xlabel("Space", fontsize="small")
+    #
+    # axes[3].set_ylabel("Time", fontsize="small")
+    # axes[2].set_ylabel("Time", fontsize="small")
+    # axes[2].yaxis.set_label_position("right")
+
+    axes = np.flip(axes)
+    ax_mol_error, ax_mol_std, ax_mol_mean = axes[:3]
+    ax_pnmol_mean, ax_pnmol_std, ax_pnmol_error = axes[3:]
+
+    contour_args = {"alpha": 0.7, "levels": 20}
+    contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
+    contour_args_errors = {}
+
+    cmap_mol, cmap_pnmol = "RdYlBu_r", "RdYlGn_r"
+
+    bar_mol = _figure_1_plot_errors(
+        ax=ax_mol_error,
+        result=results[2],
+        result_reference=results[-1],
+        **contour_args,
+        **contour_args_errors,
+        cmap=cmap_mol,
+        vmin=0.0,
+        vmax=500.0,
+        # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
+    )
+    fig.colorbar(bar_mol, ax=ax_mol_error, location="right", ticks=(0, 250, 500))
+
+    bar_pnmol = _figure_1_plot_errors(
+        ax=ax_pnmol_error,
+        result=results[0],
+        result_reference=results[-1],
+        **contour_args,
+        **contour_args_errors,
+        cmap=cmap_pnmol,
+        vmin=0.0,
+        vmax=10.0,
+        # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
+    )
+    fig.colorbar(bar_pnmol, ax=ax_pnmol_error, location="left", ticks=(0, 2.5, 5.0))
+
+    _figure_1_plot_stds(
+        ax=ax_mol_std,
+        result=results[2],
+        **contour_args,
+        **contour_args_errors,
+        cmap="Blues",
+    )
+    _figure_1_plot_stds(
+        ax=ax_pnmol_std,
+        result=results[0],
+        **contour_args,
+        **contour_args_errors,
+        cmap="Greens",
+    )
+
+    _figure_1_plot_means(
+        ax=ax_mol_mean, result=results[2], **contour_args, **contour_args_means
+    )
+    _figure_1_plot_means(
+        ax=ax_pnmol_mean, result=results[0], **contour_args, **contour_args_means
+    )
+
+    title_style = {"loc": "left", "fontsize": "small"}
+    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Calibration", **title_style)
+    ax_mol_std.set_title(r"$\bf MOL/2$. " + "Uncertainty", **title_style)
+    ax_mol_mean.set_title(r"$\bf MOL/3$. " + "Estimate", **title_style)
+
+    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Calibration", **title_style)
+    ax_pnmol_std.set_title(r"$\bf PN/2$. " + "Uncertainty", **title_style)
+    ax_pnmol_mean.set_title(r"$\bf PN/3$. " + "Estimate", **title_style)
+
+    plt.savefig(path + "figure.pdf")
+    plt.show()
+
+    #
+    # means_mol, std_mol, t_mol, x_mol = results[2]
+    # means_pnmol, std_pnmol, t_pnmol, x_pnmol = results[0]  # white
+    #
+    # n_mol = jnp.minimum(len(means_mol), len(means_reference))
+    # error_mol =  jnp.abs(means_reference[:n_mol] - means_mol[:n_mol])
+    # n_pnmol = jnp.minimum(len(means_pnmol), len(means_reference))
+    # error_pnmol =  jnp.abs(means_reference[:n_pnmol] - means_mol[:n_pnmol])
+    #
+    # ax_pnmol_error.contour()
+    #
+    # vmin, vmax = None, None
+    # pnmol_colorbar = None
+    # for axis_row, method, result in zip(axes, methods[:-1], results):
+    #     m, s, t, x = result
+    #     n = jnp.minimum(len(m), len(means_reference))
+    #     T, X = jnp.meshgrid(t[:n], x[:, 0])
+    #     error = jnp.abs(means_reference[:n] - m[:n])
+    #     if vmin is None and vmax is None:
+    #         vmin_error, vmax_error = jnp.amin(error), jnp.amax(error)
+    #         vmin_std, vmax_std = jnp.amin(s), jnp.amax(s)
+    #         vmin = jnp.minimum(vmin_error, vmin_std)
+    #         vmax = jnp.maximum(vmax_error, vmax_std)
+    #
+    #     contour_args = {"alpha": 0.8}
+    #     contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
+    #     contour_args_errors = {"cmap": "inferno"}
+    #     figure_1_plot_contour(
+    #         axis_row[0], X, T, m[:n].T, **contour_args, **contour_args_means
+    #     )
+    #     bar = figure_1_plot_contour(
+    #         axis_row[1], X, T, s[:n].T + 1e-12, **contour_args, **contour_args_errors
+    #     )
+    #     fig.colorbar(bar, ax=axis_row[1])
+    #
+    #     bar = figure_1_plot_contour(
+    #         axis_row[2], X, T, error.T + 1e-12, **contour_args, **contour_args_errors
+    #     )
+    #     fig.colorbar(bar, ax=axis_row[2])
+    #
+    #     # if pnmol_colorbar is None:
+    #     #     fig.colorbar(bar_error, ax=axes[:, -1].ravel().tolist())
+    #     #     pnmol_colorbar = 1
+    #
+    #     for ax in axis_row:
+    #         ax.set_yticks(t[:n:4])
+    #         ax.set_xticks(x[:, 0])
+    #
+    # # x-labels
+    # bottom_row_axis = axes[-1]
+    # for ax in bottom_row_axis:
+    #     ax.set_xlabel("Space")
+    #
+    # # y-labels
+    # nicer_label = {
+    #     "pnmol_white": "White",
+    #     "pnmol_latent": "Latent",
+    #     "tornadox": "PN+MOL",
+    #     "reference": "Scipy",
+    # }
+    # left_column_axis = axes[:, 0]
+    # for ax, label in zip(left_column_axis, methods):
+    #     ax.set_ylabel(nicer_label[label])
+    #
+    # # Common settings for all plots
+    # for ax in axes.flatten():
+    #     ax.set_xticklabels(())
+    #     ax.set_yticklabels(())
+    #
+    # # Column titles
+    # top_row_axis = axes[0]
+    # ax1, ax2, ax3 = top_row_axis
+    # ax1.set_title(r"$\bf a.$ " + "Mean", loc="left", fontsize="medium")
+    # ax2.set_title(r"$\bf b.$ " + "Std.-dev.", loc="left", fontsize="medium")
+    # ax3.set_title(r"$\bf c.$ " + "Error", loc="left", fontsize="medium")
+
+
+def _figure_1_plot_errors(ax, result, result_reference, **style):
+
+    means_reference, *_, x_reference = result_reference
+
+    m, s, t, x = result
+    n = jnp.minimum(len(m), len(means_reference))
+    T, X = jnp.meshgrid(t[:n], x[:, 0])
+    error = jnp.abs(means_reference[:n] - m[:n])
+
+    ax.set_xticks(x[:, 0])
+    ax.set_yticks(t)
+    ax.set_xticklabels(())
+    ax.set_yticklabels(())
+    return figure_1_plot_contour(ax, X.T, T.T, error / (s[:n] + 1e-12) + 1e-12, **style)
+
+
+def _figure_1_plot_stds(ax, result, **style):
+
+    m, s, t, x = result
+    n = len(m)
+    T, X = jnp.meshgrid(t[:n], x[:, 0])
+
+    ax.set_xticks(x[:, 0])
+    ax.set_yticks(t)
+    ax.set_xticklabels(())
+    ax.set_yticklabels(())
+
+    return figure_1_plot_contour(ax, X.T, T.T, s + 1e-12, **style)
+
+
+def _figure_1_plot_means(ax, result, **style):
+
+    m, s, t, x = result
+    n = len(m)
+    T, X = jnp.meshgrid(t[:n], x[:, 0])
+
+    ax.contourf(X.T, T.T, m, **style)
+    ax.set_xticks(x[:, 0])
+    ax.set_yticks(t)
+    ax.set_xticklabels(())
+    ax.set_yticklabels(())
+
+    return ax
+
+
 def figure_1_load_results(*, prefix, path=PATH_RESULTS):
     path_means = path + prefix + "_means.npy"
     path_stds = path + prefix + "_stds.npy"
@@ -127,9 +349,9 @@ def figure_1_load_results(*, prefix, path=PATH_RESULTS):
     return means, stds, ts, xs
 
 
-def figure_1_plot_contour(ax, /, *args, **kwargs):
+def figure_1_plot_contour(ax, *args, **kwargs):
     """Contour lines with fill color and sharp edges."""
-    ax.contour(*args, **kwargs)
+    ax.contour(*args, **kwargs, linewidths=0.1)
     return ax.contourf(*args, **kwargs)
 
 
