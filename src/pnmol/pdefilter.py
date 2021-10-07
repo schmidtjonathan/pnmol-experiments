@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from pnmol import kernels
-from pnmol.base import iwp
+from pnmol.base import iwp, rv
 from pnmol.odetools import init, step
 
 
@@ -110,8 +110,9 @@ class PDEFilter(ABC):
             diffusion_squared_list.append(state.diffusion_squared_local)
             pass
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
-        cov_sqrtm_new = state.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
-        return state._replace(cov_sqrtm=cov_sqrtm_new), info
+        cov_sqrtm_new = state.y.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
+        new_y = rv.MultivariateNormal(state.y.mean, cov_sqrtm_new)
+        return state._replace(y=new_y), info
 
     def solution_generator(self, pde, /, *, stop_at=None, progressbar=False):
         """Generate ODE solver steps."""
