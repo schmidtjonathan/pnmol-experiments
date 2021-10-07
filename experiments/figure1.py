@@ -1,5 +1,5 @@
 """Code to generate figure 1."""
-
+import pathlib
 
 import jax.numpy as jnp
 import plotting
@@ -87,12 +87,16 @@ def read_mean_and_std_latent(sol, E0):
     return means, stds
 
 
-def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
+def save_result(result, /, *, prefix, path="experiments/results"):
+    path = pathlib.Path(path) / "figure1"
+    if not path.is_dir():
+        path.mkdir(parents=True)
+
     means, stds, ts, xs = result
-    path_means = path + prefix + "_means.npy"
-    path_stds = path + prefix + "_stds.npy"
-    path_ts = path + prefix + "_ts.npy"
-    path_xs = path + prefix + "_xs.npy"
+    path_means = path / (prefix + "_means.npy")
+    path_stds = path / (prefix + "_stds.npy")
+    path_ts = path / (prefix + "_ts.npy")
+    path_xs = path / (prefix + "_xs.npy")
     jnp.save(path_means, means)
     jnp.save(path_stds, stds)
     jnp.save(path_ts, ts)
