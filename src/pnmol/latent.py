@@ -5,71 +5,122 @@ import jax
 import jax.numpy as jnp
 
 from pnmol import pdefilter
-from pnmol.base import iwp, rv, sqrt, stacked_ssm
+from pnmol.base import rv, sqrt, stacked_ssm
 
 
 class _LatentForceEK1Base(pdefilter.PDEFilter):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.P0 = None
-        self.E0 = None
-        self.E1 = None
+
+        # Stacked state space model
+        self.ssm = None
+        self.state_iwp = None
+        self.lf_iwp = None
 
     def initialize(self, pde):
+        # The initialization of latent PDE filters is a bit complicated...
+        # It starts with assembling the state space components.
+        # Then, m0 and C0 are chosen as a standard Normal RV.
+        # Then, the state RV is updated on the PDE initial condition.
+        # This requires a tiny nugget, because we will continue conditioning the same RV.
+        # Then, the state RV and the latent RV are stacked together.
+        # The ODE is evaluated, and the stack of state and latent force
+        # is updated on an EK1-linearised PDE measurement (which includes the BCs).
+        # Altogether, this would be equivalent to initialising (y, \dot y0) accurately,
+        # and the rest with standard-normals.
+        # The specialty herein is that the BCs are used faithfully.
+        #
+        # To faithfully compare with e.g. tornadox,
+        # use the tornadox.Stack(use_df=False) initialization for the ODE filters.
+        #
+        # One thing that should not be discarded is that due to the updating nature here,
+        # the global diffusion MLE is affected (y0 and the PDE measurement are data).
 
-        X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
-
-        self.state_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.y0.shape[0],
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
-        )
-        self.lf_iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.y0.shape[0],
-            wp_diffusion_sqrtm=pde.E_sqrtm,
-        )
+        # [Initialize state-space model]
+        iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
+        self.state_iwp, self.lf_iwp = iwp, iwp
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
-        self.P0 = self.E0 = self.state_iwp.projection_matrix(0)
-        self.E1 = self.state_iwp.projection_matrix(1)
+        # [Initialize random variables]
 
-        # This is kind of wrong still... RK init should get the proper diffusion.
-        ivp = pde.to_tornadox_ivp()
-        extended_dy0, cov_sqrtm_state = self.init(
-            f=ivp.f,
-            df=ivp.df,
-            y0=ivp.y0,
-            t0=ivp.t0,
-            num_derivatives=self.state_iwp.num_derivatives,
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        # Shorthand access to the shapes of the initial conditions
+        n, d = self.num_derivatives + 1, pde.mesh_spatial.shape[0]
+
+        # Starting point for the initial conditions
+        # Dont make it a non-zero mean without updating the code below!
+        m0_state_raw = jnp.zeros((n, d))
+        m0_latent_raw = jnp.zeros((n, d))
+        m0_state_raw_flat = m0_state_raw.reshape((-1,), order="F")
+        m0_latent_raw_flat = m0_latent_raw.reshape((-1,), order="F")
+        c0 = self.diffuse_prior_scale * jnp.eye(n)  # shorthand
+        C0_sqrtm_state_raw = jnp.kron(diffusion_state_sqrtm, c0)
+        C0_sqrtm_latent_raw = jnp.kron(pde.E_sqrtm, c0)
+
+        # Update state on initial condition
+        z_y0, H_y0 = pde.y0, self.E0
+        C0_sqrtm_state_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt_no_meascov(
+            transition_matrix=H_y0,
+            cov_cholesky=C0_sqrtm_state_raw,
         )
-        dy0_padded = jnp.pad(
-            extended_dy0,
-            pad_width=((0, 0), (1, 1)),
-            mode="constant",
-            constant_values=0.0,
-        )
-        initmean = jnp.concatenate((pde.y0.reshape(1, -1), dy0_padded[1:, :]), axis=0)
-        mean = jnp.concatenate([initmean, jnp.zeros_like(initmean)], -1)
+        m0_state_flat_y0 = kgain_y0 @ z_y0  # prior mean was zero
 
-        cov_sqrtm_state_ = jnp.kron(diffusion_state_sqrtm, cov_sqrtm_state)
-        cov_sqrtm_eps = jnp.kron(pde.E_sqrtm, cov_sqrtm_state)
-
-        cov_sqrtm = jax.scipy.linalg.block_diag(
-            cov_sqrtm_state_,
-            cov_sqrtm_eps,
+        # Stack m0 and e0 together
+        m0_stack = jnp.hstack((m0_state_flat_y0, m0_latent_raw_flat))
+        C0_sqrtm_block = jax.scipy.linalg.block_diag(
+            C0_sqrtm_state_y0, C0_sqrtm_latent_raw
         )
 
-        y = rv.MultivariateNormal(mean=mean, cov_sqrtm=cov_sqrtm)
+        # Evaluate ODE at the initial condition
+        p_empty = jnp.eye(n * d)
+        z_pde, H_pde = self.evaluate_ode(
+            pde=pde,
+            p0=self.E0,
+            p1=self.E1,
+            m_pred=m0_stack,
+            t=pde.t0,
+            p_state=p_empty,
+            p_eps=p_empty,
+        )
+
+        # Update the stack of state and latent force on the PDE measurement.
+        matrix_nugget = 1e-10 * jnp.eye(d + pde.B.shape[0])
+        C0_sqrtm_state_latent, kgain, S_pde = sqrt.update_sqrt(
+            transition_matrix=H_pde,
+            cov_cholesky=C0_sqrtm_block,
+            meascov_sqrtm=matrix_nugget,
+        )
+        m0_state_latent = m0_stack - kgain @ (H_pde @ m0_stack - z_pde)
+
+        # Reshape carefully
+        m0_state, m0_latent = jnp.split(m0_state_latent, 2)
+        m0_state_reshaped = m0_state.reshape((n, d), order="F")
+        m0_latent_reshaped = m0_latent.reshape((n, d), order="F")
+        m0_state_latent_reshaped = jnp.concatenate(
+            (m0_state_reshaped, m0_latent_reshaped), axis=1
+        )
+
+        y = rv.MultivariateNormal(
+            mean=m0_state_latent_reshaped, cov_sqrtm=C0_sqrtm_state_latent
+        )
+
+        # Dont forget that the initial data affects the quasi-MLE for the diffusion!
+        S_y0, S_pde = S_sqrtm_y0 @ S_sqrtm_y0.T, S_pde @ S_pde.T
+        diffusion_squared_local_y0 = z_y0 @ jnp.linalg.solve(S_y0, z_y0) / z_y0.shape[0]
+        diffusion_squared_local_pde = (
+            (H_pde @ m0_stack - z_pde)
+            @ jnp.linalg.solve(S_pde, (H_pde @ m0_stack - z_pde))
+            / z_pde.shape[0]
+        )
 
         return pdefilter.PDEFilterState(
             t=pde.t0,
             y=y,
             error_estimate=None,
             reference_state=None,
-            diffusion_squared_local=0.0,
+            diffusion_squared_local=[
+                diffusion_squared_local_y0,
+                diffusion_squared_local_pde,
+            ],
         )
 
     def attempt_step(self, state, dt, pde):
@@ -114,9 +165,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
 
         # [Update]
-        Cl_new, K, Sl = sqrt.update_sqrt(
-            H, Clp, meascov_sqrtm=jnp.zeros((H.shape[0], H.shape[0]))
-        )
+        Cl_new, K, Sl = sqrt.update_sqrt_no_meascov(H, Clp)
         flat_m_new = mp - K @ z
 
         # Back into non-preconditioned space

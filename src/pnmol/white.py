@@ -9,24 +9,9 @@ from pnmol.base import iwp, rv, sqrt
 
 
 class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.P0 = None
-        self.E0 = None
-        self.E1 = None
-
     def initialize(self, pde):
 
-        X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
-
-        self.iwp = iwp.IntegratedWienerTransition(
-            num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.y0.shape[0],
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
-        )
-        self.P0 = self.E0 = self.iwp.projection_matrix(0)
-        self.E1 = self.iwp.projection_matrix(1)
+        self.iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
 
         # This is kind of wrong still... RK init should get the proper diffusion.
         ivp = pde.to_tornadox_ivp()
@@ -72,14 +57,13 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         mp = self.predict_mean(A, m)
 
         # Measure / calibrate
-        z, H = self.evaluate_ode(
+        z, H, E_with_bc_sqrtm = self.evaluate_ode(
             pde=pde,
             p0=self.E0 @ P,
             p1=self.E1 @ P,
             m_pred=mp,
             t=state.t + dt,
         )
-        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, pde.R_sqrtm)
         _, error = self.estimate_error(ql=Ql, z=z, h=H, E_sqrtm=E_with_bc_sqrtm)
         Clp = sqrt.propagate_cholesky_factor(A @ Cl, Ql)
 
@@ -143,7 +127,10 @@ class LinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
         H = jnp.vstack((H_ode, pde.B @ p0))
         shift = jnp.hstack((b, jnp.zeros(pde.B.shape[0])))
         z = H @ m_pred + shift
-        return z, H
+
+        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, pde.R_sqrtm)
+
+        return z, H, E_with_bc_sqrtm
 
 
 class SemiLinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
@@ -162,4 +149,7 @@ class SemiLinearWhiteNoiseEK1(_WhiteNoiseEK1Base):
         H = jnp.vstack((H_ode, B @ p0))
         shift = jnp.hstack((b, jnp.zeros(B.shape[0])))
         z = H @ m_pred + shift
-        return z, H
+
+        E_with_bc_sqrtm = jax.scipy.linalg.block_diag(pde.E_sqrtm, pde.R_sqrtm)
+
+        return z, H, E_with_bc_sqrtm

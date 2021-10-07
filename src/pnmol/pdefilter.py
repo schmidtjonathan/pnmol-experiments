@@ -10,6 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from pnmol import kernels
+from pnmol.base import iwp
 from pnmol.odetools import init, step
 
 
@@ -40,6 +41,7 @@ class PDEFilter(ABC):
         num_derivatives=2,
         initialization=None,
         spatial_kernel=None,
+        diffuse_prior_scale=1.0,
     ):
 
         # Step-size selection
@@ -59,6 +61,18 @@ class PDEFilter(ABC):
             spatial_kernel or kernels.Matern52() + kernels.WhiteNoise()
         )
 
+        # Different to common ODE filters, we always need those:
+        self.E0 = None
+        self.E1 = None
+
+        # Diffuse priors have an incredibly large initial covariance,
+        # which encodes unknown initial conditions.
+        # For PDE filters, this is governed by the diffuse_prior_scale
+        # parameter, which is multiplied with the initial cov_sqrtm
+        # before clever initialisation procedures.
+        # To make the prior diffuse, choose e.g. 10^3 as a scale.
+        self.diffuse_prior_scale = diffuse_prior_scale
+
     def __repr__(self):
         return f"{self.__class__.__name__}(num_derivatives={self.num_derivatives}, steprule={self.steprule}, initialization={self.init})"
 
@@ -75,7 +89,12 @@ class PDEFilter(ABC):
             times.append(state.t)
             means.append(state.y.mean)
             cov_sqrtms.append(state.y.cov_sqrtm)
-            diffusion_squared_list.append(state.diffusion_squared_local)
+
+            # The initialisation procedure yields a list of two local diffusions.
+            if isinstance(state.diffusion_squared_local, list):
+                diffusion_squared_list.extend(state.diffusion_squared_local)
+            else:
+                diffusion_squared_list.append(state.diffusion_squared_local)
 
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
 
@@ -214,6 +233,20 @@ class PDEFilter(ABC):
     @abstractmethod
     def attempt_step(self, state, dt, pde):
         raise NotImplementedError
+
+    def initialize_iwp(self, pde):
+
+        X = pde.mesh_spatial.points
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        prior = iwp.IntegratedWienerTransition(
+            num_derivatives=self.num_derivatives,
+            wiener_process_dimension=pde.y0.shape[0],
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        )
+        E0 = prior.projection_matrix(0)
+        E1 = prior.projection_matrix(1)
+
+        return prior, E0, E1, diffusion_state_sqrtm
 
 
 class _TimeStopper:

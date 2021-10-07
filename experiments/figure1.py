@@ -39,7 +39,9 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     steprule = tornadox.step.ConstantSteps(dt)
     ivp = pde.to_tornadox_ivp()
     ek1 = tornadox.ek1.ReferenceEK1(
-        num_derivatives=nu, steprule=steprule, initialization=tornadox.init.RungeKutta()
+        num_derivatives=nu,
+        steprule=steprule,
+        initialization=tornadox.init.Stack(use_df=False),
     )
     sol = ek1.solve(ivp, progressbar=progressbar)
     E0 = ek1.iwp.projection_matrix(0)
@@ -99,7 +101,7 @@ def save_result(result, /, *, prefix, path="experiments/results/figure1/"):
 
 # Hyperparameters (method)
 DT = 0.05
-DX = 0.1
+DX = 0.2
 HIGH_RES_FACTOR_DX = 10
 HIGH_RES_FACTOR_DT = 10
 NUM_DERIVATIVES = 2
@@ -107,8 +109,14 @@ NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
 PROGRESSBAR = True
 
+# todo: input scale MLE.
+# todo (cont.): the functionality is there, but where should it happen?
+# todo (cont.): in each problem example maybe?
+INPUT_SCALE = 1.0
+
+
 # Hyperparameters (problem)
-T0, TMAX = 0.0, 10.0
+T0, TMAX = 0.0, 3.0
 DIFFUSION_RATE = 0.035
 
 
@@ -117,9 +125,10 @@ PDE_PNMOL = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX,
-    stencil_size=STENCIL_SIZE,
+    stencil_size_interior=STENCIL_SIZE,
+    stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.SquareExponential(),
+    kernel=pnmol.kernels.SquareExponential(input_scale=INPUT_SCALE),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
@@ -127,9 +136,10 @@ PDE_TORNADOX = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX,
-    stencil_size=STENCIL_SIZE,
+    stencil_size_interior=STENCIL_SIZE,
+    stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.SquareExponential(),
+    kernel=pnmol.kernels.SquareExponential(input_scale=INPUT_SCALE),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
@@ -137,16 +147,17 @@ PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
     t0=T0,
     tmax=TMAX,
     dx=DX / HIGH_RES_FACTOR_DX,
-    stencil_size=STENCIL_SIZE,
+    stencil_size_interior=STENCIL_SIZE,
+    stencil_size_boundary=STENCIL_SIZE,
     diffusion_rate=DIFFUSION_RATE,
-    kernel=pnmol.kernels.SquareExponential(),
+    kernel=pnmol.kernels.SquareExponential(input_scale=INPUT_SCALE),
     nugget_gram_matrix_fd=NUGGET_COV_FD,
     bcond="dirichlet",
 )
 
 # Solve the PDE with the different methods
-KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-3)
-KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + KERNEL_NUGGET
+KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-2)
+KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52(input_scale=INPUT_SCALE) + KERNEL_NUGGET
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
     dt=DT,
