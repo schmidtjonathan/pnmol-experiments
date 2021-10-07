@@ -109,11 +109,8 @@ NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
 PROGRESSBAR = True
 
-# todo: input scale MLE.
-# todo (cont.): the functionality is there, but where should it happen?
-# todo (cont.): in each problem example maybe?
 INPUT_SCALE = 1.0
-
+INPUT_SCALE_MATERN = 1.0
 
 # Hyperparameters (problem)
 T0, TMAX = 0.0, 3.0
@@ -157,7 +154,9 @@ PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
 
 # Solve the PDE with the different methods
 KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-2)
-KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52(input_scale=INPUT_SCALE) + KERNEL_NUGGET
+KERNEL_DIFFUSION_PNMOL = (
+    pnmol.kernels.Matern52(input_scale=INPUT_SCALE_MATERN) + KERNEL_NUGGET
+)
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
     dt=DT,
