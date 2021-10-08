@@ -15,7 +15,7 @@ import tqdm
 import pnmol
 
 
-def solve_pde_reference(pde, *, dt, high_res_factor_dx, high_res_factor_dt):
+def solve_pde_reference(pde, *, high_res_factor_dx):
     t_eval = jnp.array([pde.tmax])
     ivp = pde.to_tornadox_ivp()
     sol = scipy.integrate.solve_ivp(ivp.f, ivp.t_span, ivp.y0, t_eval=t_eval)
@@ -25,20 +25,7 @@ def solve_pde_reference(pde, *, dt, high_res_factor_dx, high_res_factor_dt):
     assert mean.shape == (1, ivp.y0.size) == std.shape
     mean, std = mean.squeeze(), std.squeeze()  # (highres * dx,)
 
-    means = [
-        jnp.pad(m, pad_width=1, mode="constant", constant_values=0.0)[
-            ::high_res_factor_dx
-        ]
-        for m in jnp.split(mean, 3)
-    ]
-    stds = [
-        jnp.pad(s, pad_width=1, mode="constant", constant_values=0.0)[
-            ::high_res_factor_dx
-        ]
-        for s in jnp.split(std, 3)
-    ]
-    mean = jnp.concatenate(means)
-    std = jnp.concatenate(stds)
+    mean, std = mean[::high_res_factor_dx], std[::high_res_factor_dx]
 
     return mean, std, -1
 
@@ -56,6 +43,11 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
     E0 = ek1.iwp.projection_matrix(0)
     mean, std = read_mean_and_std(final_state, E0)
 
+    means = [m[1:-1] for m in jnp.split(mean, 3)]  # (dx, )
+    stds = [s[1:-1] for s in jnp.split(std, 3)]
+    mean = jnp.concatenate(means)
+    std = jnp.concatenate(stds)
+
     return mean, std, elapsed_time
 
 
@@ -72,17 +64,6 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
 
     E0 = ek1.iwp.projection_matrix(0)
     mean, std = read_mean_and_std(final_state, E0)
-
-    means = [
-        jnp.pad(m, pad_width=1, mode="constant", constant_values=0.0)
-        for m in jnp.split(mean, 3)
-    ]
-    stds = [
-        jnp.pad(s, pad_width=1, mode="constant", constant_values=0.0)
-        for s in jnp.split(std, 3)
-    ]
-    mean = jnp.concatenate(means)
-    std = jnp.concatenate(stds)
 
     return mean, std, elapsed_time
 
@@ -145,8 +126,7 @@ DXs = jnp.logspace(numpy.log10(0.1), numpy.log10(0.25), num=10, endpoint=True, b
 
 # Hyperparameters (method)
 
-HIGH_RES_FACTOR_DX = 5
-HIGH_RES_FACTOR_DT = 5
+HIGH_RES_FACTOR_DX = 1
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
@@ -233,8 +213,6 @@ for i_dx, dx in enumerate(DXs):
         )
         mean_reference, std_reference, elapsed_time_reference = solve_pde_reference(
             PDE_REFERENCE,
-            dt=dt / HIGH_RES_FACTOR_DT,
-            high_res_factor_dt=HIGH_RES_FACTOR_DT,
             high_res_factor_dx=HIGH_RES_FACTOR_DX,
         )
 
