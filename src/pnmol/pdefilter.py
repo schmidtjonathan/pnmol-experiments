@@ -107,7 +107,10 @@ class PDEFilter(ABC):
         state, info = None, None
         diffusion_squared_list = []
         for state, info in solution_generator:
-            diffusion_squared_list.append(state.diffusion_squared_local)
+            if isinstance(state.diffusion_squared_local, list):
+                diffusion_squared_list.extend(state.diffusion_squared_local)
+            else:
+                diffusion_squared_list.append(state.diffusion_squared_local)
             pass
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
         cov_sqrtm_new = state.y.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
