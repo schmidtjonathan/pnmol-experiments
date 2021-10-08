@@ -105,6 +105,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         diffusion_squared_local = (
             residual_white @ residual_white / residual_white.shape[0]
         )
+        error = dt * error
 
         # Push back to non-preconditioned state
         Cl_new = P @ Cl_new
@@ -137,7 +138,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         S = s_no_e + e
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
-        error = jnp.sqrt(jnp.diag(S))
+        error = jnp.sqrt(jnp.diag(S)) * sigma
         return sigma, error
 
     @abc.abstractstaticmethod

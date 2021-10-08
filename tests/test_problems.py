@@ -10,16 +10,18 @@ from pnmol.pde import examples, problems
 problems_1d_all = pytest.mark.parametrize(
     "prob1d",
     [
-        examples.heat_1d_discretized(dx=0.1, bcond="dirichlet"),
-        examples.heat_1d_discretized(dx=0.1, bcond="neumann"),
-        examples.sir_1d_discretized(),
-        examples.spruce_budworm_1d_discretized(bcond="dirichlet"),
-        examples.spruce_budworm_1d_discretized(bcond="neumann"),
+        examples.heat_1d_discretized(dx=0.2, bcond="dirichlet"),
+        examples.heat_1d_discretized(dx=0.2, bcond="neumann"),
+        examples.sir_1d_discretized(dx=0.2),
+        examples.lotka_volterra_1d_discretized(dx=0.2),
+        examples.spruce_budworm_1d_discretized(dx=0.2, bcond="dirichlet"),
+        examples.spruce_budworm_1d_discretized(dx=0.2, bcond="neumann"),
     ],
     ids=[
         "heat-dirichlet",
         "heat-neumann",
         "sir",
+        "lotka-volterra",
         "spruce-budworm-dirichlet",
         "spruce-budworm-neumann",
     ],
