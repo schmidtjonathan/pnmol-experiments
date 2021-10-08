@@ -89,7 +89,7 @@ def read_mean_and_std_latent(final_state, E0):
 
 
 def save_result(result, /, *, prefix, path="experiments/results"):
-    path = pathlib.Path(path) / "figure_main"
+    path = pathlib.Path(path) / "figure3"
     if not path.is_dir():
         path.mkdir(parents=True)
 
@@ -103,7 +103,7 @@ def save_result(result, /, *, prefix, path="experiments/results"):
 
 
 def save_dtdx(path="experiments/results"):
-    path = pathlib.Path(path) / "figure_main"
+    path = pathlib.Path(path) / "figure3"
     if not path.is_dir():
         path.mkdir(parents=True)
 

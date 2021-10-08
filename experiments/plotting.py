@@ -475,11 +475,11 @@ def figure_2(path=PATH_RESULTS):
 # "MAIN" EXPERIMENT FIGURE
 
 
-def figure_main(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
-    path = path + "figure_main/"
+def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
+    path = path + "figure3/"
     plt.style.use(STYLESHEETS)
 
-    results = [figure_main_load_results(prefix=method, path=path) for method in methods]
+    results = [figure3_load_results(prefix=method, path=path) for method in methods]
 
     figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
@@ -533,7 +533,7 @@ def figure_main(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     plt.show()
 
 
-def figure_main_load_results(*, prefix, path=PATH_RESULTS):
+def figure3_load_results(*, prefix, path=PATH_RESULTS):
     path_error = path + prefix + "_error.npy"
     path_std = path + prefix + "_std.npy"
     path_runtime = path + prefix + "_runtime.npy"
@@ -545,11 +545,11 @@ def figure_main_load_results(*, prefix, path=PATH_RESULTS):
     return error, std, runtime
 
 
-def figure_main_plot_contour(ax, /, *args, **kwargs):
+def figure3_plot_contour(ax, /, *args, **kwargs):
     """Contour lines with fill color and sharp edges."""
     ax.contour(*args, **kwargs)
     return ax.contourf(*args, **kwargs)
 
 
 if __name__ == "__main__":
-    figure_main()
+    figure3()
