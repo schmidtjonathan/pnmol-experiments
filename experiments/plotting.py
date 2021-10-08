@@ -493,10 +493,10 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
     DTDX = jnp.load(pathlib.Path(path) / "dtdx.npy")
     DTs, DXs = jnp.split(DTDX, 2, axis=0)
-    extents = [float(DTs.min()), float(DTs.max()), float(DXs.max()), float(DXs.min())]
+    extents = [float(DTs.min()), float(DTs.max()), float(DXs.min()), float(DXs.max())]
 
     for axis_row, result in zip(axes, results):
-        err_mat, std_mat, runtime_mat = result
+        err_mat, std_mat, runtime_mat = [jnp.flip(mat, 0) for mat in result]
         # axis_row[0].contour(DTs, DXs, err_mat)
         # axis_row[1].contour(DTs, DXs, std_mat)
         # axis_row[2].contour(DTs, DXs, runtime_mat)
