@@ -487,12 +487,12 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         ncols=3,
         dpi=200,
         figsize=figure_size,
-        sharex=True,
-        sharey=True,
     )
 
     DTDX = jnp.load(pathlib.Path(path) / "dtdx.npy")
     DTs, DXs = jnp.split(DTDX, 2, axis=0)
+    DTs, DXs = np.array(DTs).squeeze(), np.array(DXs).squeeze()
+
     extents = [float(DTs.min()), float(DTs.max()), float(DXs.min()), float(DXs.max())]
 
     for axis_row, result in zip(axes, results):
@@ -514,12 +514,12 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         fig.colorbar(im_std, ax=axis_row[1])
         fig.colorbar(im_rt, ax=axis_row[2])
 
-        # axis_row[0].set_xticks(DTs)
-        # axis_row[0].set_yticks(DXs)
-        # axis_row[1].set_xticks(DTs)
-        # axis_row[1].set_yticks(DXs)
-        # axis_row[2].set_xticks(DTs)
-        # axis_row[2].set_yticks(DXs)
+        axis_row[0].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
+        axis_row[0].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
+        axis_row[1].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
+        axis_row[1].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
+        axis_row[2].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
+        axis_row[2].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
 
     axes[0, 0].set_title("Error")
     axes[0, 1].set_title("STD")
@@ -528,6 +528,8 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     axes[1, 0].set_ylabel("PN+MOL\ndx")
     for bottom_ax in axes[-1, :]:
         bottom_ax.set_xlabel("dt")
+
+    fig.tight_layout()
 
     plt.savefig(path + "figure.pdf")
     plt.show()
