@@ -221,8 +221,8 @@ def lotka_volterra_1d(
     bbox = jnp.asarray(bbox)
 
     def y0_fun(x):
-        u0 = gaussian_bell_1d(1 - x)
-        v0 = gaussian_bell_1d(x)
+        u0 = 5 * jnp.ones_like(x)
+        v0 = 20.0 * gaussian_bell_1d(x)
         return jnp.concatenate((u0, v0))
 
     @jax.jit
@@ -297,7 +297,10 @@ def spruce_budworm_1d(
     bcond="dirichlet",
     growth_rate=1.0,
 ):
-    """Explained in https://www-m6.ma.tum.de/~kuttler/script_reaktdiff.pdf (ctrl+f for "spruce")"""
+    """Explained in https://www-m6.ma.tum.de/~kuttler/script_reaktdiff.pdf (ctrl+f for "spruce").
+
+    Also known as Fisher's equation: https://en.wikipedia.org/wiki/Fisher%27s_equation
+    """
     if bbox is None:
         bbox = [0.0, 1.0]
     bbox = jnp.asarray(bbox)

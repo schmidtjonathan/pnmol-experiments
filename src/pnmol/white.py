@@ -121,7 +121,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             y=rv.MultivariateNormal(m_new, Cl_new),
             diffusion_squared_local=diffusion_squared_local,
         )
-        info_dict = dict(num_f_evaluations=1)
+        info_dict = dict(num_f_evaluations=1, num_df_evaluations=1)
         return new_state, info_dict
 
     @staticmethod
