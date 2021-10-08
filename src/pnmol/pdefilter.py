@@ -156,8 +156,10 @@ class PDEFilter(ABC):
             ]
             info["num_attempted_steps"] += step_info["num_attempted_steps"]
             yield state, info
+
         if pbar is not None:
             pbar.update()
+            pbar.set_description(f"t={state.t:.4f}, dt={dt:.2E}")
             pbar.close()
 
     @staticmethod

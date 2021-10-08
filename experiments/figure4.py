@@ -6,47 +6,48 @@ import matplotlib.pyplot as plt
 
 import pnmol
 
-steps = pnmol.odetools.step.Adaptive(abstol=1e-5, reltol=1e-7)
 k = pnmol.kernels.duplicate(
-    pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(), num=3
+    pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(), num=2
 )
-solver = pnmol.white.SemiLinearWhiteNoiseEK1(steprule=steps, spatial_kernel=k)
 
-
-pde = pnmol.pde.examples.sir_1d_discretized(
+pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
     tmax=20.0,
-    dx=0.2,
-    diffusion_rate_S=0.1,
-    diffusion_rate_I=0.1,
-    diffusion_rate_R=0.1,
+    dx=0.05,
 )
 
+for tol in jnp.logspace(-1, -3, 5):
 
-sol = solver.solve(pde, progressbar=True)
+    steps = pnmol.odetools.step.Adaptive(abstol=0.01 * tol, reltol=tol)
+    solver = pnmol.white.SemiLinearWhiteNoiseEK1(steprule=steps, spatial_kernel=k)
 
-s, i, r = jnp.split(sol.mean, 3, axis=-1)
+    sol = solver.solve(pde, progressbar=True)
+    print(sol.info)
 
-fig, (
-    ax_dt,
-    ax_sol,
-    ax_single_curve1,
-    ax_single_curve2,
-    ax_single_curve3,
-) = plt.subplots(ncols=5)
+
+u, v = jnp.split(sol.mean, 2, axis=-1)
+
+fig, axes = plt.subplots(ncols=6)
+ax_dt, ax_sol1, ax_sol2 = axes[:3]
+ax_single_curve1, ax_single_curve2, ax_single_curve3 = axes[3:]
+
 
 ax_dt.semilogy(jnp.diff(sol.t))
+ax_dt.set_title("Step-size")
+
+ax_sol1.imshow(u[:, 0, :].T, aspect="auto", vmin=0.0, cmap="Blues")
+ax_sol2.imshow(v[:, 0, :].T, aspect="auto", vmin=0.0, cmap="Oranges")
+
+ax_sol1.set_title("Predators")
+ax_sol2.set_title("Prey")
 
 
-# bar = ax_sol.imshow(means[:, 0, :].T, aspect="auto", vmin=0.)
-# fig.colorbar(bar, ax=ax_sol)
+ax_single_curve1.plot(sol.t, u[:, 0, 0])
+ax_single_curve1.plot(sol.t, v[:, 0, 0])
+ax_single_curve2.plot(sol.t, u[:, 0, 10])
+ax_single_curve2.plot(sol.t, v[:, 0, 10])
+ax_single_curve3.plot(sol.t, u[:, 0, -1])
+ax_single_curve3.plot(sol.t, v[:, 0, -1])
 
-ax_single_curve1.plot(sol.t, s[:, 0, 0])
-ax_single_curve1.plot(sol.t, i[:, 0, 0])
-ax_single_curve1.plot(sol.t, r[:, 0, 0])
-ax_single_curve2.plot(sol.t, s[:, 0, 2])
-ax_single_curve2.plot(sol.t, i[:, 0, 2])
-ax_single_curve2.plot(sol.t, r[:, 0, 2])
-ax_single_curve3.plot(sol.t, s[:, 0, 4])
-ax_single_curve3.plot(sol.t, i[:, 0, 4])
-ax_single_curve3.plot(sol.t, r[:, 0, 4])
+for ax in [ax_single_curve1, ax_single_curve2, ax_single_curve3]:
+    ax.set_ylim((0.0, 25.0))
 plt.show()

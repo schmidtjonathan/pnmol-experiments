@@ -178,6 +178,76 @@ def sir_1d(
     )
 
 
+def lotka_volterra_1d_discretized(
+    *,
+    dx=0.05,
+    kernel=None,
+    nugget_gram_matrix_fd=0.0,
+    stencil_size_interior=3,
+    stencil_size_boundary=3,
+    **kwargs,
+):
+    pde = lotka_volterra_1d(**kwargs)
+    mesh_spatial = mesh.RectangularMesh.from_bbox_1d(pde.bbox, step=dx)
+
+    if kernel is None:
+        kernel = kernels.SquareExponential()
+
+    pde.discretize_system(
+        mesh_spatial=mesh_spatial,
+        kernel=kernel,
+        stencil_size_interior=stencil_size_interior,
+        stencil_size_boundary=stencil_size_boundary,
+        nugget_gram_matrix=nugget_gram_matrix_fd,
+    )
+    return pde
+
+
+def lotka_volterra_1d(
+    *,
+    bbox=None,
+    t0=0.0,
+    tmax=10.0,
+    a=0.5,
+    b=0.05,
+    c=0.05,
+    d=0.5,
+    diffusion_scale_u=0.1,
+    diffusion_scale_v=0.1,
+):
+
+    if bbox is None:
+        bbox = [0.0, 1.0]
+    bbox = jnp.asarray(bbox)
+
+    def y0_fun(x):
+        u0 = 5 * jnp.ones_like(x)
+        v0 = 20.0 * gaussian_bell_1d(x)
+        return jnp.concatenate((u0, v0))
+
+    @jax.jit
+    def f_lotka_volterra(_, x):
+        u, v = jnp.split(x, 2)
+        u_new = a * u - b * u * v
+        v_new = c * u * v - d * v
+        return jnp.concatenate((u_new, v_new))
+
+    df_lotka_volterra = jax.jit(jax.jacfwd(f_lotka_volterra, argnums=1))
+
+    laplace = diffops.laplace()
+    return problems.SystemSemiLinearEvolutionNeumann(
+        diffop=(laplace, laplace),
+        diffop_scale=(diffusion_scale_u, diffusion_scale_v),
+        bbox=bbox,
+        t0=t0,
+        tmax=tmax,
+        y0_fun=y0_fun,
+        f=f_lotka_volterra,
+        df=df_lotka_volterra,
+        df_diagonal=None,
+    )
+
+
 def spruce_budworm_1d_discretized(
     *,
     bbox=None,
@@ -227,7 +297,10 @@ def spruce_budworm_1d(
     bcond="dirichlet",
     growth_rate=1.0,
 ):
-    """Explained in https://www-m6.ma.tum.de/~kuttler/script_reaktdiff.pdf (ctrl+f for "spruce")"""
+    """Explained in https://www-m6.ma.tum.de/~kuttler/script_reaktdiff.pdf (ctrl+f for "spruce").
+
+    Also known as Fisher's equation: https://en.wikipedia.org/wiki/Fisher%27s_equation
+    """
     if bbox is None:
         bbox = [0.0, 1.0]
     bbox = jnp.asarray(bbox)
