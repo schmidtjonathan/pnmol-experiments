@@ -5,6 +5,7 @@ import pathlib
 import time
 
 import jax.numpy as jnp
+import matplotlib.pyplot as plt
 import numpy
 import plotting
 import scipy.integrate
@@ -19,23 +20,32 @@ def solve_pde_reference(pde, *, dt, high_res_factor_dx, high_res_factor_dt):
     ivp = pde.to_tornadox_ivp()
     sol = scipy.integrate.solve_ivp(ivp.f, ivp.t_span, ivp.y0, t_eval=t_eval)
 
-    means = sol.y.T
-    assert means.shape == (1, ivp.y0.size)
-    stds = 0.0 * sol.y.T
+    mean = sol.y.T
+    std = 0.0 * sol.y.T
+    assert mean.shape == (1, ivp.y0.size) == std.shape
+    mean, std = mean.squeeze(), std.squeeze()  # (highres * dx,)
 
-    means = jnp.pad(means, pad_width=1, mode="constant", constant_values=0.0)[
-        1:-1, ...
-    ][::high_res_factor_dt, ::high_res_factor_dx]
-    stds = jnp.pad(stds, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...][
-        ::high_res_factor_dt, ::high_res_factor_dx
+    means = [
+        jnp.pad(m, pad_width=1, mode="constant", constant_values=0.0)[
+            ::high_res_factor_dx
+        ]
+        for m in jnp.split(mean, 3)
     ]
+    stds = [
+        jnp.pad(s, pad_width=1, mode="constant", constant_values=0.0)[
+            ::high_res_factor_dx
+        ]
+        for s in jnp.split(std, 3)
+    ]
+    mean = jnp.concatenate(means)
+    std = jnp.concatenate(stds)
 
-    return means, stds, -1
+    return mean, std, -1
 
 
 def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
     steprule = pnmol.odetools.step.Constant(dt)
-    ek1 = pnmol.white.LinearWhiteNoiseEK1(
+    ek1 = pnmol.white.SemiLinearWhiteNoiseEK1(
         num_derivatives=nu, steprule=steprule, spatial_kernel=kernel
     )
 
@@ -63,8 +73,16 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     E0 = ek1.iwp.projection_matrix(0)
     mean, std = read_mean_and_std(final_state, E0)
 
-    mean = jnp.pad(mean, pad_width=1, mode="constant", constant_values=0.0)
-    std = jnp.pad(std, pad_width=1, mode="constant", constant_values=0.0)
+    means = [
+        jnp.pad(m, pad_width=1, mode="constant", constant_values=0.0)
+        for m in jnp.split(mean, 3)
+    ]
+    stds = [
+        jnp.pad(s, pad_width=1, mode="constant", constant_values=0.0)
+        for s in jnp.split(std, 3)
+    ]
+    mean = jnp.concatenate(means)
+    std = jnp.concatenate(stds)
 
     return mean, std, elapsed_time
 
@@ -115,11 +133,14 @@ def save_dtdx(path="experiments/results"):
 
 # Ranges
 DTs = jnp.logspace(
-    numpy.log10(0.001), numpy.log10(0.01), num=15, endpoint=True, base=10
-)  # jnp.logspace(-2, 0, num=25)
-DXs = jnp.logspace(
-    numpy.log10(0.1), numpy.log10(0.25), num=15, endpoint=True, base=10
-)  # jnp.logspace(-2, 0, num=25)
+    # numpy.log10(0.001), numpy.log10(0.01), num=10, endpoint=True, base=10
+    numpy.log10(0.05),
+    numpy.log10(0.5),
+    num=10,
+    endpoint=True,
+    base=10,
+)
+DXs = jnp.logspace(numpy.log10(0.1), numpy.log10(0.25), num=10, endpoint=True, base=10)
 
 
 # Hyperparameters (method)
@@ -132,7 +153,7 @@ STENCIL_SIZE = 3
 PROGRESSBAR = True
 
 # Hyperparameters (problem)
-T0, TMAX = 0.0, 4.0
+T0, TMAX = 0.0, 40.0
 DIFFUSION_RATE = 0.035
 
 
@@ -155,45 +176,49 @@ for i_dx, dx in enumerate(DXs):
     for i_dt, dt in enumerate(DTs):
         i_exp = i_exp + 1
 
-        print(
-            f"\n======| Experiment {i_exp} of {num_exp_total} +++ dt={dt}, dx={dx} \n"
-        )
-
         # PDE problems
-        PDE_PNMOL = pnmol.pde.examples.heat_1d_discretized(
+        PDE_PNMOL = pnmol.pde.examples.sir_1d_discretized(
             t0=T0,
             tmax=TMAX,
             dx=dx,
-            stencil_size=STENCIL_SIZE,
-            diffusion_rate=DIFFUSION_RATE,
-            kernel=pnmol.kernels.SquareExponential(),
+            stencil_size_interior=STENCIL_SIZE,
+            stencil_size_boundary=STENCIL_SIZE,
+            diffusion_rate_S=DIFFUSION_RATE,
+            diffusion_rate_I=DIFFUSION_RATE,
+            diffusion_rate_R=DIFFUSION_RATE,
             nugget_gram_matrix_fd=NUGGET_COV_FD,
-            bcond="dirichlet",
         )
-        PDE_TORNADOX = pnmol.pde.examples.heat_1d_discretized(
+        PDE_TORNADOX = pnmol.pde.examples.sir_1d_discretized(
             t0=T0,
             tmax=TMAX,
             dx=dx,
-            stencil_size=STENCIL_SIZE,
-            diffusion_rate=DIFFUSION_RATE,
-            kernel=pnmol.kernels.SquareExponential(),
+            stencil_size_interior=STENCIL_SIZE,
+            stencil_size_boundary=STENCIL_SIZE,
+            diffusion_rate_S=DIFFUSION_RATE,
+            diffusion_rate_I=DIFFUSION_RATE,
+            diffusion_rate_R=DIFFUSION_RATE,
             nugget_gram_matrix_fd=NUGGET_COV_FD,
-            bcond="dirichlet",
         )
-        PDE_REFERENCE = pnmol.pde.examples.heat_1d_discretized(
+        PDE_REFERENCE = pnmol.pde.examples.sir_1d_discretized(
             t0=T0,
             tmax=TMAX,
             dx=dx / HIGH_RES_FACTOR_DX,
-            stencil_size=STENCIL_SIZE,
-            diffusion_rate=DIFFUSION_RATE,
-            kernel=pnmol.kernels.SquareExponential(),
+            stencil_size_interior=STENCIL_SIZE,
+            stencil_size_boundary=STENCIL_SIZE,
+            diffusion_rate_S=DIFFUSION_RATE,
+            diffusion_rate_I=DIFFUSION_RATE,
+            diffusion_rate_R=DIFFUSION_RATE,
             nugget_gram_matrix_fd=NUGGET_COV_FD,
-            bcond="dirichlet",
+        )
+        dim = PDE_PNMOL.y0.size
+        print(
+            f"\n======| Experiment {i_exp} of {num_exp_total} +++ dt={dt}, dx={dx} (state dimension: {dim} = 3 * {dim//3}) \n"
         )
 
         # Solve the PDE with the different methods
-        KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-3)
-        KERNEL_DIFFUSION_PNMOL = pnmol.kernels.Matern52() + KERNEL_NUGGET
+        KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(
+            pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(), num=3
+        )
 
         mean_white, std_white, elapsed_time_white = solve_pde_pnmol_white(
             PDE_PNMOL,
