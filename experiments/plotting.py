@@ -454,16 +454,16 @@ def figure_2(path=PATH_RESULTS):
     ax_E_dense.set_xticks(())
     ax_E_dense.set_yticks(())
 
-    ax_L_sparse.set_title(r"$\bf a.$ " + "$D$ (sparse)", loc="left", fontsize="medium")
-    ax_E_sparse.set_title(r"$\bf b.$ " + "$E$ (sparse)", loc="left", fontsize="medium")
-    ax_L_dense.set_title(r"$\bf c.$ " + "$D$ (dense)", loc="left", fontsize="medium")
-    ax_E_dense.set_title(r"$\bf d.$ " + "$E$ (dense)", loc="left", fontsize="medium")
+    ax_L_sparse.set_title(r"$\bf a.$ " + "Diff. matrix", loc="left", fontsize="medium")
+    ax_E_sparse.set_title(r"$\bf b.$ " + "Error cov.", loc="left", fontsize="medium")
+    ax_L_dense.set_title(r"$\bf c.$ " + "Diff. matrix", loc="left", fontsize="medium")
+    ax_E_dense.set_title(r"$\bf d.$ " + "Error cov.", loc="left", fontsize="medium")
 
     ax_rmse.set_title(
         r"$\bf e.$ " + "RMSE vs. Stencil Size", loc="left", fontsize="medium"
     )
     ax_curve.set_title(
-        r"$\bf f.$ " + "Solution / Laplacian / Samples", loc="left", fontsize="medium"
+        r"$\bf f.$ " + "Solution / Prior samples", loc="left", fontsize="medium"
     )
 
     plt.savefig(path + "figure.pdf", dpi=300)

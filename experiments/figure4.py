@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-for dx in [0.015, 0.03]:
+for dx in [0.01, 0.05]:
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
@@ -25,7 +25,7 @@ for dx in [0.015, 0.03]:
     )
     ivp = pde.to_tornadox_ivp()
 
-    ref_scale = 16
+    ref_scale = 6
     pde_ref = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx / ref_scale,
@@ -39,7 +39,7 @@ for dx in [0.015, 0.03]:
         jax.jit(ivp_ref.f),
         ivp_ref.t_span,
         y0=ivp_ref.y0,
-        method="DOP853",
+        method="LSODA",
         atol=1e-10,
         rtol=1e-10,
         t_eval=(ivp_ref.t0, ivp_ref.tmax),
