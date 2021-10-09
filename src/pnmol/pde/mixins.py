@@ -178,13 +178,13 @@ class IVPConversionLinearMixIn(_IVPConversionMixInInterface):
 
         self._check_ivp_conversion_conditions()
 
+        @jax.jit
         def f_new(_, x):
-            assert x.ndim == 1
             x_padded = self.bc_pad(x)
             x_new = self.L @ x_padded
             return self.bc_remove_pad(x_new)
 
-        df_new = jax.jacfwd(f_new, argnums=1)
+        df_new = jax.jit(jax.jacfwd(f_new, argnums=1))
         y0_new = self.bc_remove_pad(self.y0)
         return tornadox.ivp.InitialValueProblem(
             f=f_new, df=df_new, y0=y0_new, t0=self.t0, tmax=self.tmax, df_diagonal=None
@@ -197,12 +197,13 @@ class IVPConversionSemiLinearMixIn(_IVPConversionMixInInterface):
     def to_tornadox_ivp(self):
         self._check_ivp_conversion_conditions()
 
+        @jax.jit
         def f_new(t, x):
             x_padded = self.bc_pad(x)
             x_new = self.L @ x_padded + self.f(t, x_padded)
             return self.bc_remove_pad(x_new)
 
-        df_new = jax.jacfwd(f_new, argnums=1)
+        df_new = jax.jit(jax.jacfwd(f_new, argnums=1))
         y0_new = self.bc_remove_pad(self.y0)
         return tornadox.ivp.InitialValueProblem(
             f=f_new, df=df_new, y0=y0_new, t0=self.t0, tmax=self.tmax, df_diagonal=None
@@ -230,12 +231,14 @@ class _SystemBoundaryConditionMixinInterface(_BoundaryConditionMixInInterface):
         self.bc = bc
         super().__init__(**kwargs)
 
+    @functools.partial(jax.jit, static_argnums=0)
     def bc_pad(self, x):
         n = len(self.diffop)
         x_reshaped = x.reshape((n, -1))
         x_split_padded = jnp.apply_along_axis(self.bc.bc_pad, -1, x_reshaped)
         return x_split_padded.reshape((-1,))
 
+    @functools.partial(jax.jit, static_argnums=0)
     def bc_remove_pad(self, x):
         n = len(self.diffop)
         x_reshaped = x.reshape((n, -1))
@@ -256,9 +259,11 @@ class SystemDirichletMixIn(_SystemBoundaryConditionMixinInterface):
 class NeumannMixIn(_BoundaryConditionMixInInterface):
     """Neumann condition functionality for PDE problems."""
 
+    @functools.partial(jax.jit, static_argnums=0)
     def bc_pad(self, x):
         return jnp.pad(x, pad_width=1, mode="edge")
 
+    @functools.partial(jax.jit, static_argnums=0)
     def bc_remove_pad(self, x):
         return x[1:-1]
 
@@ -270,9 +275,11 @@ class DirichletMixIn(_BoundaryConditionMixInInterface):
         self.neumann = NeumannMixIn()
         super().__init__(**kwargs)
 
+    @functools.partial(jax.jit, static_argnums=0)
     def bc_pad(self, x):
         return jnp.pad(x, pad_width=1, mode="constant", constant_values=0.0)
 
+    @functools.partial(jax.jit, static_argnums=0)
     def bc_remove_pad(self, x):
         return x[1:-1]
 
