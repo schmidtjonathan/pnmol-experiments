@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-for dx in [0.01, 0.05]:
+for dx in [0.01, 0.025, 0.05]:
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
@@ -25,7 +25,7 @@ for dx in [0.01, 0.05]:
     )
     ivp = pde.to_tornadox_ivp()
 
-    ref_scale = 6
+    ref_scale = 7
     pde_ref = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx / ref_scale,
@@ -71,7 +71,7 @@ for dx in [0.01, 0.05]:
     scipy_nsteps = []
 
     # dts = jnp.logspace(0., -3, 1, endpoint=True)
-    dts = jnp.logspace(0.0, -2.5, 12, endpoint=True)
+    dts = jnp.logspace(0.0, -3.0, 12, endpoint=True)
     for dt in dts:
 
         # [PNMOL] Solve

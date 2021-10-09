@@ -393,7 +393,7 @@ def figure_2(path=PATH_RESULTS):
         jnp.abs(E_sparse @ E_sparse.T) + clip_value,
         **cmap,
         aspect="auto",
-        norm=LogNorm(),
+        norm=LogNorm(vmin=clip_value),
     )
     ax_E_dense.imshow(
         jnp.abs(E_dense @ E_dense.T) + clip_value, **cmap, aspect="auto", norm=LogNorm()
@@ -420,8 +420,8 @@ def figure_2(path=PATH_RESULTS):
 
     ax_curve.plot(x, fx, label="u(x)", color="black", linestyle="dashed")
     ax_curve.plot(x, dfx, label="$\Delta u(x)$", color="black")
-    ax_curve.plot(x, s2, **s1_style, alpha=0.6)
-    ax_curve.plot(x, s3, **s2_style, alpha=0.6)
+    ax_curve.plot(x, s2, **s1_style, alpha=0.4)
+    ax_curve.plot(x, s3, **s2_style, alpha=0.4)
 
     endmarker_style = {
         "marker": "o",
@@ -472,7 +472,7 @@ def figure_2(path=PATH_RESULTS):
 
 def figure_4():
 
-    dxs = [0.05, 0.025]
+    dxs = [0.025, 0.01]
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.6 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
@@ -522,8 +522,25 @@ def figure_4():
 
     axes[0].set_ylabel("RMSE")
     axes[0].legend(
-        handlelength=4, fontsize="x-small", fancybox=False, edgecolor="black"
+        loc="upper right",
+        handlelength=2.5,
+        fontsize="x-small",
+        fancybox=False,
+        edgecolor="black",
     ).get_frame().set_linewidth(0.5)
+
+    for ax in axes:
+        ax.grid(which="minor", axis="y", linewidth=0.5, linestyle="dotted", alpha=0.75)
+
+    ax_nsteps.set_title(
+        r"$\bf a.$ " + "RMSE vs. Number of time-steps", loc="left", fontsize="medium"
+    )
+    ax_runtime.set_title(
+        r"$\bf b.$ " + "RMSE vs. Run time", loc="left", fontsize="medium"
+    )
+    ax_chi2.set_title(
+        r"$\bf c.$ " + "RMSE vs. Calibration", loc="left", fontsize="medium"
+    )
 
     ax_chi2.axvspan(0.01, 100.0, color="gray", alpha=0.2)
     plt.savefig("./experiments/results/figure4/figure.pdf", dpi=300)
