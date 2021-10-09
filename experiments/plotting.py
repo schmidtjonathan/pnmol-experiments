@@ -468,3 +468,63 @@ def figure_2(path=PATH_RESULTS):
 
     plt.savefig(path + "figure.pdf", dpi=300)
     plt.show()
+
+
+def figure_4():
+
+    dxs = [0.05, 0.025]
+
+    figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.6 * AISTATS_TEXTWIDTH_SINGLE)
+    fig, axes = plt.subplots(
+        ncols=3, sharey=True, figsize=figsize, dpi=200, constrained_layout=True
+    )
+    ax_nsteps, ax_runtime, ax_chi2 = axes
+
+    for dx, ls in zip(dxs, [":", "-"]):
+        path = "./experiments/results/figure4/" + f"dx_{dx}_"
+
+        style_mol = {"color": "C0", "label": f"MOL (dx={dx})"}
+        style_pnmol = {"color": "C1", "label": f"PNMOL (dx={dx})"}
+        style_scipy = {"color": "gray", "label": f"SciPy (dx={dx})"}
+        style_all = {"linestyle": ls, "marker": "."}
+
+        plt.style.use(STYLESHEETS)
+
+        # dt = jnp.load(path + "dts.npy")
+
+        mol_rmse = jnp.load(path + "mol_rmse.npy")
+        mol_chi2 = jnp.load(path + "mol_chi2.npy")
+        mol_nsteps = jnp.load(path + "mol_nsteps.npy")
+        mol_time = jnp.load(path + "mol_time.npy")
+
+        pnmol_rmse = jnp.load(path + "pnmol_rmse.npy")
+        pnmol_chi2 = jnp.load(path + "pnmol_chi2.npy")
+        pnmol_nsteps = jnp.load(path + "pnmol_nsteps.npy")
+        pnmol_time = jnp.load(path + "pnmol_time.npy")
+
+        scipy_rmse = jnp.load(path + "scipy_rmse.npy")
+        scipy_nsteps = jnp.load(path + "scipy_nsteps.npy")
+        scipy_time = jnp.load(path + "scipy_time.npy")
+
+        ax_nsteps.set_xlabel("Number of time-steps")
+        ax_nsteps.loglog(mol_nsteps, mol_rmse, **style_mol, **style_all)
+        ax_nsteps.loglog(pnmol_nsteps, pnmol_rmse, **style_pnmol, **style_all)
+        # ax_nsteps.loglog(scipy_nsteps, scipy_rmse, **style_scipy, **style_all)
+
+        ax_runtime.set_xlabel("Run time [s]")
+        ax_runtime.loglog(mol_time, mol_rmse, **style_mol, **style_all)
+        ax_runtime.loglog(pnmol_time, pnmol_rmse, **style_pnmol, **style_all)
+        # ax_runtime.loglog(scipy_time, scipy_rmse, **style_scipy, **style_all)
+
+        ax_chi2.set_xlabel(r"$\chi^2$-statistic")
+        ax_chi2.loglog(mol_chi2, mol_rmse, **style_mol, **style_all)
+        ax_chi2.loglog(pnmol_chi2, pnmol_rmse, **style_pnmol, **style_all)
+
+    axes[0].set_ylabel("RMSE")
+    axes[0].legend(
+        handlelength=4, fontsize="x-small", fancybox=False, edgecolor="black"
+    ).get_frame().set_linewidth(0.5)
+
+    ax_chi2.axvspan(0.01, 100.0, color="gray", alpha=0.2)
+    plt.savefig("./experiments/results/figure4/figure.pdf", dpi=300)
+    plt.show()

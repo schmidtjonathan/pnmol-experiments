@@ -107,11 +107,13 @@ class PDEFilter(ABC):
         state, info = None, None
         diffusion_squared_list = []
         for state, info in solution_generator:
-            diffusion_squared_list.append(state.diffusion_squared_local)
-            pass
+            if isinstance(state.diffusion_squared_local, list):
+                diffusion_squared_list.extend(state.diffusion_squared_local)
+            else:
+                diffusion_squared_list.append(state.diffusion_squared_local)
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
-        cov_sqrtm_new = state.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
-        return state._replace(cov_sqrtm=cov_sqrtm_new), info
+        cov_sqrtm_new = state.y.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
+        return state._replace(y=state.y._replace(cov_sqrtm=cov_sqrtm_new)), info
 
     def solution_generator(self, pde, /, *, stop_at=None, progressbar=False):
         """Generate ODE solver steps."""
