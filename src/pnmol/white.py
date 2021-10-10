@@ -48,8 +48,8 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
             cov_cholesky=C0_sqrtm_y0,
             meascov_sqrtm=E_sqrtm_pde + matrix_nugget,
         )
-        residual_pde = H_pde @ m0_flat_y0 - z_pde
-        m0 = m0_flat_y0 - kgain @ residual_pde
+        # residual_pde = H_pde @ m0_flat_y0 - z_pde
+        m0 = m0_flat_y0 - kgain @ z_pde
 
         # Reshape and initialise the RV
         m0_reshaped = m0.reshape((n, d), order="F")
@@ -59,7 +59,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         S_y0, S_pde = S_sqrtm_y0 @ S_sqrtm_y0.T, S_pde @ S_pde.T
         diffusion_squared_local_y0 = z_y0 @ jnp.linalg.solve(S_y0, z_y0) / z_y0.shape[0]
         diffusion_squared_local_pde = (
-            residual_pde @ jnp.linalg.solve(S_pde, residual_pde) / residual_pde.shape[0]
+            z_pde @ jnp.linalg.solve(S_pde, z_pde) / z_pde.shape[0]
         )
 
         return pdefilter.PDEFilterState(
@@ -72,6 +72,20 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
                 diffusion_squared_local_pde,
             ],
         )
+
+    def initialize_iwp(self, pde):
+
+        X = pde.mesh_spatial.points
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        prior = iwp.IntegratedWienerTransition(
+            num_derivatives=self.num_derivatives,
+            wiener_process_dimension=pde.y0.shape[0],
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        )
+        E0 = prior.projection_matrix(0)
+        E1 = prior.projection_matrix(1)
+
+        return prior, E0, E1, diffusion_state_sqrtm
 
     def attempt_step(self, state, dt, pde):
         P, Pinv = self.iwp.nordsieck_preconditioner(dt=dt)

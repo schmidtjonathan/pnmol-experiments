@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 
 from pnmol import pdefilter
-from pnmol.base import rv, sqrt, stacked_ssm
+from pnmol.base import iwp, rv, sqrt, stacked_ssm
 
 
 class _LatentForceEK1Base(pdefilter.PDEFilter):
@@ -37,8 +37,13 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         # the global diffusion MLE is affected (y0 and the PDE measurement are data).
 
         # [Initialize state-space model]
-        iwp, self.E0, self.E1, diffusion_state_sqrtm = self.initialize_iwp(pde=pde)
-        self.state_iwp, self.lf_iwp = iwp, iwp
+        (
+            self.state_iwp,
+            self.lf_iwp,
+            self.E0,
+            self.E1,
+            diffusion_state_sqrtm,
+        ) = self.initialize_iwp_latent(pde=pde)
         self.ssm = stacked_ssm.StackedSSM(processes=[self.state_iwp, self.lf_iwp])
 
         # [Initialize random variables]
@@ -65,7 +70,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         m0_state_flat_y0 = kgain_y0 @ z_y0  # prior mean was zero
 
         # Stack m0 and e0 together
-        m0_stack = jnp.hstack((m0_state_flat_y0, m0_latent_raw_flat))
+        m0_stack = jnp.concatenate((m0_state_flat_y0, m0_latent_raw_flat))
         C0_sqrtm_block = jax.scipy.linalg.block_diag(
             C0_sqrtm_state_y0, C0_sqrtm_latent_raw
         )
@@ -89,7 +94,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             cov_cholesky=C0_sqrtm_block,
             meascov_sqrtm=matrix_nugget,
         )
-        m0_state_latent = m0_stack - kgain @ (H_pde @ m0_stack - z_pde)
+        m0_state_latent = m0_stack - kgain @ z_pde
 
         # Reshape carefully
         m0_state, m0_latent = jnp.split(m0_state_latent, 2)
@@ -107,9 +112,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         S_y0, S_pde = S_sqrtm_y0 @ S_sqrtm_y0.T, S_pde @ S_pde.T
         diffusion_squared_local_y0 = z_y0 @ jnp.linalg.solve(S_y0, z_y0) / z_y0.shape[0]
         diffusion_squared_local_pde = (
-            (H_pde @ m0_stack - z_pde)
-            @ jnp.linalg.solve(S_pde, (H_pde @ m0_stack - z_pde))
-            / z_pde.shape[0]
+            z_pde @ jnp.linalg.solve(S_pde, z_pde) / z_pde.shape[0]
         )
 
         return pdefilter.PDEFilterState(
@@ -122,6 +125,25 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
                 diffusion_squared_local_pde,
             ],
         )
+
+    def initialize_iwp_latent(self, pde):
+
+        X = pde.mesh_spatial.points
+        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
+        prior_state = iwp.IntegratedWienerTransition(
+            num_derivatives=self.num_derivatives,
+            wiener_process_dimension=pde.y0.shape[0],
+            wp_diffusion_sqrtm=diffusion_state_sqrtm,
+        )
+        prior_latent = iwp.IntegratedWienerTransition(
+            num_derivatives=self.num_derivatives,
+            wiener_process_dimension=pde.y0.shape[0],
+            wp_diffusion_sqrtm=pde.E_sqrtm,
+        )
+        E0 = prior_latent.projection_matrix(0)
+        E1 = prior_latent.projection_matrix(1)
+
+        return prior_state, prior_latent, E0, E1, diffusion_state_sqrtm
 
     def attempt_step(self, state, dt, pde):
 
