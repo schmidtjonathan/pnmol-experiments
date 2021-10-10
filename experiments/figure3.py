@@ -4,6 +4,7 @@ import itertools
 import pathlib
 import time
 
+import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
 import numpy
@@ -19,27 +20,19 @@ def solve_pde_reference(pde, *, high_res_factor_dx):
     t_eval = jnp.array([pde.tmax])
     ivp = pde.to_tornadox_ivp()
     sol = scipy.integrate.solve_ivp(
-        ivp.f, ivp.t_span, ivp.y0, t_eval=t_eval, atol=1e-10, rtol=1e-10
+        jax.jit(ivp.f), ivp.t_span, ivp.y0, t_eval=t_eval, atol=1e-10, rtol=1e-10
     )
 
     mean = sol.y.T
-    std = 0.0 * sol.y.T
-    assert mean.shape == (1, ivp.y0.size) == std.shape
-    mean, std = mean.squeeze(), std.squeeze()  # (highres * dx,)
+    assert mean.shape == (1, ivp.y0.size)
+    mean = mean.squeeze()
 
     means = [
         m[high_res_factor_dx - 1 :: high_res_factor_dx] for m in jnp.split(mean, 3)
     ]  # (dx, )
-    stds = [s[high_res_factor_dx - 1 :: high_res_factor_dx] for s in jnp.split(std, 3)]
     mean = jnp.concatenate(means)
-    std = jnp.concatenate(stds)
 
-    return (
-        mean,
-        std,
-        None,
-        None,
-    )
+    return mean
 
 
 def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
@@ -95,6 +88,14 @@ def read_mean_and_std_and_cov(final_state, E0):
     # print(final_state.y.mean.shape, final_state.y.cov_sqrtm.shape)
     mean = final_state.y.mean[0, :]
     cov = E0 @ (final_state.y.cov_sqrtm @ final_state.y.cov_sqrtm.T) @ E0.T
+    assert jnp.allclose(
+        jnp.diagonal(cov),
+        E0 @ jnp.diagonal(final_state.y.cov_sqrtm @ final_state.y.cov_sqrtm.T),
+    )
+    print(
+        jnp.diagonal(cov),
+        E0 @ jnp.diagonal(final_state.y.cov_sqrtm @ final_state.y.cov_sqrtm.T),
+    )
     std = jnp.sqrt(jnp.diagonal(cov))
     return mean, std, cov
 
@@ -190,14 +191,8 @@ for i_dx, dx in enumerate(sorted(DXs)):
         diffusion_rate_R=DIFFUSION_RATE,
         nugget_gram_matrix_fd=NUGGET_COV_FD,
     )
-    (
-        mean_reference,
-        std_reference,
-        cov_reference,
-        elapsed_time_reference,
-    ) = solve_pde_reference(
-        PDE_REFERENCE,
-        high_res_factor_dx=HIGH_RES_FACTOR_DX,
+    mean_reference = solve_pde_reference(
+        PDE_REFERENCE, high_res_factor_dx=HIGH_RES_FACTOR_DX
     )
     for i_dt, dt in enumerate(DTs):
         i_exp = i_exp + 1
