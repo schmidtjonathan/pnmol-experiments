@@ -49,7 +49,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         # [Initialize random variables]
 
         # Shorthand access to the shapes of the initial conditions
-        n, d = self.num_derivatives + 1, pde.mesh_spatial.shape[0]
+        n, d = self.num_derivatives + 1, pde.L.shape[0]
 
         # Starting point for the initial conditions
         # Dont make it a non-zero mean without updating the code below!
@@ -62,10 +62,17 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         C0_sqrtm_latent_raw = jnp.kron(pde.E_sqrtm, c0)
 
         # Update state on initial condition
+        # There is a clash with the certain initial conditions (via y0)
+        # and the assumed-to-be-certain boundary conditions (below).
+        # Until this is made up for (can it even?), we add a nugget on the diagonal
+        # of the observation covariance matrices (i.e. assume a larg(ish) meascov).
+        # Both get the same nugget. This fixes most of the issue.
         z_y0, H_y0 = pde.y0, self.E0
-        C0_sqrtm_state_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt_no_meascov(
+        matrix_nugget = 1e-6 * jnp.eye(d)
+        C0_sqrtm_state_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt(
             transition_matrix=H_y0,
             cov_cholesky=C0_sqrtm_state_raw,
+            meascov_sqrtm=matrix_nugget,
         )
         m0_state_flat_y0 = kgain_y0 @ z_y0  # prior mean was zero
 
@@ -88,7 +95,7 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
         )
 
         # Update the stack of state and latent force on the PDE measurement.
-        matrix_nugget = 1e-10 * jnp.eye(d + pde.B.shape[0])
+        matrix_nugget = 1e-6 * jnp.eye(d + pde.B.shape[0])
         C0_sqrtm_state_latent, kgain, S_pde = sqrt.update_sqrt(
             transition_matrix=H_pde,
             cov_cholesky=C0_sqrtm_block,

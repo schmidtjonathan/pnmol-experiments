@@ -25,10 +25,17 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         C0_sqrtm_raw = jnp.kron(diffusion_state_sqrtm, c0)
 
         # Update state on initial condition
+        # There is a clash with the certain initial conditions (via y0)
+        # and the assumed-to-be-certain boundary conditions (below).
+        # Until this is made up for (can it even?), we add a nugget on the diagonal
+        # of the observation covariance matrices (i.e. assume a larg(ish) meascov).
+        # Both get the same nugget. This fixes most of the issue.
         z_y0, H_y0 = pde.y0, self.E0
-        C0_sqrtm_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt_no_meascov(
+        matrix_nugget = 1e-6 * jnp.eye(d)
+        C0_sqrtm_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt(
             transition_matrix=H_y0,
             cov_cholesky=C0_sqrtm_raw,
+            meascov_sqrtm=matrix_nugget,
         )
         m0_flat_y0 = kgain_y0 @ z_y0  # prior mean was zero
 
@@ -42,7 +49,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         )
 
         # Update the stack of state and latent force on the PDE measurement.
-        matrix_nugget = 1e-10 * jnp.eye(d + pde.B.shape[0])
+        matrix_nugget = 1e-6 * jnp.eye(d + pde.B.shape[0])
         C0_sqrtm, kgain, S_pde = sqrt.update_sqrt(
             transition_matrix=H_pde,
             cov_cholesky=C0_sqrtm_y0,
