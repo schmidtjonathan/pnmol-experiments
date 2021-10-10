@@ -484,46 +484,74 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
         nrows=len(methods),
-        ncols=3,
+        ncols=4,
         dpi=200,
         figsize=figure_size,
     )
 
-    DTDX = jnp.load(pathlib.Path(path) / "dtdx.npy")
-    DTs, DXs = jnp.split(DTDX, 2, axis=0)
-    DTs, DXs = np.array(DTs).squeeze(), np.array(DXs).squeeze()
-
-    extents = [float(DTs.min()), float(DTs.max()), float(DXs.min()), float(DXs.max())]
-
     for axis_row, result in zip(axes, results):
-        err_mat, std_mat, runtime_mat = [jnp.flip(mat, 0) for mat in result]
+        err_mat, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
+        extents = [
+            float(DTs.min()),
+            float(DTs.max()),
+            float(DXs.max()),
+            float(DXs.min()),
+        ]
+        print(std_mat)
         # axis_row[0].contour(DTs, DXs, err_mat)
         # axis_row[1].contour(DTs, DXs, std_mat)
         # axis_row[2].contour(DTs, DXs, runtime_mat)
         im_err = axis_row[0].imshow(
-            err_mat, aspect="auto", norm=LogNorm(), extent=extents
+            # DTs,
+            # DXs,
+            err_mat,
+            norm=LogNorm(),
+            extent=extents,
+            aspect="auto",
         )
         im_std = axis_row[1].imshow(
-            std_mat, aspect="auto", norm=LogNorm(), extent=extents
+            # DTs,
+            # DXs,
+            std_mat,
+            norm=LogNorm(),
+            extent=extents,
+            aspect="auto",
         )
-        im_rt = axis_row[2].imshow(
-            runtime_mat, aspect="auto", norm=LogNorm(), extent=extents
+        im_calib = axis_row[2].imshow(
+            # DTs,
+            # DXs,
+            chi2_mat,
+            norm=LogNorm(),
+            extent=extents,
+            aspect="auto",
         )
+        im_rt = axis_row[3].imshow(
+            # DTs,
+            # DXs,
+            runtime_mat,
+            norm=LogNorm(),
+            extent=extents,
+            aspect="auto",
+        )
+        print(DTs)
+        print(DXs)
 
         fig.colorbar(im_err, ax=axis_row[0])
         fig.colorbar(im_std, ax=axis_row[1])
-        fig.colorbar(im_rt, ax=axis_row[2])
+        fig.colorbar(im_calib, ax=axis_row[2])
+        fig.colorbar(im_rt, ax=axis_row[3])
 
-        axis_row[0].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
-        axis_row[0].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
-        axis_row[1].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
-        axis_row[1].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
-        axis_row[2].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
-        axis_row[2].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
+        # axis_row[0].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
+        # axis_row[0].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
+        # axis_row[1].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
+        # axis_row[1].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
+        # axis_row[2].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
+        # axis_row[2].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
 
     axes[0, 0].set_title("Error")
     axes[0, 1].set_title("STD")
-    axes[0, 2].set_title("Runtime")
+    axes[0, 2].set_title("Calibration")
+    axes[0, 3].set_title("Runtime")
     axes[0, 0].set_ylabel("PNMOL\ndx")
     axes[1, 0].set_ylabel("PN+MOL\ndx")
     for bottom_ax in axes[-1, :]:
@@ -536,15 +564,22 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
 
 def figure3_load_results(*, prefix, path=PATH_RESULTS):
+    print(path)
     path_error = path + prefix + "_error.npy"
     path_std = path + prefix + "_std.npy"
+    path_chi2 = path + prefix + "_chi2.npy"
     path_runtime = path + prefix + "_runtime.npy"
+    path_dt = path + (prefix + "_dt.npy")
+    path_dx = path + (prefix + "_dx.npy")
 
     error = jnp.load(path_error)
     std = jnp.load(path_std)
+    chi2 = jnp.load(path_chi2)
     runtime = jnp.load(path_runtime)
+    dt = jnp.load(path_dt)
+    dx = jnp.load(path_dx)
 
-    return error, std, runtime
+    return error, std, chi2, runtime, dt, dx
 
 
 def figure3_plot_contour(ax, /, *args, **kwargs):
