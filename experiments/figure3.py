@@ -88,14 +88,6 @@ def read_mean_and_std_and_cov(final_state, E0):
     # print(final_state.y.mean.shape, final_state.y.cov_sqrtm.shape)
     mean = final_state.y.mean[0, :]
     cov = E0 @ (final_state.y.cov_sqrtm @ final_state.y.cov_sqrtm.T) @ E0.T
-    assert jnp.allclose(
-        jnp.diagonal(cov),
-        E0 @ jnp.diagonal(final_state.y.cov_sqrtm @ final_state.y.cov_sqrtm.T),
-    )
-    print(
-        jnp.diagonal(cov),
-        E0 @ jnp.diagonal(final_state.y.cov_sqrtm @ final_state.y.cov_sqrtm.T),
-    )
     std = jnp.sqrt(jnp.diagonal(cov))
     return mean, std, cov
 
@@ -252,7 +244,7 @@ for i_dx, dx in enumerate(sorted(DXs)):
         RESULT_TORNADOX["error"][i_dx, i_dt] = error_tornadox
         RESULT_TORNADOX["std"][i_dx, i_dt] = mean_std_tornadox
         RESULT_TORNADOX["runtime"][i_dx, i_dt] = elapsed_time_tornadox
-        RESULT_WHITE["chi2"][i_dx, i_dt] = chi2_tornadox
+        RESULT_TORNADOX["chi2"][i_dx, i_dt] = chi2_tornadox
         RESULT_TORNADOX["dt"][i_dx, i_dt] = dt
         RESULT_TORNADOX["dx"][i_dx, i_dt] = dx
 
