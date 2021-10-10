@@ -341,33 +341,6 @@ def spruce_budworm_1d(
     raise ValueError
 
 
-def nonlinear_wave():
-    bbox = [0.0, 10.0]
-    t0 = 0.0
-    tmax = 1.0
-
-    def sol(t, x, p=jnp.sqrt(2.0) / 2.0):
-        return 1.0 / (1 + jnp.exp(p * (x - p * t)))
-
-    def f(t, x):
-        return x ** 2 * (1.0 - x)
-
-    y0_fun = partial(sol, t=t0)
-    diffop = diffops.laplace()
-
-    return problems.SemiLinearEvolutionDirichlet(
-        t0=t0,
-        tmax=tmax,
-        y0_fun=y0_fun,
-        bbox=bbox,
-        diffop=diffops.laplace(),
-        diffop_scale=diffusion_rate,
-        f=f_spruce,
-        df=df_spruce,
-        df_diagonal=None,
-    )
-
-
 # A bunch of initial condition defaults. They all adhere to Dirichlet conditions.
 
 
