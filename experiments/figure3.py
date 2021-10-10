@@ -190,6 +190,15 @@ for i_dx, dx in enumerate(sorted(DXs)):
         diffusion_rate_R=DIFFUSION_RATE,
         nugget_gram_matrix_fd=NUGGET_COV_FD,
     )
+    (
+        mean_reference,
+        std_reference,
+        cov_reference,
+        elapsed_time_reference,
+    ) = solve_pde_reference(
+        PDE_REFERENCE,
+        high_res_factor_dx=HIGH_RES_FACTOR_DX,
+    )
     for i_dt, dt in enumerate(DTs):
         i_exp = i_exp + 1
 
@@ -213,15 +222,6 @@ for i_dx, dx in enumerate(sorted(DXs)):
             elapsed_time_tornadox,
         ) = solve_pde_tornadox(
             PDE_PNMOL, dt=dt, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
-        )
-        (
-            mean_reference,
-            std_reference,
-            cov_reference,
-            elapsed_time_reference,
-        ) = solve_pde_reference(
-            PDE_REFERENCE,
-            high_res_factor_dx=HIGH_RES_FACTOR_DX,
         )
 
         error_white_abs = jnp.abs(mean_white - mean_reference)
