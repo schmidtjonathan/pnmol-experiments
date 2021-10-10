@@ -472,9 +472,9 @@ def figure_2(path=PATH_RESULTS):
 
 def figure_4():
 
-    dxs = [0.025, 0.01]
+    dxs = [0.05, 0.01]
 
-    figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.6 * AISTATS_TEXTWIDTH_SINGLE)
+    figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
         ncols=3, sharey=True, figsize=figsize, dpi=200, constrained_layout=True
     )
