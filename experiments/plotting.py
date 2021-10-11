@@ -481,66 +481,102 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
         nrows=len(methods),
-        ncols=4,
+        ncols=5,
         dpi=400,
         figsize=figure_size,
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
     )
 
-    vmin_err = jnp.minimum(results[0][0].min(), results[1][0].min())
-    vmax_err = jnp.maximum(results[0][0].max(), results[1][0].max())
+    vmin_err_rel = jnp.minimum(results[0][0].min(), results[1][0].min())
+    vmax_err_rel = jnp.maximum(results[0][0].max(), results[1][0].max())
 
+    vmin_err_abs = jnp.minimum(results[0][1].min(), results[1][1].min())
+    vmax_err_abs = jnp.maximum(results[0][1].max(), results[1][1].max())
+
+    vmin_std = jnp.minimum(results[0][2].min(), results[1][2].min())
+    vmax_std = jnp.maximum(results[0][2].max(), results[1][2].max())
+
+    vmin_calib = jnp.minimum(results[0][3].min(), results[1][3].min())
+    vmax_calib = jnp.maximum(results[0][3].max(), results[1][3].max())
+
+    vmin_time = jnp.minimum(results[0][4].min(), results[1][4].min())
+    vmax_time = jnp.maximum(results[0][4].max(), results[1][4].max())
+
+    nicer_method_name = {"tornadox": "MOL", "pnmol_white": "PNMOL"}
     for axis_row, method, result in zip(axes, methods, results):
-        axis_row[0].set_ylabel(f"{method}\ndx")
-        err_mat, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
+        axis_row[0].set_ylabel(f"{nicer_method_name[method]}\ndx")
+        err_mat_rel, err_mat_abs, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
         extents = [
             float(DTs.min()),
             float(DTs.max()),
             float(DXs.max()),
             float(DXs.min()),
         ]
-
-        im_err = axis_row[0].imshow(
-            err_mat,
+        style = {"cmap": "RdYlBu"}
+        im_err_rel = axis_row[0].imshow(
+            err_mat_rel,
             norm=LogNorm(
-                vmin=vmin_err,
-                vmax=vmax_err,
+                vmin=vmin_err_rel,
+                vmax=vmax_err_rel,
             ),
             extent=extents,
             aspect="auto",
+            **style,
         )
-        im_std = axis_row[1].imshow(
+        im_err_abs = axis_row[1].imshow(
+            err_mat_abs,
+            norm=LogNorm(
+                vmin=vmin_err_abs,
+                vmax=vmax_err_abs,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style,
+        )
+        im_std = axis_row[2].imshow(
             std_mat,
-            norm=LogNorm(),
+            norm=LogNorm(
+                vmin=vmin_std,
+                vmax=vmax_std,
+            ),
             extent=extents,
             aspect="auto",
+            **style,
         )
-        im_calib = axis_row[2].imshow(
+        im_calib = axis_row[3].imshow(
             chi2_mat,
-            norm=LogNorm(),
+            norm=LogNorm(
+                vmin=vmin_calib,
+                vmax=vmax_calib,
+            ),
             extent=extents,
             aspect="auto",
+            **style,
         )
-        im_rt = axis_row[3].imshow(
+        im_rt = axis_row[4].imshow(
             runtime_mat,
-            norm=LogNorm(),
+            norm=LogNorm(vmin=vmin_time, vmax=vmax_time),
             extent=extents,
             aspect="auto",
+            **style,
         )
 
-        fig.colorbar(im_err, ax=axis_row[0])
-        fig.colorbar(im_std, ax=axis_row[1])
-        fig.colorbar(im_calib, ax=axis_row[2])
-        fig.colorbar(im_rt, ax=axis_row[3])
+        fig.colorbar(im_err_rel, ax=axis_row[0])
+        fig.colorbar(im_err_abs, ax=axis_row[1])
+        fig.colorbar(im_std, ax=axis_row[2])
+        fig.colorbar(im_calib, ax=axis_row[3])
+        fig.colorbar(im_rt, ax=axis_row[4])
 
-    axes[0, 0].set_title("Error")
-    axes[0, 1].set_title("STD")
-    axes[0, 2].set_title("Calibration")
-    axes[0, 3].set_title("Runtime")
+    axes[0, 0].set_title("Relative Error", fontsize="medium")
+    axes[0, 1].set_title("Absolute Error", fontsize="medium")
+    axes[0, 2].set_title("Std. dev.", fontsize="medium")
+    axes[0, 3].set_title(r"$\chi^2$-statistic", fontsize="medium")
+    axes[0, 4].set_title("Run time [s]", fontsize="medium")
 
     for bottom_ax in axes[-1, :]:
         bottom_ax.set_xlabel("dt")
-
-    fig.tight_layout()
 
     plt.savefig(path + "figure.pdf")
     plt.show()
@@ -548,21 +584,23 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
 def figure3_load_results(*, prefix, path=PATH_RESULTS):
     print(path)
-    path_error = path + prefix + "_error_abs.npy"
+    path_error_rel = path + prefix + "_error_rel.npy"
+    path_error_abs = path + prefix + "_error_abs.npy"
     path_std = path + prefix + "_std.npy"
     path_chi2 = path + prefix + "_chi2.npy"
     path_runtime = path + prefix + "_runtime.npy"
     path_dt = path + (prefix + "_dt.npy")
     path_dx = path + (prefix + "_dx.npy")
 
-    error = jnp.load(path_error)
+    error_rel = jnp.load(path_error_rel)
+    error_abs = jnp.load(path_error_abs)
     std = jnp.load(path_std)
     chi2 = jnp.load(path_chi2)
     runtime = jnp.load(path_runtime)
     dt = jnp.load(path_dt)
     dx = jnp.load(path_dx)
 
-    return error, std, chi2, runtime, dt, dx
+    return error_rel, error_abs, std, chi2, runtime, dt, dx
 
 
 def figure3_plot_contour(ax, /, *args, **kwargs):
