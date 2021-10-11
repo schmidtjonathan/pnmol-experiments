@@ -133,7 +133,7 @@ STENCIL_SIZE = 3
 PROGRESSBAR = True
 
 # Hyperparameters (problem)
-T0, TMAX = 0.0, 6.0
+T0, TMAX = 0.0, 15.0
 DIFFUSION_RATE = 0.035
 
 
@@ -211,10 +211,24 @@ for i_dx, dx in enumerate(sorted(DXs)):
             PDE_PNMOL, dt=dt, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
         )
 
-        assert not (jnp.any(jnp.isnan(mean_white)) or jnp.any(jnp.isnan(cov_white)))
-        assert not (
-            jnp.any(jnp.isnan(mean_tornadox)) or jnp.any(jnp.isnan(cov_tornadox))
-        )
+        if (
+            jnp.any(jnp.isnan(mean_white))
+            or jnp.any(jnp.isnan(cov_white))
+            or jnp.any(mean_white < 1e-10)
+            or jnp.any(cov_white < 1e-10)
+            or jnp.any(mean_white > 1e10)
+            or jnp.any(cov_white > 1e10)
+        ):
+            print("Warning: NaN in white")
+        if (
+            jnp.any(jnp.isnan(mean_tornadox))
+            or jnp.any(jnp.isnan(cov_tornadox))
+            or jnp.any(mean_tornadox < 1e-10)
+            or jnp.any(cov_tornadox < 1e-10)
+            or jnp.any(mean_tornadox > 1e10)
+            or jnp.any(cov_tornadox > 1e10)
+        ):
+            print("Warning: NaN in tornadox")
 
         error_white_abs = jnp.abs(mean_white - mean_reference)
         error_tornadox_abs = jnp.abs(mean_tornadox - mean_reference)
