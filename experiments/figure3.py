@@ -40,7 +40,8 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
     )
 
     start = time.time()
-    final_state, _ = ek1.simulate_final_state(pde, progressbar=progressbar)
+    with jax.disable_jit():
+        final_state, _ = ek1.simulate_final_state(pde, progressbar=progressbar)
     elapsed_time = time.time() - start
 
     E0 = ek1.iwp.projection_matrix(0)
@@ -66,7 +67,8 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     )
 
     start = time.time()
-    final_state, info = ek1.simulate_final_state(ivp, progressbar=progressbar)
+    with jax.disable_jit():
+        final_state, info = ek1.simulate_final_state(ivp, progressbar=progressbar)
     elapsed_time = time.time() - start
 
     E0 = ek1.iwp.projection_matrix(0)
@@ -116,7 +118,7 @@ DTs = jnp.logspace(
     # numpy.log10(0.001), numpy.log10(0.5), num=10, endpoint=True, base=10
     numpy.log10(0.01),
     numpy.log10(2.5),
-    num=12,
+    num=9,
     endpoint=True,
     base=10,
 )
@@ -124,9 +126,8 @@ DTs = jnp.logspace(
 DXs = 1.0 / (2.0 ** jnp.arange(2, 6))
 
 # Hyperparameters (method)
-
 HIGH_RES_FACTOR_DX = 6
-NUM_DERIVATIVES = 2
+NUM_DERIVATIVES = 1
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
 PROGRESSBAR = True
