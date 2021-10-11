@@ -472,7 +472,7 @@ def figure_2(path=PATH_RESULTS):
 
 def figure_4():
 
-    dxs = [0.05, 0.01]
+    dxs = [0.025]
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
@@ -484,8 +484,8 @@ def figure_4():
         path = "./experiments/results/figure4/" + f"dx_{dx}_"
 
         style_mol = {"color": "C0", "label": f"MOL (dx={dx})"}
-        style_pnmol = {"color": "C1", "label": f"PNMOL (dx={dx})"}
-        style_scipy = {"color": "gray", "label": f"SciPy (dx={dx})"}
+        style_pnmol_white = {"color": "C1", "label": f"PNMOL (white; dx={dx})"}
+        style_pnmol_latent = {"color": "C2", "label": f"PNMOL (latent; dx={dx})"}
         style_all = {"linestyle": ls, "marker": "."}
 
         plt.style.use(STYLESHEETS)
@@ -497,28 +497,42 @@ def figure_4():
         mol_nsteps = jnp.load(path + "mol_nsteps.npy")
         mol_time = jnp.load(path + "mol_time.npy")
 
-        pnmol_rmse = jnp.load(path + "pnmol_rmse.npy")
-        pnmol_chi2 = jnp.load(path + "pnmol_chi2.npy")
-        pnmol_nsteps = jnp.load(path + "pnmol_nsteps.npy")
-        pnmol_time = jnp.load(path + "pnmol_time.npy")
+        pnmol_white_rmse = jnp.load(path + "pnmol_white_rmse.npy")
+        pnmol_white_chi2 = jnp.load(path + "pnmol_white_chi2.npy")
+        pnmol_white_nsteps = jnp.load(path + "pnmol_white_nsteps.npy")
+        pnmol_white_time = jnp.load(path + "pnmol_white_time.npy")
 
-        scipy_rmse = jnp.load(path + "scipy_rmse.npy")
-        scipy_nsteps = jnp.load(path + "scipy_nsteps.npy")
-        scipy_time = jnp.load(path + "scipy_time.npy")
+        pnmol_latent_rmse = jnp.load(path + "pnmol_latent_rmse.npy")
+        pnmol_latent_chi2 = jnp.load(path + "pnmol_latent_chi2.npy")
+        pnmol_latent_nsteps = jnp.load(path + "pnmol_latent_nsteps.npy")
+        pnmol_latent_time = jnp.load(path + "pnmol_latent_time.npy")
 
         ax_nsteps.set_xlabel("Number of time-steps")
         ax_nsteps.loglog(mol_nsteps, mol_rmse, **style_mol, **style_all)
-        ax_nsteps.loglog(pnmol_nsteps, pnmol_rmse, **style_pnmol, **style_all)
-        # ax_nsteps.loglog(scipy_nsteps, scipy_rmse, **style_scipy, **style_all)
+        ax_nsteps.loglog(
+            pnmol_white_nsteps, pnmol_white_rmse, **style_pnmol_white, **style_all
+        )
+        ax_nsteps.loglog(
+            pnmol_latent_nsteps, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+        )
 
         ax_runtime.set_xlabel("Run time [s]")
         ax_runtime.loglog(mol_time, mol_rmse, **style_mol, **style_all)
-        ax_runtime.loglog(pnmol_time, pnmol_rmse, **style_pnmol, **style_all)
-        # ax_runtime.loglog(scipy_time, scipy_rmse, **style_scipy, **style_all)
+        ax_runtime.loglog(
+            pnmol_white_time, pnmol_white_rmse, **style_pnmol_white, **style_all
+        )
+        ax_runtime.loglog(
+            pnmol_latent_time, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+        )
 
         ax_chi2.set_xlabel(r"$\chi^2$-statistic")
         ax_chi2.loglog(mol_chi2, mol_rmse, **style_mol, **style_all)
-        ax_chi2.loglog(pnmol_chi2, pnmol_rmse, **style_pnmol, **style_all)
+        ax_chi2.loglog(
+            pnmol_white_chi2, pnmol_white_rmse, **style_pnmol_white, **style_all
+        )
+        ax_chi2.loglog(
+            pnmol_latent_chi2, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+        )
 
     axes[0].set_ylabel("RMSE")
     axes[0].legend(
