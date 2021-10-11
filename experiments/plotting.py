@@ -569,12 +569,17 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         fig.colorbar(im_calib, ax=axis_row[3])
         fig.colorbar(im_rt, ax=axis_row[4])
 
-    axes[0, 0].set_title("Relative Error", fontsize="medium")
-    axes[0, 1].set_title("Absolute Error", fontsize="medium")
-    axes[0, 2].set_title("Std. dev.", fontsize="medium")
-    axes[0, 3].set_title(r"$\chi^2$-statistic", fontsize="medium")
-    axes[0, 4].set_title("Run time [s]", fontsize="medium")
+    axes[0, 0].set_title(r"$\bf a1$. Relative Error", fontsize="small", loc="left")
+    axes[0, 1].set_title(r"$\bf a2$. Absolute Error", fontsize="small", loc="left")
+    axes[0, 2].set_title(r"$\bf a3$. Std. dev.", fontsize="small", loc="left")
+    axes[0, 3].set_title(r"$\bf a4$. $\chi^2$-statistic", fontsize="small", loc="left")
+    axes[0, 4].set_title(r"$\bf a5$. Run time [s]", fontsize="small", loc="left")
 
+    axes[1, 0].set_title(r"$\bf b1$.", fontsize="small", loc="left")
+    axes[1, 1].set_title(r"$\bf b2$.", fontsize="small", loc="left")
+    axes[1, 2].set_title(r"$\bf b3$.", fontsize="small", loc="left")
+    axes[1, 3].set_title(r"$\bf b4$.", fontsize="small", loc="left")
+    axes[1, 4].set_title(r"$\bf b5$.", fontsize="small", loc="left")
     for bottom_ax in axes[-1, :]:
         bottom_ax.set_xlabel("dt")
 
