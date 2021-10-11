@@ -115,19 +115,18 @@ def save_result(result, /, *, prefix, path="experiments/results"):
 # Ranges
 DTs = jnp.logspace(
     # numpy.log10(0.001), numpy.log10(0.5), num=10, endpoint=True, base=10
-    numpy.log10(0.05),
-    numpy.log10(0.5),
+    numpy.log10(0.01),
+    numpy.log10(2.5),
     num=10,
     endpoint=True,
     base=10,
 )
-DXs = jnp.array(
-    [0.01, 0.0125, 0.025, 0.05, 0.1, 0.2]
-)  # 1.0 / (2.0 ** jnp.arange(2, 5))
+
+DXs = 1.0 / (2.0 ** jnp.arange(2, 6))
 
 # Hyperparameters (method)
 
-HIGH_RES_FACTOR_DX = 4
+HIGH_RES_FACTOR_DX = 6
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
