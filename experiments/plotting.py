@@ -489,7 +489,11 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         figsize=figure_size,
     )
 
-    for axis_row, result in zip(axes, results):
+    vmin_err = jnp.minimum(results[0][0].min(), results[1][0].min())
+    vmax_err = jnp.maximum(results[0][0].max(), results[1][0].max())
+
+    for axis_row, method, result in zip(axes, methods, results):
+        axis_row[0].set_ylabel(f"{method}\ndx")
         err_mat, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
         extents = [
             float(DTs.min()),
@@ -497,63 +501,45 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
             float(DXs.max()),
             float(DXs.min()),
         ]
-        print(std_mat)
-        # axis_row[0].contour(DTs, DXs, err_mat)
-        # axis_row[1].contour(DTs, DXs, std_mat)
-        # axis_row[2].contour(DTs, DXs, runtime_mat)
+
         im_err = axis_row[0].imshow(
-            # DTs,
-            # DXs,
             err_mat,
-            norm=LogNorm(),
+            norm=LogNorm(
+                vmin=vmin_err,
+                vmax=vmax_err,
+            ),
             extent=extents,
             aspect="auto",
         )
         im_std = axis_row[1].imshow(
-            # DTs,
-            # DXs,
             std_mat,
             norm=LogNorm(),
             extent=extents,
             aspect="auto",
         )
         im_calib = axis_row[2].imshow(
-            # DTs,
-            # DXs,
             chi2_mat,
             norm=LogNorm(),
             extent=extents,
             aspect="auto",
         )
         im_rt = axis_row[3].imshow(
-            # DTs,
-            # DXs,
             runtime_mat,
             norm=LogNorm(),
             extent=extents,
             aspect="auto",
         )
-        print(DTs)
-        print(DXs)
 
         fig.colorbar(im_err, ax=axis_row[0])
         fig.colorbar(im_std, ax=axis_row[1])
         fig.colorbar(im_calib, ax=axis_row[2])
         fig.colorbar(im_rt, ax=axis_row[3])
 
-        # axis_row[0].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
-        # axis_row[0].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
-        # axis_row[1].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
-        # axis_row[1].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
-        # axis_row[2].set_xticks(DTs[np.array([0, 5, 8, 9])].round(2))
-        # axis_row[2].set_yticks(DXs[np.array([0, 5, 8, 9])].round(2))
-
     axes[0, 0].set_title("Error")
     axes[0, 1].set_title("STD")
     axes[0, 2].set_title("Calibration")
     axes[0, 3].set_title("Runtime")
-    axes[0, 0].set_ylabel("PNMOL\ndx")
-    axes[1, 0].set_ylabel("PN+MOL\ndx")
+
     for bottom_ax in axes[-1, :]:
         bottom_ax.set_xlabel("dt")
 
