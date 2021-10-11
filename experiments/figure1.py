@@ -1,8 +1,6 @@
 """Code to generate figure 1."""
 
 
-import warnings
-
 import jax
 import jax.numpy as jnp
 import plotting
@@ -10,8 +8,6 @@ import scipy.integrate
 import tornadox
 
 import pnmol
-
-warnings.filterwarnings("ignore")
 
 
 def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):

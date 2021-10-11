@@ -2,7 +2,6 @@
 
 
 import time
-import warnings
 
 import jax
 import jax.numpy as jnp
@@ -11,8 +10,6 @@ import tornadox
 from scipy.integrate import solve_ivp
 
 import pnmol
-
-warnings.filterwarnings("ignore")
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 

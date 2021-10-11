@@ -1,5 +1,4 @@
 import abc
-import warnings
 from functools import partial
 
 import jax
@@ -160,11 +159,6 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         sigma_squared = z @ jnp.linalg.solve(S, z) / z.shape[0]
         sigma = jnp.sqrt(sigma_squared)
         error = jnp.sqrt(jnp.diag(S)) * sigma
-
-        if jnp.any(jnp.diag(s_no_e) < jnp.diag(e)):
-            warnings.warn(
-                "The PDE noise is larger than time-discretisation error. Choose a smaller dx and retry."
-            )
         return sigma, error
 
     @abc.abstractstaticmethod
