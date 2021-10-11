@@ -40,7 +40,7 @@ class PDEFilter(ABC):
         steprule=None,
         num_derivatives=2,
         spatial_kernel=None,
-        diffuse_prior_scale=1.0,
+        diffuse_prior_scale=1e0,
     ):
 
         # Step-size selection
@@ -111,11 +111,9 @@ class PDEFilter(ABC):
                 diffusion_squared_list.extend(state.diffusion_squared_local)
             else:
                 diffusion_squared_list.append(state.diffusion_squared_local)
-            pass
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
         cov_sqrtm_new = state.y.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
-        new_y = rv.MultivariateNormal(state.y.mean, cov_sqrtm_new)
-        return state._replace(y=new_y), info
+        return state._replace(y=state.y._replace(cov_sqrtm=cov_sqrtm_new)), info
 
     def solution_generator(self, pde, /, *, stop_at=None, progressbar=False):
         """Generate ODE solver steps."""
@@ -235,20 +233,6 @@ class PDEFilter(ABC):
     @abstractmethod
     def attempt_step(self, state, dt, pde):
         raise NotImplementedError
-
-    def initialize_iwp(self, pde):
-
-        X = pde.mesh_spatial.points
-        diffusion_state_sqrtm = jnp.linalg.cholesky(self.spatial_kernel(X, X.T))
-        prior = iwp.IntegratedWienerTransition(
-            num_derivatives=self.num_derivatives,
-            wiener_process_dimension=pde.y0.shape[0],
-            wp_diffusion_sqrtm=diffusion_state_sqrtm,
-        )
-        E0 = prior.projection_matrix(0)
-        E1 = prior.projection_matrix(1)
-
-        return prior, E0, E1, diffusion_state_sqrtm
 
 
 class _TimeStopper:
