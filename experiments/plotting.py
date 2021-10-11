@@ -587,6 +587,84 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     plt.show()
 
 
+def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
+    path = path + "figure3/"
+    plt.style.use(STYLESHEETS)
+
+    results = [figure3_load_results(prefix=method, path=path) for method in methods]
+
+    figure_size = (AISTATS_TEXTWIDTH_SINGLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
+    fig, axes = plt.subplots(
+        nrows=len(methods),
+        ncols=2,
+        dpi=400,
+        figsize=figure_size,
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
+    )
+
+    vmin_err_rel = jnp.minimum(results[0][0].min(), results[1][0].min())
+    vmax_err_rel = jnp.maximum(results[0][0].max(), results[1][0].max())
+
+    vmin_calib = jnp.minimum(results[0][3].min(), results[1][3].min())
+    vmax_calib = jnp.maximum(results[0][3].max(), results[1][3].max())
+    vmin_calib = 1.0 / vmax_calib
+    # vmin_calib = 1e-2
+    # vmax_calib = 100.
+    nicer_method_name = {"tornadox": "MOL", "pnmol_white": "PNMOL"}
+    for axis_row, method, result in zip(axes, methods, results):
+        axis_row[0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
+        err_mat_rel, err_mat_abs, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
+        extents = [
+            float(DTs.min()),
+            float(DTs.max()),
+            float(DXs.min()),
+            float(DXs.max()),
+        ]
+        style_chi2 = {"cmap": "RdYlBu_r"}
+        style_error = {"cmap": "RdYlBu_r"}
+        im_err_rel = axis_row[0].imshow(
+            jnp.flip(err_mat_rel, axis=0),
+            norm=LogNorm(
+                vmin=vmin_err_rel,
+                vmax=vmax_err_rel,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style_error,
+        )
+
+        im_calib = axis_row[1].imshow(
+            jnp.flip(chi2_mat, axis=0),
+            norm=LogNorm(
+                vmin=vmin_calib,
+                vmax=vmax_calib,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style_chi2,
+        )
+
+        fig.colorbar(im_err_rel, ax=axis_row[0])
+        fig.colorbar(im_calib, ax=axis_row[1])
+
+    axes[0, 0].set_title(r"$\bf PN/1$. Relative RMSE", fontsize="small", loc="left")
+    axes[0, 1].set_title(
+        r"$\bf PN/1$. $\chi^2$-statistic", fontsize="small", loc="left"
+    )
+
+    axes[1, 0].set_title(r"$\bf MOL/1$. Relative RMSE", fontsize="small", loc="left")
+    axes[1, 1].set_title(
+        r"$\bf MOL/2$. $\chi^2$-statistic", fontsize="small", loc="left"
+    )
+    for bottom_ax in axes[-1, :]:
+        bottom_ax.set_xlabel(r"Step-size $\Delta t$", fontsize="small")
+
+    plt.savefig(path + "figure.pdf")
+    plt.show()
+
+
 def figure3_load_results(*, prefix, path=PATH_RESULTS):
     print(path)
     path_error_rel = path + prefix + "_error_rel.npy"
