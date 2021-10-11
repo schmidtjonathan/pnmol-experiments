@@ -94,14 +94,16 @@ def save_result(result, /, *, prefix, path="experiments/results"):
     if not path.is_dir():
         path.mkdir(parents=True)
 
-    path_error = path / (prefix + "_error.npy")
+    path_error_abs = path / (prefix + "_error_abs.npy")
+    path_error_rel = path / (prefix + "_error_rel.npy")
     path_std = path / (prefix + "_std.npy")
     path_runtime = path / (prefix + "_runtime.npy")
     path_chi2 = path / (prefix + "_chi2.npy")
     path_dt = path / (prefix + "_dt.npy")
     path_dx = path / (prefix + "_dx.npy")
 
-    jnp.save(path_error, result["error"])
+    jnp.save(path_error_abs, result["error_abs"])
+    jnp.save(path_error_rel, result["error_rel"])
     jnp.save(path_std, result["std"])
     jnp.save(path_runtime, result["runtime"])
     jnp.save(path_chi2, result["chi2"])
@@ -114,7 +116,7 @@ DTs = jnp.logspace(
     # numpy.log10(0.001), numpy.log10(0.5), num=10, endpoint=True, base=10
     numpy.log10(0.01),
     numpy.log10(2.5),
-    num=10,
+    num=12,
     endpoint=True,
     base=10,
 )
@@ -130,13 +132,14 @@ STENCIL_SIZE = 3
 PROGRESSBAR = True
 
 # Hyperparameters (problem)
-T0, TMAX = 0.0, 10.0
+T0, TMAX = 0.0, 6.0
 DIFFUSION_RATE = 0.035
 
 
 RESULT_WHITE, RESULT_TORNADOX = [
     {
-        "error": numpy.zeros((len(DXs), len(DTs))),
+        "error_abs": numpy.zeros((len(DXs), len(DTs))),
+        "error_rel": numpy.zeros((len(DXs), len(DTs))),
         "std": numpy.zeros((len(DXs), len(DTs))),
         "runtime": numpy.zeros((len(DXs), len(DTs))),
         "chi2": numpy.zeros((len(DXs), len(DTs))),
@@ -162,7 +165,7 @@ for i_dx, dx in enumerate(sorted(DXs)):
         tmax=TMAX,
         dx=dx,
         stencil_size_interior=STENCIL_SIZE,
-        stencil_size_boundary=STENCIL_SIZE,
+        stencil_size_boundary=STENCIL_SIZE + 1,
         diffusion_rate_S=DIFFUSION_RATE,
         diffusion_rate_I=DIFFUSION_RATE,
         diffusion_rate_R=DIFFUSION_RATE,
@@ -173,7 +176,7 @@ for i_dx, dx in enumerate(sorted(DXs)):
         tmax=TMAX,
         dx=dx / HIGH_RES_FACTOR_DX,
         stencil_size_interior=STENCIL_SIZE,
-        stencil_size_boundary=STENCIL_SIZE,
+        stencil_size_boundary=STENCIL_SIZE + 1,
         diffusion_rate_S=DIFFUSION_RATE,
         diffusion_rate_I=DIFFUSION_RATE,
         diffusion_rate_R=DIFFUSION_RATE,
@@ -214,12 +217,18 @@ for i_dx, dx in enumerate(sorted(DXs)):
 
         error_white_abs = jnp.abs(mean_white - mean_reference)
         error_tornadox_abs = jnp.abs(mean_tornadox - mean_reference)
-        error_white = jnp.linalg.norm(error_white_abs / mean_reference) / jnp.sqrt(
+        rmse_white_rel = jnp.linalg.norm(error_white_abs / mean_reference) / jnp.sqrt(
             mean_reference.size
         )
-        error_tornadox = jnp.linalg.norm(
+        rmse_white_abs = jnp.linalg.norm(error_white_abs) / jnp.sqrt(
+            mean_reference.size
+        )
+        rmse_tornadox_rel = jnp.linalg.norm(
             error_tornadox_abs / mean_reference
         ) / jnp.sqrt(mean_reference.size)
+        rmse_tornadox_abs = jnp.linalg.norm(error_tornadox_abs) / jnp.sqrt(
+            mean_reference.size
+        )
 
         chi2_white = (
             error_white_abs
@@ -235,19 +244,28 @@ for i_dx, dx in enumerate(sorted(DXs)):
         mean_std_white = jnp.mean(std_white)
         mean_std_tornadox = jnp.mean(std_tornadox)
 
-        RESULT_WHITE["error"][i_dx, i_dt] = error_white
+        RESULT_WHITE["error_abs"][i_dx, i_dt] = rmse_white_abs
+        RESULT_WHITE["error_rel"][i_dx, i_dt] = rmse_white_rel
         RESULT_WHITE["std"][i_dx, i_dt] = mean_std_white
         RESULT_WHITE["runtime"][i_dx, i_dt] = elapsed_time_white
         RESULT_WHITE["chi2"][i_dx, i_dt] = chi2_white
         RESULT_WHITE["dt"][i_dx, i_dt] = dt
         RESULT_WHITE["dx"][i_dx, i_dt] = dx
 
-        RESULT_TORNADOX["error"][i_dx, i_dt] = error_tornadox
+        RESULT_TORNADOX["error_abs"][i_dx, i_dt] = rmse_tornadox_abs
+        RESULT_TORNADOX["error_rel"][i_dx, i_dt] = rmse_tornadox_rel
         RESULT_TORNADOX["std"][i_dx, i_dt] = mean_std_tornadox
         RESULT_TORNADOX["runtime"][i_dx, i_dt] = elapsed_time_tornadox
         RESULT_TORNADOX["chi2"][i_dx, i_dt] = chi2_tornadox
         RESULT_TORNADOX["dt"][i_dx, i_dt] = dt
         RESULT_TORNADOX["dx"][i_dx, i_dt] = dx
+
+        print(
+            f"MOL:\n\tRMSE={rmse_tornadox_rel}, chi2={chi2_tornadox}, time={elapsed_time_tornadox}"
+        )
+        print(
+            f"PNMOL(white):\n\tRMSE={rmse_white_rel}, chi2={chi2_white}, time={elapsed_time_white}"
+        )
 
 
 save_result(RESULT_WHITE, prefix="pnmol_white")

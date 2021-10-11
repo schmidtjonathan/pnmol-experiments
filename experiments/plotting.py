@@ -472,7 +472,7 @@ def figure_2(path=PATH_RESULTS):
     plt.show()
 
 
-def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
+def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     path = path + "figure3/"
     plt.style.use(STYLESHEETS)
 
@@ -482,7 +482,7 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     fig, axes = plt.subplots(
         nrows=len(methods),
         ncols=4,
-        dpi=200,
+        dpi=400,
         figsize=figure_size,
     )
 
@@ -548,7 +548,7 @@ def figure3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
 def figure3_load_results(*, prefix, path=PATH_RESULTS):
     print(path)
-    path_error = path + prefix + "_error.npy"
+    path_error = path + prefix + "_error_abs.npy"
     path_std = path + prefix + "_std.npy"
     path_chi2 = path + prefix + "_chi2.npy"
     path_runtime = path + prefix + "_runtime.npy"
