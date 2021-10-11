@@ -60,7 +60,7 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
 def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     steprule = tornadox.step.ConstantSteps(dt)
     ivp = pde.to_tornadox_ivp()
-    ek1 = tornadox.ek1.ReferenceEK1(
+    ek1 = tornadox.ek1.ReferenceEK1ConstantDiffusion(
         num_derivatives=nu,
         steprule=steprule,
         initialization=tornadox.init.Stack(use_df=False),
@@ -113,20 +113,22 @@ def save_result(result, /, *, prefix, path="experiments/results"):
     jnp.save(path_dx, result["dx"])
 
 
-# Ranges
-DTs = jnp.logspace(
-    # numpy.log10(0.001), numpy.log10(0.5), num=10, endpoint=True, base=10
-    numpy.log10(0.01),
-    numpy.log10(2.5),
-    num=9,
-    endpoint=True,
-    base=10,
-)
+#
+# # Ranges
+# DTs = jnp.logspace(
+#     # numpy.log10(0.001), numpy.log10(0.5), num=10, endpoint=True, base=10
+#     numpy.log10(0.01),
+#     numpy.log10(2.5),
+#     num=9,
+#     endpoint=True,
+#     base=10,
+# )
+DTs = 2.0 ** jnp.arange(1, -8, step=-1)
 
 DXs = 1.0 / (2.0 ** jnp.arange(2, 6))
 
 # Hyperparameters (method)
-HIGH_RES_FACTOR_DX = 6
+HIGH_RES_FACTOR_DX = 8
 NUM_DERIVATIVES = 1
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
@@ -186,7 +188,7 @@ for i_dx, dx in enumerate(sorted(DXs)):
     mean_reference = solve_pde_reference(
         PDE_REFERENCE, high_res_factor_dx=HIGH_RES_FACTOR_DX
     )
-    for i_dt, dt in enumerate(DTs):
+    for i_dt, dt in enumerate(sorted(DTs)):
         i_exp = i_exp + 1
 
         dim = PDE_PNMOL.y0.size
@@ -210,25 +212,6 @@ for i_dx, dx in enumerate(sorted(DXs)):
         ) = solve_pde_tornadox(
             PDE_PNMOL, dt=dt, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
         )
-
-        if (
-            jnp.any(jnp.isnan(mean_white))
-            or jnp.any(jnp.isnan(cov_white))
-            or jnp.any(mean_white < 1e-10)
-            or jnp.any(cov_white < 1e-10)
-            or jnp.any(mean_white > 1e10)
-            or jnp.any(cov_white > 1e10)
-        ):
-            print("Warning: NaN in white")
-        if (
-            jnp.any(jnp.isnan(mean_tornadox))
-            or jnp.any(jnp.isnan(cov_tornadox))
-            or jnp.any(mean_tornadox < 1e-10)
-            or jnp.any(cov_tornadox < 1e-10)
-            or jnp.any(mean_tornadox > 1e10)
-            or jnp.any(cov_tornadox > 1e10)
-        ):
-            print("Warning: NaN in tornadox")
 
         error_white_abs = jnp.abs(mean_white - mean_reference)
         error_tornadox_abs = jnp.abs(mean_tornadox - mean_reference)
