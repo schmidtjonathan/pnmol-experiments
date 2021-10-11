@@ -39,18 +39,19 @@ def solve_pde_pnmol_latent(pde, *, dt, nu, progressbar, kernel):
 def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     steprule = tornadox.step.ConstantSteps(dt)
     ivp = pde.to_tornadox_ivp()
-    ek1 = tornadox.ek1.ReferenceEK1(
+    ek1 = tornadox.ek1.ReferenceEK1ConstantDiffusion(
         num_derivatives=nu,
         steprule=steprule,
         initialization=tornadox.init.Stack(use_df=False),
     )
-    sol = ek1.solve(ivp, progressbar=progressbar)
+    sol, sigma_squared = ek1.solve(ivp, progressbar=progressbar)
+    sigma = jnp.sqrt(sigma_squared)
     E0 = ek1.iwp.projection_matrix(0)
     means, stds = read_mean_and_std(sol, E0)
 
     means = jnp.pad(means, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
     stds = jnp.pad(stds, pad_width=1, mode="constant", constant_values=0.0)[1:-1, ...]
-    return means, stds, sol.t, pde.mesh_spatial.points
+    return means, sigma * stds, sol.t, pde.mesh_spatial.points
 
 
 def solve_pde_reference(pde, *, dt, high_res_factor_dx, high_res_factor_dt):
@@ -105,9 +106,9 @@ def save_result(result, /, *, prefix, path="experiments/results"):
 
 
 # Hyperparameters (method)
-DT = 0.005
+DT = 0.05
 DX = 0.2
-HIGH_RES_FACTOR_DX = 8
+HIGH_RES_FACTOR_DX = 12
 HIGH_RES_FACTOR_DT = 8
 NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
@@ -162,6 +163,11 @@ with jax.disable_jit():
 KERNEL_NUGGET = pnmol.kernels.WhiteNoise(output_scale=1e-7)
 KERNEL_DIFFUSION_PNMOL = KERNEL  # + KERNEL_NUGGET
 
+with jax.disable_jit():
+    RESULT_TORNADOX = solve_pde_tornadox(
+        PDE_TORNADOX, dt=DT, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
+    )
+
 RESULT_PNMOL_WHITE = solve_pde_pnmol_white(
     PDE_PNMOL,
     dt=DT,
@@ -175,9 +181,6 @@ RESULT_PNMOL_LATENT = solve_pde_pnmol_latent(
     nu=NUM_DERIVATIVES,
     progressbar=PROGRESSBAR,
     kernel=KERNEL_DIFFUSION_PNMOL,
-)
-RESULT_TORNADOX = solve_pde_tornadox(
-    PDE_TORNADOX, dt=DT, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
 )
 RESULT_REFERENCE = solve_pde_reference(
     PDE_REFERENCE,
