@@ -62,7 +62,7 @@ def figure_1(
             vmax = jnp.maximum(vmax_error, vmax_std)
 
         contour_args = {"alpha": 0.8}
-        contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
+        contour_args_means = {"vmin": 0.0, "vmax": 0.1, "cmap": "Greys"}
         contour_args_errors = {"cmap": "inferno"}
         figure_1_plot_contour(
             axis_row[0], X, T, m[:n].T, **contour_args, **contour_args_means
@@ -393,7 +393,7 @@ def figure_2(path=PATH_RESULTS):
         jnp.abs(E_sparse @ E_sparse.T) + clip_value,
         **cmap,
         aspect="auto",
-        norm=LogNorm(),
+        norm=LogNorm(vmin=clip_value),
     )
     ax_E_dense.imshow(
         jnp.abs(E_dense @ E_dense.T) + clip_value, **cmap, aspect="auto", norm=LogNorm()
@@ -420,8 +420,8 @@ def figure_2(path=PATH_RESULTS):
 
     ax_curve.plot(x, fx, label="u(x)", color="black", linestyle="dashed")
     ax_curve.plot(x, dfx, label="$\Delta u(x)$", color="black")
-    ax_curve.plot(x, s2, **s1_style, alpha=0.6)
-    ax_curve.plot(x, s3, **s2_style, alpha=0.6)
+    ax_curve.plot(x, s2, **s1_style, alpha=0.4)
+    ax_curve.plot(x, s3, **s2_style, alpha=0.4)
 
     endmarker_style = {
         "marker": "o",
@@ -454,17 +454,108 @@ def figure_2(path=PATH_RESULTS):
     ax_E_dense.set_xticks(())
     ax_E_dense.set_yticks(())
 
-    ax_L_sparse.set_title(r"$\bf a.$ " + "$D$ (sparse)", loc="left", fontsize="medium")
-    ax_E_sparse.set_title(r"$\bf b.$ " + "$E$ (sparse)", loc="left", fontsize="medium")
-    ax_L_dense.set_title(r"$\bf c.$ " + "$D$ (dense)", loc="left", fontsize="medium")
-    ax_E_dense.set_title(r"$\bf d.$ " + "$E$ (dense)", loc="left", fontsize="medium")
+    ax_L_sparse.set_title(r"$\bf a.$ " + "Diff. matrix", loc="left", fontsize="medium")
+    ax_E_sparse.set_title(r"$\bf b.$ " + "Error cov.", loc="left", fontsize="medium")
+    ax_L_dense.set_title(r"$\bf c.$ " + "Diff. matrix", loc="left", fontsize="medium")
+    ax_E_dense.set_title(r"$\bf d.$ " + "Error cov.", loc="left", fontsize="medium")
 
     ax_rmse.set_title(
         r"$\bf e.$ " + "RMSE vs. Stencil Size", loc="left", fontsize="medium"
     )
     ax_curve.set_title(
-        r"$\bf f.$ " + "Solution / Laplacian / Samples", loc="left", fontsize="medium"
+        r"$\bf f.$ " + "Solution / Prior samples", loc="left", fontsize="medium"
     )
 
     plt.savefig(path + "figure.pdf", dpi=300)
+    plt.show()
+
+
+def figure_4():
+
+    dxs = [0.025]
+
+    figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
+    fig, axes = plt.subplots(
+        ncols=3, sharey=True, figsize=figsize, dpi=200, constrained_layout=True
+    )
+    ax_nsteps, ax_runtime, ax_chi2 = axes
+
+    for dx, ls in zip(dxs, [":", "-"]):
+        path = "./experiments/results/figure4/" + f"dx_{dx}_"
+
+        style_mol = {"color": "C0", "label": f"MOL (dx={dx})"}
+        style_pnmol_white = {"color": "C1", "label": f"PNMOL (white; dx={dx})"}
+        style_pnmol_latent = {"color": "C2", "label": f"PNMOL (latent; dx={dx})"}
+        style_all = {"linestyle": ls, "marker": "."}
+
+        plt.style.use(STYLESHEETS)
+
+        # dt = jnp.load(path + "dts.npy")
+
+        mol_rmse = jnp.load(path + "mol_rmse.npy")
+        mol_chi2 = jnp.load(path + "mol_chi2.npy")
+        mol_nsteps = jnp.load(path + "mol_nsteps.npy")
+        mol_time = jnp.load(path + "mol_time.npy")
+
+        pnmol_white_rmse = jnp.load(path + "pnmol_white_rmse.npy")
+        pnmol_white_chi2 = jnp.load(path + "pnmol_white_chi2.npy")
+        pnmol_white_nsteps = jnp.load(path + "pnmol_white_nsteps.npy")
+        pnmol_white_time = jnp.load(path + "pnmol_white_time.npy")
+
+        pnmol_latent_rmse = jnp.load(path + "pnmol_latent_rmse.npy")
+        pnmol_latent_chi2 = jnp.load(path + "pnmol_latent_chi2.npy")
+        pnmol_latent_nsteps = jnp.load(path + "pnmol_latent_nsteps.npy")
+        pnmol_latent_time = jnp.load(path + "pnmol_latent_time.npy")
+
+        ax_nsteps.set_xlabel("Number of time-steps")
+        ax_nsteps.loglog(mol_nsteps, mol_rmse, **style_mol, **style_all)
+        ax_nsteps.loglog(
+            pnmol_white_nsteps, pnmol_white_rmse, **style_pnmol_white, **style_all
+        )
+        ax_nsteps.loglog(
+            pnmol_latent_nsteps, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+        )
+
+        ax_runtime.set_xlabel("Run time [s]")
+        ax_runtime.loglog(mol_time, mol_rmse, **style_mol, **style_all)
+        ax_runtime.loglog(
+            pnmol_white_time, pnmol_white_rmse, **style_pnmol_white, **style_all
+        )
+        ax_runtime.loglog(
+            pnmol_latent_time, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+        )
+
+        ax_chi2.set_xlabel(r"$\chi^2$-statistic")
+        ax_chi2.loglog(mol_chi2, mol_rmse, **style_mol, **style_all)
+        ax_chi2.loglog(
+            pnmol_white_chi2, pnmol_white_rmse, **style_pnmol_white, **style_all
+        )
+        ax_chi2.loglog(
+            pnmol_latent_chi2, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+        )
+
+    axes[0].set_ylabel("RMSE")
+    axes[0].legend(
+        loc="upper right",
+        handlelength=2.5,
+        fontsize="x-small",
+        fancybox=False,
+        edgecolor="black",
+    ).get_frame().set_linewidth(0.5)
+
+    for ax in axes:
+        ax.grid(which="minor", axis="y", linewidth=0.5, linestyle="dotted", alpha=0.75)
+
+    ax_nsteps.set_title(
+        r"$\bf a.$ " + "RMSE vs. Number of time-steps", loc="left", fontsize="medium"
+    )
+    ax_runtime.set_title(
+        r"$\bf b.$ " + "RMSE vs. Run time", loc="left", fontsize="medium"
+    )
+    ax_chi2.set_title(
+        r"$\bf c.$ " + "RMSE vs. Calibration", loc="left", fontsize="medium"
+    )
+
+    ax_chi2.axvspan(0.01, 100.0, color="gray", alpha=0.2)
+    plt.savefig("./experiments/results/figure4/figure.pdf", dpi=300)
     plt.show()

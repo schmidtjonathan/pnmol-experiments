@@ -101,7 +101,7 @@ mesh = pnmol.mesh.RectangularMesh(
 scale_mle = input_scale_mle(
     mesh_points=mesh.points.squeeze(),
     obj=obj_fun,
-    num_trial_points=3,  # 20 was good
+    num_trial_points=20,  # 20 was good
 )
 
 
