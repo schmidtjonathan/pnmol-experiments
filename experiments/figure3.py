@@ -27,12 +27,10 @@ def solve_pde_reference(pde, *, high_res_factor_dx):
     assert mean.shape == (1, ivp.y0.size)
     mean = mean.squeeze()
 
-    means = [
-        m[high_res_factor_dx - 1 :: high_res_factor_dx] for m in jnp.split(mean, 3)
-    ]  # (dx, )
-    mean = jnp.concatenate(means)
+    i_mean = jnp.split(mean, 3)[1]
+    i_mean = i_mean[high_res_factor_dx - 1 :: high_res_factor_dx]
 
-    return mean
+    return i_mean
 
 
 def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
@@ -48,20 +46,14 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
     E0 = ek1.iwp.projection_matrix(0)
     mean, std, cov = read_mean_and_std_and_cov(final_state, E0)
 
-    means = [m[1:-1] for m in jnp.split(mean, 3)]  # (dx, )
-    stds = [s[1:-1] for s in jnp.split(std, 3)]
-    blocks = [
-        [block[1:-1, 1:-1] for block in jnp.split(c_row, 3, axis=1)]
-        for c_row in jnp.split(cov, 3, axis=0)
-    ]
+    i_mean, i_std = jnp.split(mean, 3)[1], jnp.split(std, 3)[1]
+    i_mean, i_std = i_mean[1:-1], i_std[1:-1]
 
-    sliced_cov_rows = [jnp.concatenate(b, axis=1) for b in blocks]
+    blocks = [jnp.split(c_row, 3, axis=1) for c_row in jnp.split(cov, 3, axis=0)]
+    i_cov = blocks[1][1]
+    i_cov = i_cov[1:-1, 1:-1]
 
-    sliced_cov = jnp.concatenate(sliced_cov_rows, axis=0)
-    mean = jnp.concatenate(means)
-    std = jnp.concatenate(stds)
-
-    return mean, std, sliced_cov, elapsed_time
+    return i_mean, i_std, i_cov, elapsed_time
 
 
 def solve_pde_tornadox(pde, *, dt, nu, progressbar):
@@ -80,7 +72,12 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     E0 = ek1.iwp.projection_matrix(0)
     mean, std, cov = read_mean_and_std_and_cov(final_state, E0)
 
-    return mean, std, cov, elapsed_time
+    i_mean, i_std = jnp.split(mean, 3)[1], jnp.split(std, 3)[1]
+
+    blocks = [jnp.split(c_row, 3, axis=1) for c_row in jnp.split(cov, 3, axis=0)]
+    i_cov = blocks[1][1]
+
+    return i_mean, i_std, i_cov, elapsed_time
 
 
 def read_mean_and_std_and_cov(final_state, E0):
@@ -208,6 +205,11 @@ for i_dx, dx in enumerate(sorted(DXs)):
             elapsed_time_tornadox,
         ) = solve_pde_tornadox(
             PDE_PNMOL, dt=dt, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
+        )
+
+        assert not (jnp.any(jnp.isnan(mean_white)) or jnp.any(jnp.isnan(cov_white)))
+        assert not (
+            jnp.any(jnp.isnan(mean_tornadox)) or jnp.any(jnp.isnan(cov_tornadox))
         )
 
         error_white_abs = jnp.abs(mean_white - mean_reference)
