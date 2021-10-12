@@ -26,8 +26,9 @@ def solve_pde_reference(pde, *, high_res_factor_dx):
     mean = sol.y.T
     assert mean.shape == (1, ivp.y0.size)
     mean = mean.squeeze()
+    print("reference", mean)
 
-    i_mean = jnp.split(mean, 3)[1]
+    i_mean = jnp.split(mean, 3)[0]
     i_mean = i_mean[high_res_factor_dx - 1 :: high_res_factor_dx]
 
     return i_mean
@@ -46,8 +47,9 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
 
     E0 = ek1.iwp.projection_matrix(0)
     mean, std, cov = read_mean_and_std_and_cov(final_state, E0)
+    print("white", mean)
 
-    i_mean, i_std = jnp.split(mean, 3)[1], jnp.split(std, 3)[1]
+    i_mean, i_std = jnp.split(mean, 3)[0], jnp.split(std, 3)[0]
     i_mean, i_std = i_mean[1:-1], i_std[1:-1]
 
     blocks = [jnp.split(c_row, 3, axis=1) for c_row in jnp.split(cov, 3, axis=0)]
@@ -60,7 +62,7 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
 def solve_pde_tornadox(pde, *, dt, nu, progressbar):
     steprule = tornadox.step.ConstantSteps(dt)
     ivp = pde.to_tornadox_ivp()
-    ek1 = tornadox.ek1.ReferenceEK1(
+    ek1 = tornadox.ek1.ReferenceEK1ConstantDiffusion(
         num_derivatives=nu,
         steprule=steprule,
         initialization=tornadox.init.Stack(use_df=False),
@@ -73,8 +75,8 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
 
     E0 = ek1.iwp.projection_matrix(0)
     mean, std, cov = read_mean_and_std_and_cov(final_state, E0)
-
-    i_mean, i_std = jnp.split(mean, 3)[1], jnp.split(std, 3)[1]
+    print("tornadox", mean)
+    i_mean, i_std = jnp.split(mean, 3)[0], jnp.split(std, 3)[0]
 
     blocks = [jnp.split(c_row, 3, axis=1) for c_row in jnp.split(cov, 3, axis=0)]
     i_cov = blocks[1][1]
@@ -113,27 +115,29 @@ def save_result(result, /, *, prefix, path="experiments/results"):
     jnp.save(path_dx, result["dx"])
 
 
-# Ranges
-DTs = jnp.logspace(
-    # numpy.log10(0.001), numpy.log10(0.5), num=10, endpoint=True, base=10
-    numpy.log10(0.01),
-    numpy.log10(2.5),
-    num=9,
-    endpoint=True,
-    base=10,
-)
+#
+# # Ranges
+# DTs = jnp.logspace(
+#     # numpy.log10(0.001), numpy.log10(0.5), num=10, endpoint=True, base=10
+#     numpy.log10(0.01),
+#     numpy.log10(2.5),
+#     num=9,
+#     endpoint=True,
+#     base=10,
+# )
+DTs = 2.0 ** jnp.arange(2, -7, step=-0.5)
 
-DXs = 1.0 / (2.0 ** jnp.arange(2, 6))
+DXs = 1.0 / (2.0 ** jnp.arange(2, 7))
 
 # Hyperparameters (method)
-HIGH_RES_FACTOR_DX = 6
+HIGH_RES_FACTOR_DX = 10
 NUM_DERIVATIVES = 1
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
 PROGRESSBAR = True
 
 # Hyperparameters (problem)
-T0, TMAX = 0.0, 15.0
+T0, TMAX = 0.0, 6.0
 DIFFUSION_RATE = 0.035
 
 
@@ -155,10 +159,13 @@ num_exp_total = len(DXs) * len(DTs)
 
 
 # Solve the PDE with the different methods
+# KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(
+#     pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(output_scale=1e-3), num=3
+# )
+
 KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(
     pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(), num=3
 )
-
 for i_dx, dx in enumerate(sorted(DXs)):
     # PDE problems
     PDE_PNMOL = pnmol.pde.examples.sir_1d_discretized(
@@ -166,12 +173,15 @@ for i_dx, dx in enumerate(sorted(DXs)):
         tmax=TMAX,
         dx=dx,
         stencil_size_interior=STENCIL_SIZE,
-        stencil_size_boundary=STENCIL_SIZE + 1,
+        stencil_size_boundary=STENCIL_SIZE + 2,
         diffusion_rate_S=DIFFUSION_RATE,
         diffusion_rate_I=DIFFUSION_RATE,
         diffusion_rate_R=DIFFUSION_RATE,
         nugget_gram_matrix_fd=NUGGET_COV_FD,
+        kernel=pnmol.kernels.SquareExponential(),
     )
+
+    print(jnp.diag(PDE_PNMOL.E_sqrtm))
     PDE_REFERENCE = pnmol.pde.examples.sir_1d_discretized(
         t0=T0,
         tmax=TMAX,
@@ -182,11 +192,12 @@ for i_dx, dx in enumerate(sorted(DXs)):
         diffusion_rate_I=DIFFUSION_RATE,
         diffusion_rate_R=DIFFUSION_RATE,
         nugget_gram_matrix_fd=NUGGET_COV_FD,
+        kernel=pnmol.kernels.SquareExponential(),
     )
     mean_reference = solve_pde_reference(
         PDE_REFERENCE, high_res_factor_dx=HIGH_RES_FACTOR_DX
     )
-    for i_dt, dt in enumerate(DTs):
+    for i_dt, dt in enumerate(sorted(DTs)):
         i_exp = i_exp + 1
 
         dim = PDE_PNMOL.y0.size
@@ -210,25 +221,6 @@ for i_dx, dx in enumerate(sorted(DXs)):
         ) = solve_pde_tornadox(
             PDE_PNMOL, dt=dt, nu=NUM_DERIVATIVES, progressbar=PROGRESSBAR
         )
-
-        if (
-            jnp.any(jnp.isnan(mean_white))
-            or jnp.any(jnp.isnan(cov_white))
-            or jnp.any(mean_white < 1e-10)
-            or jnp.any(cov_white < 1e-10)
-            or jnp.any(mean_white > 1e10)
-            or jnp.any(cov_white > 1e10)
-        ):
-            print("Warning: NaN in white")
-        if (
-            jnp.any(jnp.isnan(mean_tornadox))
-            or jnp.any(jnp.isnan(cov_tornadox))
-            or jnp.any(mean_tornadox < 1e-10)
-            or jnp.any(cov_tornadox < 1e-10)
-            or jnp.any(mean_tornadox > 1e10)
-            or jnp.any(cov_tornadox > 1e10)
-        ):
-            print("Warning: NaN in tornadox")
 
         error_white_abs = jnp.abs(mean_white - mean_reference)
         error_tornadox_abs = jnp.abs(mean_tornadox - mean_reference)

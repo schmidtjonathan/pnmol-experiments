@@ -30,7 +30,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         # of the observation covariance matrices (i.e. assume a larg(ish) meascov).
         # Both get the same nugget. This fixes most of the issue.
         z_y0, H_y0 = pde.y0, self.E0
-        matrix_nugget = 1e-6 * jnp.eye(d)
+        matrix_nugget = 1e-10 * jnp.eye(d)
         C0_sqrtm_y0, kgain_y0, S_sqrtm_y0 = sqrt.update_sqrt(
             transition_matrix=H_y0,
             cov_cholesky=C0_sqrtm_raw,
@@ -48,7 +48,7 @@ class _WhiteNoiseEK1Base(pdefilter.PDEFilter):
         )
 
         # Update the stack of state and latent force on the PDE measurement.
-        matrix_nugget = 1e-6 * jnp.eye(d + pde.B.shape[0])
+        matrix_nugget = 1e-10 * jnp.eye(d + pde.B.shape[0])
         C0_sqrtm, kgain, S_pde = sqrt.update_sqrt(
             transition_matrix=H_pde,
             cov_cholesky=C0_sqrtm_y0,

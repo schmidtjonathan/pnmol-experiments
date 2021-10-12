@@ -63,7 +63,7 @@ def figure_1(
             vmin = jnp.minimum(vmin_error, vmin_std)
             vmax = jnp.maximum(vmax_error, vmax_std)
 
-        contour_args = {"alpha": 0.8}
+        contour_args = {"alpha": 0.8, "levels": 20}
         contour_args_means = {"vmin": 0.0, "vmax": 0.1, "cmap": "Greys"}
         contour_args_errors = {"cmap": "inferno"}
         figure_1_plot_contour(
@@ -132,20 +132,21 @@ def figure_1_singlerow(
     figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.4 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
         nrows=1,
-        ncols=6,
+        ncols=4,
         dpi=200,
         figsize=figure_size,
         sharex=True,
         sharey=True,
         constrained_layout=True,
+        gridspec_kw={"width_ratios": [3, 2, 2, 3]},
     )
 
     axes = np.flip(axes)
-    ax_mol_error, ax_mol_std, ax_mol_mean = axes[:3]
-    ax_pnmol_mean, ax_pnmol_std, ax_pnmol_error = axes[3:]
+    ax_mol_error, ax_mol_mean = axes[:2]
+    ax_pnmol_mean, ax_pnmol_error = axes[2:]
 
     contour_args = {"alpha": 0.7, "levels": 20}
-    contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
+    contour_args_means = {"vmin": 0.0, "vmax": 0.1, "cmap": "Greys"}
     contour_args_errors = {}
 
     cmap_mol, cmap_pnmol = "RdYlBu_r", "RdYlGn_r"
@@ -157,11 +158,9 @@ def figure_1_singlerow(
         **contour_args,
         **contour_args_errors,
         cmap=cmap_mol,
-        vmin=0.0,
-        vmax=500.0,
         # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
     )
-    fig.colorbar(bar_mol, ax=ax_mol_error, location="right", ticks=(0, 250, 500))
+    fig.colorbar(bar_mol, ax=ax_mol_error, location="right", ticks=(0.0, 6_500, 13_000))
 
     bar_pnmol = _figure_1_plot_errors(
         ax=ax_pnmol_error,
@@ -170,26 +169,9 @@ def figure_1_singlerow(
         **contour_args,
         **contour_args_errors,
         cmap=cmap_pnmol,
-        vmin=0.0,
-        vmax=5.0,
         # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
     )
-    fig.colorbar(bar_pnmol, ax=ax_pnmol_error, location="left", ticks=(0, 2.5, 5.0))
-
-    _figure_1_plot_stds(
-        ax=ax_mol_std,
-        result=results[2],
-        **contour_args,
-        **contour_args_errors,
-        cmap="Blues",
-    )
-    _figure_1_plot_stds(
-        ax=ax_pnmol_std,
-        result=results[0],
-        **contour_args,
-        **contour_args_errors,
-        cmap="Greens",
-    )
+    fig.colorbar(bar_pnmol, ax=ax_pnmol_error, location="left", ticks=(0.0, 7.5, 15.0))
 
     _figure_1_plot_means(
         ax=ax_mol_mean, result=results[2], **contour_args, **contour_args_means
@@ -199,13 +181,11 @@ def figure_1_singlerow(
     )
 
     title_style = {"loc": "left", "fontsize": "small"}
-    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Error/Unc.", **title_style)
-    ax_mol_std.set_title(r"$\bf MOL/2$. " + "Uncertainty", **title_style)
-    ax_mol_mean.set_title(r"$\bf MOL/3$. " + "Estimate", **title_style)
+    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Error/Uncertainty Ratio", **title_style)
+    ax_mol_mean.set_title(r"$\bf MOL/2$. " + "Posterior mean", **title_style)
 
-    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Error/Unc.", **title_style)
-    ax_pnmol_std.set_title(r"$\bf PN/2$. " + "Uncertainty", **title_style)
-    ax_pnmol_mean.set_title(r"$\bf PN/3$. " + "Estimate", **title_style)
+    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Error/Uncertainty Ratio", **title_style)
+    ax_pnmol_mean.set_title(r"$\bf PN/2$. " + "Posterior mean", **title_style)
 
     plt.savefig(path + "figure.pdf")
     plt.show()
@@ -300,7 +280,8 @@ def _figure_1_plot_errors(ax, result, result_reference, **style):
     ax.set_yticks(t)
     ax.set_xticklabels(())
     ax.set_yticklabels(())
-    return figure_1_plot_contour(ax, X.T, T.T, error / (s[:n] + 1e-12) + 1e-12, **style)
+    quotient = error / (s[:n] + 1e-12)
+    return figure_1_plot_contour(ax, X.T, T.T, quotient, **style)
 
 
 def _figure_1_plot_stds(ax, result, **style):
@@ -603,9 +584,11 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         sharey=True,
         constrained_layout=True,
     )
-
+    print(results)
     vmin_err_rel = jnp.minimum(results[0][0].min(), results[1][0].min())
     vmax_err_rel = jnp.maximum(results[0][0].max(), results[1][0].max())
+    # vmax_err_rel = 1.0
+    # vmin_err_rel = 1e-3
 
     vmin_calib = jnp.minimum(results[0][3].min(), results[1][3].min())
     vmax_calib = jnp.maximum(results[0][3].max(), results[1][3].max())
@@ -616,6 +599,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     for axis_row, method, result in zip(axes, methods, results):
         axis_row[0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
         err_mat_rel, err_mat_abs, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
+        print(DTs, DXs)
         extents = [
             float(DTs.min()),
             float(DTs.max()),
@@ -626,10 +610,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         style_error = {"cmap": "RdYlBu_r"}
         im_err_rel = axis_row[0].imshow(
             jnp.flip(err_mat_rel, axis=0),
-            norm=LogNorm(
-                vmin=vmin_err_rel,
-                vmax=vmax_err_rel,
-            ),
+            norm=LogNorm(vmin=vmin_err_rel, vmax=vmax_err_rel),
             extent=extents,
             aspect="auto",
             **style_error,
@@ -646,6 +627,14 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
             **style_chi2,
         )
 
+        axis_row[1].autoscale(False)
+        axis_row[1].set_xticks((0.02, 1.02, 2.02))  # black magic
+        axis_row[1].set_xticklabels(("$2^{-6}$", "$2^{-2.5}$", "$2^{1}$"))
+
+        axis_row[0].autoscale(False)
+        axis_row[0].set_yticks((0.07, 0.17, 0.27))  # black magic
+        axis_row[0].set_yticklabels(("$2^{-6}$", "$2^{-4}$", "$2^{-2}$"))
+
         fig.colorbar(im_err_rel, ax=axis_row[0])
         fig.colorbar(im_calib, ax=axis_row[1])
 
@@ -658,6 +647,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     axes[1, 1].set_title(
         r"$\bf MOL/2$. $\chi^2$-statistic", fontsize="small", loc="left"
     )
+
     for bottom_ax in axes[-1, :]:
         bottom_ax.set_xlabel(r"Step-size $\Delta t$", fontsize="small")
 
