@@ -424,8 +424,7 @@ def figure_2(path=PATH_RESULTS):
         linestyle="",
         marker="^",
         color=s1_style["color"],
-        label="NaN",
-        alpha=0.5,
+        label="Failed run",
     )
 
     ax_rmse.set_xlabel("Stencil size")
