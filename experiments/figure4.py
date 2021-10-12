@@ -13,7 +13,7 @@ import pnmol
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-for dx in [0.01, 0.05, 0.2]:
+for dx in sorted([0.01, 0.05, 0.1, 0.2]):
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
@@ -69,7 +69,7 @@ for dx in [0.01, 0.05, 0.2]:
     mol_time = []
 
     dts = jnp.logspace(0.0, -2.5, 12, endpoint=True)
-    for dt in dts:
+    for dt in sorted(dts):
 
         # [PNMOL-LATENT] Solve
         steps = pnmol.odetools.step.Constant(dt)
@@ -165,13 +165,14 @@ for dx in [0.01, 0.05, 0.2]:
 
         # [MOL] Solve
         steps = tornadox.step.ConstantSteps(dt)
-        ek1 = tornadox.ek1.ReferenceEK1(
+        ek1 = tornadox.ek1.ReferenceEK1ConstantDiffusion(
             num_derivatives=2,
             steprule=steps,
             initialization=tornadox.init.Stack(use_df=False),
         )
         time_start = time.time()
-        sol_mol, sol_mol_info = ek1.simulate_final_state(ivp, progressbar=True)
+        with jax.disable_jit():
+            sol_mol, sol_mol_info = ek1.simulate_final_state(ivp, progressbar=True)
         time_mol = time.time() - time_start
 
         # [MOL] Extract mean
