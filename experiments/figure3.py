@@ -125,7 +125,7 @@ def save_result(result, /, *, prefix, path="experiments/results"):
 #     endpoint=True,
 #     base=10,
 # )
-DTs = 2.0 ** jnp.arange(1, -7, step=-1)
+DTs = 2.0 ** jnp.arange(2, -7, step=-0.5)
 
 DXs = 1.0 / (2.0 ** jnp.arange(2, 7))
 

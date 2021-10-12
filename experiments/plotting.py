@@ -578,13 +578,13 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     fig, axes = plt.subplots(
         nrows=len(methods),
         ncols=2,
-        dpi=200,
+        dpi=400,
         figsize=figure_size,
         sharex=True,
         sharey=True,
         constrained_layout=True,
     )
-
+    print(results)
     vmin_err_rel = jnp.minimum(results[0][0].min(), results[1][0].min())
     vmax_err_rel = jnp.maximum(results[0][0].max(), results[1][0].max())
     # vmax_err_rel = 1.0
@@ -599,6 +599,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     for axis_row, method, result in zip(axes, methods, results):
         axis_row[0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
         err_mat_rel, err_mat_abs, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
+        print(DTs, DXs)
         extents = [
             float(DTs.min()),
             float(DTs.max()),
@@ -626,6 +627,14 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
             **style_chi2,
         )
 
+        axis_row[1].autoscale(False)
+        axis_row[1].set_xticks((0.02, 1.02, 2.02))  # black magic
+        axis_row[1].set_xticklabels(("$2^{-6}$", "$2^{-2.5}$", "$2^{1}$"))
+
+        axis_row[0].autoscale(False)
+        axis_row[0].set_yticks((0.07, 0.17, 0.27))  # black magic
+        axis_row[0].set_yticklabels(("$2^{-6}$", "$2^{-4}$", "$2^{-2}$"))
+
         fig.colorbar(im_err_rel, ax=axis_row[0])
         fig.colorbar(im_calib, ax=axis_row[1])
 
@@ -638,6 +647,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     axes[1, 1].set_title(
         r"$\bf MOL/2$. $\chi^2$-statistic", fontsize="small", loc="left"
     )
+
     for bottom_ax in axes[-1, :]:
         bottom_ax.set_xlabel(r"Step-size $\Delta t$", fontsize="small")
 
