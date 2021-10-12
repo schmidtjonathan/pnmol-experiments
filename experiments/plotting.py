@@ -578,7 +578,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     fig, axes = plt.subplots(
         nrows=len(methods),
         ncols=2,
-        dpi=400,
+        dpi=200,
         figsize=figure_size,
         sharex=True,
         sharey=True,
@@ -587,6 +587,8 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
     vmin_err_rel = jnp.minimum(results[0][0].min(), results[1][0].min())
     vmax_err_rel = jnp.maximum(results[0][0].max(), results[1][0].max())
+    # vmax_err_rel = 1.0
+    # vmin_err_rel = 1e-3
 
     vmin_calib = jnp.minimum(results[0][3].min(), results[1][3].min())
     vmax_calib = jnp.maximum(results[0][3].max(), results[1][3].max())
@@ -607,10 +609,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         style_error = {"cmap": "RdYlBu_r"}
         im_err_rel = axis_row[0].imshow(
             jnp.flip(err_mat_rel, axis=0),
-            norm=LogNorm(
-                vmin=vmin_err_rel,
-                vmax=vmax_err_rel,
-            ),
+            norm=LogNorm(),
             extent=extents,
             aspect="auto",
             **style_error,

@@ -123,13 +123,13 @@ def save_result(result, /, *, prefix, path="experiments/results"):
 #     endpoint=True,
 #     base=10,
 # )
-DTs = 2.0 ** jnp.arange(1, -8, step=-1)
+DTs = 2.0 ** jnp.arange(2, -8, step=-1)
 
-DXs = 1.0 / (2.0 ** jnp.arange(2, 6))
+DXs = 1.0 / (2.0 ** jnp.arange(2, 4))
 
 # Hyperparameters (method)
-HIGH_RES_FACTOR_DX = 8
-NUM_DERIVATIVES = 1
+HIGH_RES_FACTOR_DX = 10
+NUM_DERIVATIVES = 2
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
 PROGRESSBAR = True
@@ -157,10 +157,11 @@ num_exp_total = len(DXs) * len(DTs)
 
 
 # Solve the PDE with the different methods
-KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(
-    pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(), num=3
-)
+# KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(
+#     pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(output_scale=1e-3), num=3
+# )
 
+KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(pnmol.kernels.WhiteNoise(), num=3)
 for i_dx, dx in enumerate(sorted(DXs)):
     # PDE problems
     PDE_PNMOL = pnmol.pde.examples.sir_1d_discretized(
@@ -173,6 +174,7 @@ for i_dx, dx in enumerate(sorted(DXs)):
         diffusion_rate_I=DIFFUSION_RATE,
         diffusion_rate_R=DIFFUSION_RATE,
         nugget_gram_matrix_fd=NUGGET_COV_FD,
+        kernel=pnmol.kernels.SquareExponential(),
     )
     PDE_REFERENCE = pnmol.pde.examples.sir_1d_discretized(
         t0=T0,
@@ -184,6 +186,7 @@ for i_dx, dx in enumerate(sorted(DXs)):
         diffusion_rate_I=DIFFUSION_RATE,
         diffusion_rate_R=DIFFUSION_RATE,
         nugget_gram_matrix_fd=NUGGET_COV_FD,
+        kernel=pnmol.kernels.SquareExponential(),
     )
     mean_reference = solve_pde_reference(
         PDE_REFERENCE, high_res_factor_dx=HIGH_RES_FACTOR_DX
