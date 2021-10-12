@@ -425,7 +425,7 @@ def figure_2(path=PATH_RESULTS):
         jnp.tile(rmse_all.T[1][2], 3),
         linestyle="",
         marker="^",
-        color="black",
+        color=s1_style["color"],
         label="NaN",
     )
 
