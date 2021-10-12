@@ -413,20 +413,19 @@ def figure_2(path=PATH_RESULTS):
     ax_rmse.semilogy(
         stencil_sizes[:3], rmse_all.T[1][:3], **s1_style, **s1_label, marker="o"
     )
-    ax_rmse.semilogy(
-        stencil_sizes[6:], rmse_all.T[1][6:], **s1_style, **s1_label, marker="o"
-    )
+    ax_rmse.semilogy(stencil_sizes[6:], rmse_all.T[1][6:], **s1_style, marker="o")
 
     ax_rmse.semilogy(stencil_sizes, rmse_all.T[2], **s2_style, **s2_label, marker="s")
 
     # the three hard-coded NaN values
     ax_rmse.semilogy(
         stencil_sizes[3:6],
-        jnp.tile(rmse_all.T[1][2], 3),
+        jnp.tile(rmse_all.T[1][6], 3),
         linestyle="",
         marker="^",
         color=s1_style["color"],
         label="NaN",
+        alpha=0.5,
     )
 
     ax_rmse.set_xlabel("Stencil size")
