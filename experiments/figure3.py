@@ -26,8 +26,9 @@ def solve_pde_reference(pde, *, high_res_factor_dx):
     mean = sol.y.T
     assert mean.shape == (1, ivp.y0.size)
     mean = mean.squeeze()
+    print("reference", mean)
 
-    i_mean = jnp.split(mean, 3)[1]
+    i_mean = jnp.split(mean, 3)[0]
     i_mean = i_mean[high_res_factor_dx - 1 :: high_res_factor_dx]
 
     return i_mean
@@ -46,8 +47,9 @@ def solve_pde_pnmol_white(pde, *, dt, nu, progressbar, kernel):
 
     E0 = ek1.iwp.projection_matrix(0)
     mean, std, cov = read_mean_and_std_and_cov(final_state, E0)
+    print("white", mean)
 
-    i_mean, i_std = jnp.split(mean, 3)[1], jnp.split(std, 3)[1]
+    i_mean, i_std = jnp.split(mean, 3)[0], jnp.split(std, 3)[0]
     i_mean, i_std = i_mean[1:-1], i_std[1:-1]
 
     blocks = [jnp.split(c_row, 3, axis=1) for c_row in jnp.split(cov, 3, axis=0)]
@@ -73,8 +75,8 @@ def solve_pde_tornadox(pde, *, dt, nu, progressbar):
 
     E0 = ek1.iwp.projection_matrix(0)
     mean, std, cov = read_mean_and_std_and_cov(final_state, E0)
-
-    i_mean, i_std = jnp.split(mean, 3)[1], jnp.split(std, 3)[1]
+    print("tornadox", mean)
+    i_mean, i_std = jnp.split(mean, 3)[0], jnp.split(std, 3)[0]
 
     blocks = [jnp.split(c_row, 3, axis=1) for c_row in jnp.split(cov, 3, axis=0)]
     i_cov = blocks[1][1]
@@ -123,19 +125,19 @@ def save_result(result, /, *, prefix, path="experiments/results"):
 #     endpoint=True,
 #     base=10,
 # )
-DTs = 2.0 ** jnp.arange(2, -8, step=-1)
+DTs = 2.0 ** jnp.arange(1, -7, step=-1)
 
-DXs = 1.0 / (2.0 ** jnp.arange(2, 4))
+DXs = 1.0 / (2.0 ** jnp.arange(2, 7))
 
 # Hyperparameters (method)
 HIGH_RES_FACTOR_DX = 10
-NUM_DERIVATIVES = 2
+NUM_DERIVATIVES = 1
 NUGGET_COV_FD = 0.0
 STENCIL_SIZE = 3
 PROGRESSBAR = True
 
 # Hyperparameters (problem)
-T0, TMAX = 0.0, 15.0
+T0, TMAX = 0.0, 6.0
 DIFFUSION_RATE = 0.035
 
 
@@ -161,7 +163,9 @@ num_exp_total = len(DXs) * len(DTs)
 #     pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(output_scale=1e-3), num=3
 # )
 
-KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(pnmol.kernels.WhiteNoise(), num=3)
+KERNEL_DIFFUSION_PNMOL = pnmol.kernels.duplicate(
+    pnmol.kernels.Matern52() + pnmol.kernels.WhiteNoise(), num=3
+)
 for i_dx, dx in enumerate(sorted(DXs)):
     # PDE problems
     PDE_PNMOL = pnmol.pde.examples.sir_1d_discretized(
@@ -169,13 +173,15 @@ for i_dx, dx in enumerate(sorted(DXs)):
         tmax=TMAX,
         dx=dx,
         stencil_size_interior=STENCIL_SIZE,
-        stencil_size_boundary=STENCIL_SIZE + 1,
+        stencil_size_boundary=STENCIL_SIZE + 2,
         diffusion_rate_S=DIFFUSION_RATE,
         diffusion_rate_I=DIFFUSION_RATE,
         diffusion_rate_R=DIFFUSION_RATE,
         nugget_gram_matrix_fd=NUGGET_COV_FD,
         kernel=pnmol.kernels.SquareExponential(),
     )
+
+    print(jnp.diag(PDE_PNMOL.E_sqrtm))
     PDE_REFERENCE = pnmol.pde.examples.sir_1d_discretized(
         t0=T0,
         tmax=TMAX,

@@ -609,7 +609,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         style_error = {"cmap": "RdYlBu_r"}
         im_err_rel = axis_row[0].imshow(
             jnp.flip(err_mat_rel, axis=0),
-            norm=LogNorm(),
+            norm=LogNorm(vmin=vmin_err_rel, vmax=vmax_err_rel),
             extent=extents,
             aspect="auto",
             **style_error,

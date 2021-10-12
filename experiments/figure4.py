@@ -13,7 +13,7 @@ import pnmol
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-for dx in [0.01, 0.02, 0.05, 0.1, 0.2]:
+for dx in [0.01, 0.05, 0.2]:
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
@@ -68,7 +68,7 @@ for dx in [0.01, 0.02, 0.05, 0.1, 0.2]:
     mol_chi2 = []
     mol_time = []
 
-    dts = jnp.logspace(0.0, -3.5, 12, endpoint=True)
+    dts = jnp.logspace(0.0, -2.5, 12, endpoint=True)
     for dt in dts:
 
         # [PNMOL-LATENT] Solve
