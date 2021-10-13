@@ -13,11 +13,11 @@ import pnmol
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-dts = 2.0 ** jnp.arange(1, -7, step=-1)
+dts = 2.0 ** jnp.arange(1, -9, step=-1)
 
 num_derivatives = 1
 
-for dx in sorted([0.025]):
+for dx in sorted([0.02, 0.1, 0.2]):
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
@@ -26,7 +26,7 @@ for dx in sorted([0.025]):
     )
     ivp = pde.to_tornadox_ivp()
 
-    ref_scale = 19
+    ref_scale = 13
     pde_ref = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx / ref_scale,

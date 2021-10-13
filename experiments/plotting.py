@@ -684,11 +684,11 @@ def figure3_plot_contour(ax, /, *args, **kwargs):
 
 def figure_4():
 
-    dxs = [0.025]
+    dxs = [0.02, 0.1]
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
-        ncols=3, sharey=True, figsize=figsize, dpi=200, constrained_layout=True
+        ncols=3, sharey=True, figsize=figsize, dpi=400, constrained_layout=True
     )
     ax_nsteps, ax_runtime, ax_chi2 = axes
 
