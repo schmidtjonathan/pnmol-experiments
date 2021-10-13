@@ -3,9 +3,9 @@
 import pathlib
 
 import jax.numpy as jnp
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
 
 STYLESHEETS = [
     "experiments/style/lines_and_ticks.mplstyle",
@@ -158,7 +158,7 @@ def figure_1_singlerow(
         **contour_args,
         **contour_args_errors,
         cmap=cmap_mol,
-        # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
+        # norm=mcolors.LogNorm(vmin=1e-3,vmax=1e3, clip=True)
     )
     fig.colorbar(bar_mol, ax=ax_mol_error, location="right", ticks=(0.0, 6_500, 13_000))
 
@@ -169,7 +169,7 @@ def figure_1_singlerow(
         **contour_args,
         **contour_args_errors,
         cmap=cmap_pnmol,
-        # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
+        # norm=mcolors.LogNorm(vmin=1e-3,vmax=1e3, clip=True)
     )
     fig.colorbar(bar_pnmol, ax=ax_pnmol_error, location="left", ticks=(0.0, 7.5, 15.0))
 
@@ -376,10 +376,13 @@ def figure_2(path=PATH_RESULTS):
         jnp.abs(E_sparse @ E_sparse.T) + clip_value,
         **cmap,
         aspect="auto",
-        norm=LogNorm(vmin=clip_value),
+        norm=mcolors.LogNorm(vmin=clip_value),
     )
     ax_E_dense.imshow(
-        jnp.abs(E_dense @ E_dense.T) + clip_value, **cmap, aspect="auto", norm=LogNorm()
+        jnp.abs(E_dense @ E_dense.T) + clip_value,
+        **cmap,
+        aspect="auto",
+        norm=mcolors.LogNorm(),
     )
 
     s1_style = {
@@ -498,7 +501,7 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         style = {"cmap": "RdYlBu"}
         im_err_rel = axis_row[0].imshow(
             err_mat_rel,
-            norm=LogNorm(
+            norm=mcolors.LogNorm(
                 vmin=vmin_err_rel,
                 vmax=vmax_err_rel,
             ),
@@ -508,7 +511,7 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         )
         im_err_abs = axis_row[1].imshow(
             err_mat_abs,
-            norm=LogNorm(
+            norm=mcolors.LogNorm(
                 vmin=vmin_err_abs,
                 vmax=vmax_err_abs,
             ),
@@ -518,7 +521,7 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         )
         im_std = axis_row[2].imshow(
             std_mat,
-            norm=LogNorm(
+            norm=mcolors.LogNorm(
                 vmin=vmin_std,
                 vmax=vmax_std,
             ),
@@ -528,7 +531,7 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         )
         im_calib = axis_row[3].imshow(
             chi2_mat,
-            norm=LogNorm(
+            norm=mcolors.LogNorm(
                 vmin=vmin_calib,
                 vmax=vmax_calib,
             ),
@@ -538,7 +541,7 @@ def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         )
         im_rt = axis_row[4].imshow(
             runtime_mat,
-            norm=LogNorm(vmin=vmin_time, vmax=vmax_time),
+            norm=mcolors.LogNorm(vmin=vmin_time, vmax=vmax_time),
             extent=extents,
             aspect="auto",
             **style,
@@ -576,8 +579,8 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
     figure_size = (AISTATS_TEXTWIDTH_SINGLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
-        nrows=len(methods),
-        ncols=2,
+        nrows=2,
+        ncols=len(methods),
         dpi=400,
         figsize=figure_size,
         sharex=True,
@@ -596,21 +599,21 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
     # vmin_calib = 1e-2
     # vmax_calib = 100.
     nicer_method_name = {"tornadox": "MOL", "pnmol_white": "PNMOL"}
-    for axis_row, method, result in zip(axes, methods, results):
-        axis_row[0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
+    for axis_row, method, result in zip(axes.T, methods, results):
+
         err_mat_rel, err_mat_abs, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
         print(DTs, DXs)
         extents = [
-            float(DTs.min()),
-            float(DTs.max()),
-            float(DXs.min()),
-            float(DXs.max()),
+            0.0,
+            float(DTs.shape[0]),
+            float(DXs.shape[0]),
+            0.0,
         ]
         style_chi2 = {"cmap": "RdYlBu_r"}
-        style_error = {"cmap": "RdYlBu_r"}
+        style_error = {"cmap": "binary", "alpha": 0.8}
         im_err_rel = axis_row[0].imshow(
             jnp.flip(err_mat_rel, axis=0),
-            norm=LogNorm(vmin=vmin_err_rel, vmax=vmax_err_rel),
+            norm=mcolors.LogNorm(vmin=vmin_err_rel, vmax=vmax_err_rel),
             extent=extents,
             aspect="auto",
             **style_error,
@@ -618,7 +621,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
         im_calib = axis_row[1].imshow(
             jnp.flip(chi2_mat, axis=0),
-            norm=LogNorm(
+            norm=mcolors.LogNorm(
                 vmin=vmin_calib,
                 vmax=vmax_calib,
             ),
@@ -627,26 +630,40 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
             **style_chi2,
         )
 
+        axes[0, 0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
+        axes[1, 0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
+
+        magic_number = 0.278
+        magic_xticks = np.flip(
+            np.arange(0, DTs.shape[0] - magic_number, magic_number) + 0.5 * magic_number
+        )
         axis_row[1].autoscale(False)
-        axis_row[1].set_xticks((0.02, 1.02, 2.02))  # black magic
-        axis_row[1].set_xticklabels(("$2^{-6}$", "$2^{-2.5}$", "$2^{1}$"))
+        axis_row[1].set_xticks(magic_xticks[::4])  # black magic
+        axis_row[1].set_xticklabels(
+            ["$2^{-%d}$" % i for i in np.arange(2, 2 + len(magic_xticks[::4]), 1)],
+            fontsize="small",
+        )
 
         axis_row[0].autoscale(False)
-        axis_row[0].set_yticks((0.07, 0.17, 0.27))  # black magic
-        axis_row[0].set_yticklabels(("$2^{-6}$", "$2^{-4}$", "$2^{-2}$"))
+        axis_row[0].set_yticks(np.flip(np.arange(DXs.shape[0])) + 0.5)  # black magic
 
-        fig.colorbar(im_err_rel, ax=axis_row[0])
-        fig.colorbar(im_calib, ax=axis_row[1])
-
-    axes[0, 0].set_title(r"$\bf PN/1$. Relative RMSE", fontsize="small", loc="left")
-    axes[0, 1].set_title(
-        r"$\bf PN/1$. $\chi^2$-statistic", fontsize="small", loc="left"
+    axes[0, 0].set_yticklabels(
+        ["$2^{-%d}$" % i for i in np.arange(2, 2 + DXs.shape[0])],
+        fontsize="small",
+    )
+    axes[1, 0].set_yticklabels(
+        ["$2^{-%d}$" % i for i in np.arange(2, 2 + DXs.shape[0])],
+        fontsize="small",
     )
 
-    axes[1, 0].set_title(r"$\bf MOL/1$. Relative RMSE", fontsize="small", loc="left")
-    axes[1, 1].set_title(
-        r"$\bf MOL/2$. $\chi^2$-statistic", fontsize="small", loc="left"
-    )
+    fig.colorbar(im_err_rel, ax=axes[0, 1])
+    fig.colorbar(im_calib, ax=axes[1, 1])
+
+    axes[0, 0].set_title(r"$\bf PN$ Relative RMSE", fontsize="small", loc="left")
+    axes[1, 0].set_title(r"$\bf PN$ $\chi^2$-statistic", fontsize="small", loc="left")
+
+    axes[0, 1].set_title(r"$\bf MOL$ Relative RMSE", fontsize="small", loc="left")
+    axes[1, 1].set_title(r"$\bf MOL$ $\chi^2$-statistic", fontsize="small", loc="left")
 
     for bottom_ax in axes[-1, :]:
         bottom_ax.set_xlabel(r"Step-size $\Delta t$", fontsize="small")
