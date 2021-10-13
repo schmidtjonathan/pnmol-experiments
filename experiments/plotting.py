@@ -688,7 +688,7 @@ def figure_4():
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
-        ncols=3, sharey=True, figsize=figsize, dpi=400, constrained_layout=True
+        ncols=3, sharey=True, figsize=figsize, dpi=200, constrained_layout=True
     )
     ax_nsteps, ax_runtime, ax_chi2 = axes
 
@@ -698,20 +698,22 @@ def figure_4():
         style_mol = {
             "color": "gray",
             "linewidth": 3.0,
-            "alpha": 0.5,
+            "alpha": 0.4,
             "label": f"MOL (dx={dx})",
         }
         style_pnmol_white = {
             "color": "C1",
             "linewidth": 3.0,
             "label": f"PNMOL (white; dx={dx})",
+            "alpha": 0.75,
         }
         style_pnmol_latent = {
             "color": "C0",
             "linewidth": 3.0,
             "label": f"PNMOL (latent; dx={dx})",
+            "alpha": 0.75,
         }
-        style_all = {"linestyle": ls, "markersize": 3}
+        style_all = {"linestyle": ls, "markersize": 4}
 
         plt.style.use(STYLESHEETS)
 
@@ -766,7 +768,7 @@ def figure_4():
             **style_all,
         )
 
-        ax_chi2.set_xlabel(r"$\chi^2$-statistic")
+        ax_chi2.set_xlabel(r"Normalised $\chi^2$-statistic")
         ax_chi2.loglog(
             mol_chi2,
             mol_rmse,
@@ -775,7 +777,8 @@ def figure_4():
             label="MOL",
             color="gray",
             alpha=0.5,
-            linestyle="None",
+            linestyle="-",
+            linewidth=0.5,
         )
         ax_chi2.loglog(
             pnmol_white_chi2,
@@ -784,7 +787,8 @@ def figure_4():
             markersize=5,
             label="PNMOL (white)",
             color="C1",
-            linestyle="None",
+            linestyle="-",
+            linewidth=0.5,
         )
         ax_chi2.loglog(
             pnmol_latent_chi2,
@@ -793,29 +797,40 @@ def figure_4():
             markersize=5,
             label="PNMOL (latent)",
             color="C0",
-            linestyle="None",
+            linestyle="-",
+            linewidth=0.5,
         )
 
     # ax_nsteps.set_xlim((1e0, 1e3))
-    for ax in axes:
-        # ax.set_ylim((1e-4, 1e2))
-        pass
+
     axes[0].set_ylabel("RMSE")
     axes[0].legend(
         loc="upper right",
-        handlelength=2.5,
+        handlelength=3.5,
         fontsize="x-small",
         fancybox=False,
         edgecolor="black",
     ).get_frame().set_linewidth(0.5)
 
+    handles, labels = axes[-1].get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
     axes[-1].legend(
-        loc="upper right",
-        handlelength=2.5,
+        by_label.values(),
+        by_label.keys(),
+        loc="center right",
+        handlelength=2,
         fontsize="x-small",
         fancybox=False,
         edgecolor="black",
     ).get_frame().set_linewidth(0.5)
+    axes[-1].set_xlim((1e-7, 1e7))
+
+    axes[-1].annotate(
+        "Underconfident", (5e-6, 1e0), color="gray", alpha=0.8, fontsize="small"
+    )
+    axes[-1].annotate(
+        "Overconfident", (5e1, 2e0), color="gray", alpha=0.8, fontsize="small"
+    )
 
     for ax in axes:
         ax.grid(which="minor", axis="y", linewidth=0.5, linestyle="dotted", alpha=0.75)
@@ -830,6 +845,6 @@ def figure_4():
         r"$\bf c.$ " + "RMSE vs. Calibration", loc="left", fontsize="medium"
     )
 
-    ax_chi2.axvline(1.0, color="black", linewidth=1, alpha=0.8)
+    ax_chi2.axvline(1.0, color="gray", linewidth=1, alpha=0.8)
     plt.savefig("./experiments/results/figure4/figure.pdf", dpi=300)
     plt.show()
