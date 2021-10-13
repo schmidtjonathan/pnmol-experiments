@@ -13,16 +13,19 @@ import pnmol
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-for dx in sorted([0.01, 0.05, 0.1, 0.2]):
+dts = 2.0 ** jnp.arange(1, -10.5, step=-0.5)
+
+
+for dx in sorted([0.01, 0.025, 0.05, 0.1, 0.2]):
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
         stencil_size_interior=3,
-        stencil_size_boundary=4,
+        stencil_size_boundary=5,
     )
     ivp = pde.to_tornadox_ivp()
 
-    ref_scale = 7
+    ref_scale = 9
     pde_ref = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx / ref_scale,
@@ -68,53 +71,61 @@ for dx in sorted([0.01, 0.05, 0.1, 0.2]):
     mol_chi2 = []
     mol_time = []
 
-    dts = jnp.logspace(0.0, -2.5, 12, endpoint=True)
+    # dts = jnp.logspace(0.0, -3.5, -0.5, endpoint=True)
     for dt in sorted(dts):
 
-        # [PNMOL-LATENT] Solve
-        steps = pnmol.odetools.step.Constant(dt)
-        solver = pnmol.latent.SemiLinearLatentForceEK1(
-            num_derivatives=2, steprule=steps, spatial_kernel=k
-        )
-        time_start = time.time()
-        sol_pnmol_latent, sol_pnmol_latent_info = solver.simulate_final_state(
-            pde, progressbar=True
-        )
-        time_pnmol_latent = time.time() - time_start
+        if dx > 0.01 and dt > 1e-3:
+            # [PNMOL-LATENT] Solve
+            steps = pnmol.odetools.step.Constant(dt)
+            solver = pnmol.latent.SemiLinearLatentForceEK1(
+                num_derivatives=2, steprule=steps, spatial_kernel=k
+            )
+            time_start = time.time()
+            with jax.disable_jit():
+                sol_pnmol_latent, sol_pnmol_latent_info = solver.simulate_final_state(
+                    pde, progressbar=True
+                )
+            time_pnmol_latent = time.time() - time_start
 
-        # [PNMOL-LATENT] Extract mean
-        mean_state, _ = jnp.split(sol_pnmol_latent.y.mean[0], 2)  # ignore mean_latent
-        u_pnmol_latent_full, v_pnmol_latent_full = jnp.split(mean_state, 2)
-        u_pnmol_latent, v_pnmol_latent = (
-            u_pnmol_latent_full[1:-1],
-            v_pnmol_latent_full[1:-1],
-        )
+            # [PNMOL-LATENT] Extract mean
+            mean_state, _ = jnp.split(
+                sol_pnmol_latent.y.mean[0], 2
+            )  # ignore mean_latent
+            u_pnmol_latent_full, v_pnmol_latent_full = jnp.split(mean_state, 2)
+            u_pnmol_latent, v_pnmol_latent = (
+                u_pnmol_latent_full[1:-1],
+                v_pnmol_latent_full[1:-1],
+            )
 
-        # [PNMOL-LATENT] Extract covariance: first remove xi, then remove "v"
-        cov_final_latent = sol_pnmol_latent.y.cov_sqrtm @ sol_pnmol_latent.y.cov_sqrtm.T
-        cov_final_no_xi = jnp.split(
-            jnp.split(cov_final_latent, 2, axis=-1)[0], 2, axis=0
-        )[0]
-        cov_final_latent_interesting = solver.E0 @ cov_final_no_xi @ solver.E0.T
-        cov_final_latent_u_split_horizontally, _ = jnp.split(
-            cov_final_latent_interesting, 2, axis=-1
-        )
-        cov_final_latent_u_split, _ = jnp.split(
-            cov_final_latent_u_split_horizontally, 2, axis=0
-        )
-        cov_final_latent_u = cov_final_latent_u_split[1:-1, 1:-1]
+            # [PNMOL-LATENT] Extract covariance: first remove xi, then remove "v"
+            cov_final_latent = (
+                sol_pnmol_latent.y.cov_sqrtm @ sol_pnmol_latent.y.cov_sqrtm.T
+            )
+            cov_final_no_xi = jnp.split(
+                jnp.split(cov_final_latent, 2, axis=-1)[0], 2, axis=0
+            )[0]
+            cov_final_latent_interesting = solver.E0 @ cov_final_no_xi @ solver.E0.T
+            cov_final_latent_u_split_horizontally, _ = jnp.split(
+                cov_final_latent_interesting, 2, axis=-1
+            )
+            cov_final_latent_u_split, _ = jnp.split(
+                cov_final_latent_u_split_horizontally, 2, axis=0
+            )
+            cov_final_latent_u = cov_final_latent_u_split[1:-1, 1:-1]
 
-        # [PNMOL-LATENT] Compute error and calibration
-        error_pnmol_latent_abs = jnp.abs(u_pnmol_latent - u_reference)
-        error_pnmol_latent_rel = error_pnmol_latent_abs / jnp.abs(u_reference)
-        rmse_pnmol_latent = jnp.linalg.norm(error_pnmol_latent_rel) / jnp.sqrt(
-            u_pnmol_latent.size
-        )
-        chi2_pnmol_latent = (
-            error_pnmol_latent_abs
-            @ jnp.linalg.solve(cov_final_latent_u, error_pnmol_latent_abs)
-            / error_pnmol_latent_abs.shape[0]
-        )
+            # [PNMOL-LATENT] Compute error and calibration
+            error_pnmol_latent_abs = jnp.abs(u_pnmol_latent - u_reference)
+            error_pnmol_latent_rel = error_pnmol_latent_abs / jnp.abs(u_reference)
+            rmse_pnmol_latent = jnp.linalg.norm(error_pnmol_latent_rel) / jnp.sqrt(
+                u_pnmol_latent.size
+            )
+            chi2_pnmol_latent = (
+                error_pnmol_latent_abs
+                @ jnp.linalg.solve(cov_final_latent_u, error_pnmol_latent_abs)
+                / error_pnmol_latent_abs.shape[0]
+            )
+        else:
+            print("Skipping Latent...")
 
         ################################################################
         ################################################################
@@ -125,9 +136,10 @@ for dx in sorted([0.01, 0.05, 0.1, 0.2]):
             num_derivatives=2, steprule=steps, spatial_kernel=k
         )
         time_start = time.time()
-        sol_pnmol_white, sol_pnmol_white_info = solver.simulate_final_state(
-            pde, progressbar=True
-        )
+        with jax.disable_jit():
+            sol_pnmol_white, sol_pnmol_white_info = solver.simulate_final_state(
+                pde, progressbar=True
+            )
         time_pnmol_white = time.time() - time_start
 
         # [PNMOL-WHITE] Extract mean
@@ -206,14 +218,15 @@ for dx in sorted([0.01, 0.05, 0.1, 0.2]):
         print(
             f"PNMOL(white):\n\tRMSE={rmse_pnmol_white}, chi2={chi2_pnmol_white}, nsteps={sol_pnmol_white_info['num_steps']}, time={time_pnmol_white}"
         )
-        print(
-            f"PNMOL(latent):\n\tRMSE={rmse_pnmol_latent}, chi2={chi2_pnmol_latent}, nsteps={sol_pnmol_latent_info['num_steps']}, time={time_pnmol_latent}"
-        )
+        if dx > 0.01 and dt > 1e-3:
+            print(
+                f"PNMOL(latent):\n\tRMSE={rmse_pnmol_latent}, chi2={chi2_pnmol_latent}, nsteps={sol_pnmol_latent_info['num_steps']}, time={time_pnmol_latent}"
+            )
 
-        pnmol_latent_rmse.append(rmse_pnmol_latent)
-        pnmol_latent_chi2.append(chi2_pnmol_latent)
-        pnmol_latent_nsteps.append(sol_pnmol_latent_info["num_steps"])
-        pnmol_latent_time.append(time_pnmol_latent)
+            pnmol_latent_rmse.append(rmse_pnmol_latent)
+            pnmol_latent_chi2.append(chi2_pnmol_latent)
+            pnmol_latent_nsteps.append(sol_pnmol_latent_info["num_steps"])
+            pnmol_latent_time.append(time_pnmol_latent)
 
         pnmol_white_rmse.append(rmse_pnmol_white)
         pnmol_white_chi2.append(chi2_pnmol_white)

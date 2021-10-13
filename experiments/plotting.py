@@ -684,7 +684,7 @@ def figure3_plot_contour(ax, /, *args, **kwargs):
 
 def figure_4():
 
-    dxs = [0.025]
+    dxs = [0.05, 0.2]
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
@@ -746,6 +746,8 @@ def figure_4():
             pnmol_latent_chi2, pnmol_latent_rmse, **style_pnmol_latent, **style_all
         )
 
+    for ax in axes:
+        ax.set_ylim((1e-3, 1e1))
     axes[0].set_ylabel("RMSE")
     axes[0].legend(
         loc="upper right",

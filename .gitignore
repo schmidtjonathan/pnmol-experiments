@@ -1,7 +1,7 @@
 
 
 # Stored results
-*.npy
+# *.npy
 
 # Expensive, auto-generated files
 *.gif
