@@ -684,7 +684,7 @@ def figure3_plot_contour(ax, /, *args, **kwargs):
 
 def figure_4():
 
-    dxs = [0.01, 0.025, 0.1, 0.2]
+    dxs = [0.025]
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
@@ -798,7 +798,8 @@ def figure_4():
 
     # ax_nsteps.set_xlim((1e0, 1e3))
     for ax in axes:
-        ax.set_ylim((1e-4, 1e2))
+        # ax.set_ylim((1e-4, 1e2))
+        pass
     axes[0].set_ylabel("RMSE")
     axes[0].legend(
         loc="upper right",

@@ -13,10 +13,11 @@ import pnmol
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-dts = 2.0 ** jnp.arange(1, -10.5, step=-0.5)
+dts = 2.0 ** jnp.arange(1, -7, step=-1)
 
+num_derivatives = 1
 
-for dx in sorted([0.01, 0.025, 0.05, 0.1, 0.2]):
+for dx in sorted([0.025]):
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
@@ -25,7 +26,7 @@ for dx in sorted([0.01, 0.025, 0.05, 0.1, 0.2]):
     )
     ivp = pde.to_tornadox_ivp()
 
-    ref_scale = 9
+    ref_scale = 19
     pde_ref = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx / ref_scale,
@@ -78,7 +79,7 @@ for dx in sorted([0.01, 0.025, 0.05, 0.1, 0.2]):
             # [PNMOL-LATENT] Solve
             steps = pnmol.odetools.step.Constant(dt)
             solver = pnmol.latent.SemiLinearLatentForceEK1(
-                num_derivatives=2, steprule=steps, spatial_kernel=k
+                num_derivatives=num_derivatives, steprule=steps, spatial_kernel=k
             )
             time_start = time.time()
             with jax.disable_jit():
@@ -133,7 +134,7 @@ for dx in sorted([0.01, 0.025, 0.05, 0.1, 0.2]):
         # [PNMOL-WHITE] Solve
         steps = pnmol.odetools.step.Constant(dt)
         solver = pnmol.white.SemiLinearWhiteNoiseEK1(
-            num_derivatives=2, steprule=steps, spatial_kernel=k
+            num_derivatives=num_derivatives, steprule=steps, spatial_kernel=k
         )
         time_start = time.time()
         with jax.disable_jit():
@@ -178,7 +179,7 @@ for dx in sorted([0.01, 0.025, 0.05, 0.1, 0.2]):
         # [MOL] Solve
         steps = tornadox.step.ConstantSteps(dt)
         ek1 = tornadox.ek1.ReferenceEK1ConstantDiffusion(
-            num_derivatives=2,
+            num_derivatives=num_derivatives,
             steprule=steps,
             initialization=tornadox.init.Stack(use_df=False),
         )
