@@ -684,7 +684,7 @@ def figure3_plot_contour(ax, /, *args, **kwargs):
 
 def figure_4():
 
-    dxs = [0.05, 0.2]
+    dxs = [0.01, 0.025, 0.1, 0.2]
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
@@ -692,13 +692,26 @@ def figure_4():
     )
     ax_nsteps, ax_runtime, ax_chi2 = axes
 
-    for dx, ls in zip(dxs, [":", "-"]):
+    for dx, ls in zip(dxs, [":", "-", "--", "-."]):
         path = "./experiments/results/figure4/" + f"dx_{dx}_"
 
-        style_mol = {"color": "C0", "label": f"MOL (dx={dx})"}
-        style_pnmol_white = {"color": "C1", "label": f"PNMOL (white; dx={dx})"}
-        style_pnmol_latent = {"color": "C2", "label": f"PNMOL (latent; dx={dx})"}
-        style_all = {"linestyle": ls, "marker": "."}
+        style_mol = {
+            "color": "gray",
+            "linewidth": 3.0,
+            "alpha": 0.5,
+            "label": f"MOL (dx={dx})",
+        }
+        style_pnmol_white = {
+            "color": "C1",
+            "linewidth": 3.0,
+            "label": f"PNMOL (white; dx={dx})",
+        }
+        style_pnmol_latent = {
+            "color": "C0",
+            "linewidth": 3.0,
+            "label": f"PNMOL (latent; dx={dx})",
+        }
+        style_all = {"linestyle": ls, "markersize": 3}
 
         plt.style.use(STYLESHEETS)
 
@@ -720,36 +733,82 @@ def figure_4():
         pnmol_latent_time = jnp.load(path + "pnmol_latent_time.npy")
 
         ax_nsteps.set_xlabel("Number of time-steps")
-        ax_nsteps.loglog(mol_nsteps, mol_rmse, **style_mol, **style_all)
+        ax_nsteps.loglog(mol_nsteps, mol_rmse, marker="d", **style_mol, **style_all)
         ax_nsteps.loglog(
-            pnmol_white_nsteps, pnmol_white_rmse, **style_pnmol_white, **style_all
+            pnmol_white_nsteps,
+            pnmol_white_rmse,
+            marker="o",
+            **style_pnmol_white,
+            **style_all,
         )
         ax_nsteps.loglog(
-            pnmol_latent_nsteps, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+            pnmol_latent_nsteps,
+            pnmol_latent_rmse,
+            marker="^",
+            **style_pnmol_latent,
+            **style_all,
         )
 
         ax_runtime.set_xlabel("Run time [s]")
         ax_runtime.loglog(mol_time, mol_rmse, **style_mol, **style_all)
         ax_runtime.loglog(
-            pnmol_white_time, pnmol_white_rmse, **style_pnmol_white, **style_all
+            pnmol_white_time,
+            pnmol_white_rmse,
+            marker="o",
+            **style_pnmol_white,
+            **style_all,
         )
         ax_runtime.loglog(
-            pnmol_latent_time, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+            pnmol_latent_time,
+            pnmol_latent_rmse,
+            marker="^",
+            **style_pnmol_latent,
+            **style_all,
         )
 
         ax_chi2.set_xlabel(r"$\chi^2$-statistic")
-        ax_chi2.loglog(mol_chi2, mol_rmse, **style_mol, **style_all)
         ax_chi2.loglog(
-            pnmol_white_chi2, pnmol_white_rmse, **style_pnmol_white, **style_all
+            mol_chi2,
+            mol_rmse,
+            marker="d",
+            markersize=5,
+            label="MOL",
+            color="gray",
+            alpha=0.5,
+            linestyle="None",
         )
         ax_chi2.loglog(
-            pnmol_latent_chi2, pnmol_latent_rmse, **style_pnmol_latent, **style_all
+            pnmol_white_chi2,
+            pnmol_white_rmse,
+            marker="o",
+            markersize=5,
+            label="PNMOL (white)",
+            color="C1",
+            linestyle="None",
+        )
+        ax_chi2.loglog(
+            pnmol_latent_chi2,
+            pnmol_latent_rmse,
+            marker="^",
+            markersize=5,
+            label="PNMOL (latent)",
+            color="C0",
+            linestyle="None",
         )
 
+    # ax_nsteps.set_xlim((1e0, 1e3))
     for ax in axes:
-        ax.set_ylim((1e-3, 1e1))
+        ax.set_ylim((1e-4, 1e2))
     axes[0].set_ylabel("RMSE")
     axes[0].legend(
+        loc="upper right",
+        handlelength=2.5,
+        fontsize="x-small",
+        fancybox=False,
+        edgecolor="black",
+    ).get_frame().set_linewidth(0.5)
+
+    axes[-1].legend(
         loc="upper right",
         handlelength=2.5,
         fontsize="x-small",
@@ -770,6 +829,6 @@ def figure_4():
         r"$\bf c.$ " + "RMSE vs. Calibration", loc="left", fontsize="medium"
     )
 
-    ax_chi2.axvspan(0.01, 100.0, color="gray", alpha=0.2)
+    ax_chi2.axvline(1.0, color="black", linewidth=1, alpha=0.8)
     plt.savefig("./experiments/results/figure4/figure.pdf", dpi=300)
     plt.show()
