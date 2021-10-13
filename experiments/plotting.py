@@ -606,8 +606,8 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         extents = [
             0.0,
             float(DTs.shape[0]),
-            float(DXs.shape[0]),
             0.0,
+            float(DXs.shape[0]),
         ]
         style_chi2 = {"cmap": "RdYlBu_r"}
         style_error = {"cmap": "binary", "alpha": 0.8}
@@ -641,7 +641,7 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
         axis_row[1].set_xticks(magic_xticks[::4])  # black magic
         axis_row[1].set_xticklabels(
             ["$2^{-%d}$" % i for i in np.arange(2, 2 + len(magic_xticks[::4]), 1)],
-            fontsize="small",
+            fontsize="x-small",
         )
 
         axis_row[0].autoscale(False)
@@ -649,15 +649,18 @@ def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
 
     axes[0, 0].set_yticklabels(
         ["$2^{-%d}$" % i for i in np.arange(2, 2 + DXs.shape[0])],
-        fontsize="small",
+        fontsize="x-small",
     )
     axes[1, 0].set_yticklabels(
         ["$2^{-%d}$" % i for i in np.arange(2, 2 + DXs.shape[0])],
-        fontsize="small",
+        fontsize="x-small",
     )
 
-    fig.colorbar(im_err_rel, ax=axes[0, 1])
-    fig.colorbar(im_calib, ax=axes[1, 1])
+    cbar_err = fig.colorbar(im_err_rel, ax=axes[0, 1])
+    cbar_calib = fig.colorbar(im_calib, ax=axes[1, 1])
+
+    cbar_err.ax.tick_params(labelsize="x-small")
+    cbar_calib.ax.tick_params(labelsize="x-small")
 
     axes[0, 0].set_title(r"$\bf PN$ Relative RMSE", fontsize="small", loc="left")
     axes[1, 0].set_title(r"$\bf PN$ $\chi^2$-statistic", fontsize="small", loc="left")
