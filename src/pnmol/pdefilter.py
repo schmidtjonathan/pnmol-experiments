@@ -10,7 +10,7 @@ import numpy as np
 from tqdm import tqdm
 
 from pnmol import kernels
-from pnmol.base import iwp
+from pnmol.base import iwp, rv
 from pnmol.odetools import init, step
 
 

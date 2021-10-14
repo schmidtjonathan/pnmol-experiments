@@ -142,7 +142,7 @@ def sir_1d(
     bbox = jnp.asarray(bbox)
 
     def y0_fun(x):
-        init_infectious = 800.0 * gaussian_bell_1d_centered(x, bbox, width=0.5) + 1.0
+        init_infectious = 200.0 * gaussian_bell_1d_centered(x, bbox, width=0.5) + 1.0
         s0 = N * jnp.ones_like(init_infectious) - init_infectious
         i0 = init_infectious
         r0 = jnp.zeros_like(init_infectious)

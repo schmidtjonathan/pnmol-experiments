@@ -128,8 +128,8 @@ class _LatentForceEK1Base(pdefilter.PDEFilter):
             error_estimate=None,
             reference_state=None,
             diffusion_squared_local=[
-                diffusion_squared_local_y0,
-                diffusion_squared_local_pde,
+                # diffusion_squared_local_y0,
+                # diffusion_squared_local_pde,
             ],
         )
 

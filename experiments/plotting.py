@@ -1,9 +1,11 @@
 """Plotting code for the PNMOL experiments."""
 
+import pathlib
+
 import jax.numpy as jnp
+import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import LogNorm
 
 STYLESHEETS = [
     "experiments/style/lines_and_ticks.mplstyle",
@@ -61,7 +63,7 @@ def figure_1(
             vmin = jnp.minimum(vmin_error, vmin_std)
             vmax = jnp.maximum(vmax_error, vmax_std)
 
-        contour_args = {"alpha": 0.8}
+        contour_args = {"alpha": 0.8, "levels": 20}
         contour_args_means = {"vmin": 0.0, "vmax": 0.1, "cmap": "Greys"}
         contour_args_errors = {"cmap": "inferno"}
         figure_1_plot_contour(
@@ -130,20 +132,21 @@ def figure_1_singlerow(
     figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.4 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
         nrows=1,
-        ncols=6,
+        ncols=4,
         dpi=200,
         figsize=figure_size,
         sharex=True,
         sharey=True,
         constrained_layout=True,
+        gridspec_kw={"width_ratios": [3, 2, 2, 3]},
     )
 
     axes = np.flip(axes)
-    ax_mol_error, ax_mol_std, ax_mol_mean = axes[:3]
-    ax_pnmol_mean, ax_pnmol_std, ax_pnmol_error = axes[3:]
+    ax_mol_error, ax_mol_mean = axes[:2]
+    ax_pnmol_mean, ax_pnmol_error = axes[2:]
 
     contour_args = {"alpha": 0.7, "levels": 20}
-    contour_args_means = {"vmin": 0.0, "vmax": 1.0, "cmap": "Greys"}
+    contour_args_means = {"vmin": 0.0, "vmax": 0.1, "cmap": "Greys"}
     contour_args_errors = {}
 
     cmap_mol, cmap_pnmol = "RdYlBu_r", "RdYlGn_r"
@@ -155,11 +158,9 @@ def figure_1_singlerow(
         **contour_args,
         **contour_args_errors,
         cmap=cmap_mol,
-        vmin=0.0,
-        vmax=500.0,
-        # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
+        # norm=mcolors.LogNorm(vmin=1e-3,vmax=1e3, clip=True)
     )
-    fig.colorbar(bar_mol, ax=ax_mol_error, location="right", ticks=(0, 250, 500))
+    fig.colorbar(bar_mol, ax=ax_mol_error, location="right", ticks=(0.0, 6_500, 13_000))
 
     bar_pnmol = _figure_1_plot_errors(
         ax=ax_pnmol_error,
@@ -168,26 +169,9 @@ def figure_1_singlerow(
         **contour_args,
         **contour_args_errors,
         cmap=cmap_pnmol,
-        vmin=0.0,
-        vmax=5.0,
-        # norm=LogNorm(vmin=1e-3,vmax=1e3, clip=True)
+        # norm=mcolors.LogNorm(vmin=1e-3,vmax=1e3, clip=True)
     )
-    fig.colorbar(bar_pnmol, ax=ax_pnmol_error, location="left", ticks=(0, 2.5, 5.0))
-
-    _figure_1_plot_stds(
-        ax=ax_mol_std,
-        result=results[2],
-        **contour_args,
-        **contour_args_errors,
-        cmap="Blues",
-    )
-    _figure_1_plot_stds(
-        ax=ax_pnmol_std,
-        result=results[0],
-        **contour_args,
-        **contour_args_errors,
-        cmap="Greens",
-    )
+    fig.colorbar(bar_pnmol, ax=ax_pnmol_error, location="left", ticks=(0.0, 7.5, 15.0))
 
     _figure_1_plot_means(
         ax=ax_mol_mean, result=results[2], **contour_args, **contour_args_means
@@ -197,13 +181,11 @@ def figure_1_singlerow(
     )
 
     title_style = {"loc": "left", "fontsize": "small"}
-    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Error/Unc.", **title_style)
-    ax_mol_std.set_title(r"$\bf MOL/2$. " + "Uncertainty", **title_style)
-    ax_mol_mean.set_title(r"$\bf MOL/3$. " + "Estimate", **title_style)
+    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Error/Uncertainty Ratio", **title_style)
+    ax_mol_mean.set_title(r"$\bf MOL/2$. " + "Posterior mean", **title_style)
 
-    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Error/Unc.", **title_style)
-    ax_pnmol_std.set_title(r"$\bf PN/2$. " + "Uncertainty", **title_style)
-    ax_pnmol_mean.set_title(r"$\bf PN/3$. " + "Estimate", **title_style)
+    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Error/Uncertainty Ratio", **title_style)
+    ax_pnmol_mean.set_title(r"$\bf PN/2$. " + "Posterior mean", **title_style)
 
     plt.savefig(path + "figure.pdf")
     plt.show()
@@ -298,7 +280,8 @@ def _figure_1_plot_errors(ax, result, result_reference, **style):
     ax.set_yticks(t)
     ax.set_xticklabels(())
     ax.set_yticklabels(())
-    return figure_1_plot_contour(ax, X.T, T.T, error / (s[:n] + 1e-12) + 1e-12, **style)
+    quotient = error / (s[:n] + 1e-12)
+    return figure_1_plot_contour(ax, X.T, T.T, quotient, **style)
 
 
 def _figure_1_plot_stds(ax, result, **style):
@@ -393,10 +376,13 @@ def figure_2(path=PATH_RESULTS):
         jnp.abs(E_sparse @ E_sparse.T) + clip_value,
         **cmap,
         aspect="auto",
-        norm=LogNorm(vmin=clip_value),
+        norm=mcolors.LogNorm(vmin=clip_value),
     )
     ax_E_dense.imshow(
-        jnp.abs(E_dense @ E_dense.T) + clip_value, **cmap, aspect="auto", norm=LogNorm()
+        jnp.abs(E_dense @ E_dense.T) + clip_value,
+        **cmap,
+        aspect="auto",
+        norm=mcolors.LogNorm(),
     )
 
     s1_style = {
@@ -483,6 +469,252 @@ def figure_2(path=PATH_RESULTS):
 
     plt.savefig(path + "figure.pdf", dpi=300)
     plt.show()
+
+
+def figure_3(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
+    path = path + "figure3/"
+    plt.style.use(STYLESHEETS)
+
+    results = [figure3_load_results(prefix=method, path=path) for method in methods]
+
+    figure_size = (AISTATS_LINEWIDTH_DOUBLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
+    fig, axes = plt.subplots(
+        nrows=len(methods),
+        ncols=5,
+        dpi=400,
+        figsize=figure_size,
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
+    )
+
+    vmin_err_rel = jnp.minimum(results[0][0].min(), results[1][0].min())
+    vmax_err_rel = jnp.maximum(results[0][0].max(), results[1][0].max())
+
+    vmin_err_abs = jnp.minimum(results[0][1].min(), results[1][1].min())
+    vmax_err_abs = jnp.maximum(results[0][1].max(), results[1][1].max())
+
+    vmin_std = jnp.minimum(results[0][2].min(), results[1][2].min())
+    vmax_std = jnp.maximum(results[0][2].max(), results[1][2].max())
+
+    vmin_calib = jnp.minimum(results[0][3].min(), results[1][3].min())
+    vmax_calib = jnp.maximum(results[0][3].max(), results[1][3].max())
+
+    vmin_time = jnp.minimum(results[0][4].min(), results[1][4].min())
+    vmax_time = jnp.maximum(results[0][4].max(), results[1][4].max())
+
+    nicer_method_name = {"tornadox": "MOL", "pnmol_white": "PNMOL"}
+    for axis_row, method, result in zip(axes, methods, results):
+        axis_row[0].set_ylabel(f"{nicer_method_name[method]}\ndx")
+        err_mat_rel, err_mat_abs, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
+        extents = [
+            float(DTs.min()),
+            float(DTs.max()),
+            float(DXs.max()),
+            float(DXs.min()),
+        ]
+        style = {"cmap": "RdYlBu"}
+        im_err_rel = axis_row[0].imshow(
+            err_mat_rel,
+            norm=mcolors.LogNorm(
+                vmin=vmin_err_rel,
+                vmax=vmax_err_rel,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style,
+        )
+        im_err_abs = axis_row[1].imshow(
+            err_mat_abs,
+            norm=mcolors.LogNorm(
+                vmin=vmin_err_abs,
+                vmax=vmax_err_abs,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style,
+        )
+        im_std = axis_row[2].imshow(
+            std_mat,
+            norm=mcolors.LogNorm(
+                vmin=vmin_std,
+                vmax=vmax_std,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style,
+        )
+        im_calib = axis_row[3].imshow(
+            chi2_mat,
+            norm=mcolors.LogNorm(
+                vmin=vmin_calib,
+                vmax=vmax_calib,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style,
+        )
+        im_rt = axis_row[4].imshow(
+            runtime_mat,
+            norm=mcolors.LogNorm(vmin=vmin_time, vmax=vmax_time),
+            extent=extents,
+            aspect="auto",
+            **style,
+        )
+
+        fig.colorbar(im_err_rel, ax=axis_row[0])
+        fig.colorbar(im_err_abs, ax=axis_row[1])
+        fig.colorbar(im_std, ax=axis_row[2])
+        fig.colorbar(im_calib, ax=axis_row[3])
+        fig.colorbar(im_rt, ax=axis_row[4])
+
+    axes[0, 0].set_title(r"$\bf a1$. Relative Error", fontsize="small", loc="left")
+    axes[0, 1].set_title(r"$\bf a2$. Absolute Error", fontsize="small", loc="left")
+    axes[0, 2].set_title(r"$\bf a3$. Std. dev.", fontsize="small", loc="left")
+    axes[0, 3].set_title(r"$\bf a4$. $\chi^2$-statistic", fontsize="small", loc="left")
+    axes[0, 4].set_title(r"$\bf a5$. Run time [s]", fontsize="small", loc="left")
+
+    axes[1, 0].set_title(r"$\bf b1$.", fontsize="small", loc="left")
+    axes[1, 1].set_title(r"$\bf b2$.", fontsize="small", loc="left")
+    axes[1, 2].set_title(r"$\bf b3$.", fontsize="small", loc="left")
+    axes[1, 3].set_title(r"$\bf b4$.", fontsize="small", loc="left")
+    axes[1, 4].set_title(r"$\bf b5$.", fontsize="small", loc="left")
+    for bottom_ax in axes[-1, :]:
+        bottom_ax.set_xlabel("dt")
+
+    plt.savefig(path + "figure.pdf")
+    plt.show()
+
+
+def figure_3_2x2(path=PATH_RESULTS, methods=("pnmol_white", "tornadox")):
+    path = path + "figure3/"
+    plt.style.use(STYLESHEETS)
+
+    results = [figure3_load_results(prefix=method, path=path) for method in methods]
+
+    figure_size = (AISTATS_TEXTWIDTH_SINGLE, 0.8 * AISTATS_TEXTWIDTH_SINGLE)
+    fig, axes = plt.subplots(
+        nrows=2,
+        ncols=len(methods),
+        dpi=400,
+        figsize=figure_size,
+        sharex=True,
+        sharey=True,
+        constrained_layout=True,
+    )
+    print(results)
+    vmin_err_rel = jnp.minimum(results[0][0].min(), results[1][0].min())
+    vmax_err_rel = jnp.maximum(results[0][0].max(), results[1][0].max())
+    # vmax_err_rel = 1.0
+    # vmin_err_rel = 1e-3
+
+    vmin_calib = jnp.minimum(results[0][3].min(), results[1][3].min())
+    vmax_calib = jnp.maximum(results[0][3].max(), results[1][3].max())
+    vmin_calib = 1.0 / vmax_calib
+    # vmin_calib = 1e-2
+    # vmax_calib = 100.
+    nicer_method_name = {"tornadox": "MOL", "pnmol_white": "PNMOL"}
+    for axis_row, method, result in zip(axes.T, methods, results):
+
+        err_mat_rel, err_mat_abs, std_mat, chi2_mat, runtime_mat, DTs, DXs = result
+        print(DTs, DXs)
+        extents = [
+            0.0,
+            float(DTs.shape[0]),
+            0.0,
+            float(DXs.shape[0]),
+        ]
+        style_chi2 = {"cmap": "RdYlBu_r"}
+        style_error = {"cmap": "binary", "alpha": 0.8}
+        im_err_rel = axis_row[0].imshow(
+            jnp.flip(err_mat_rel, axis=0),
+            norm=mcolors.LogNorm(vmin=vmin_err_rel, vmax=vmax_err_rel),
+            extent=extents,
+            aspect="auto",
+            **style_error,
+        )
+
+        im_calib = axis_row[1].imshow(
+            jnp.flip(chi2_mat, axis=0),
+            norm=mcolors.LogNorm(
+                vmin=vmin_calib,
+                vmax=vmax_calib,
+            ),
+            extent=extents,
+            aspect="auto",
+            **style_chi2,
+        )
+
+        axes[0, 0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
+        axes[1, 0].set_ylabel(f"Step-size $\Delta x$", fontsize="small")
+
+        magic_number = 0.278
+        magic_xticks = np.flip(
+            np.arange(0, DTs.shape[0] - magic_number, magic_number) + 0.5 * magic_number
+        )
+        axis_row[1].autoscale(False)
+        axis_row[1].set_xticks(magic_xticks[::4])  # black magic
+        axis_row[1].set_xticklabels(
+            ["$2^{-%d}$" % i for i in np.arange(2, 2 + len(magic_xticks[::4]), 1)],
+            fontsize="x-small",
+        )
+
+        axis_row[0].autoscale(False)
+        axis_row[0].set_yticks(np.flip(np.arange(DXs.shape[0])) + 0.5)  # black magic
+
+    axes[0, 0].set_yticklabels(
+        ["$2^{-%d}$" % i for i in np.arange(2, 2 + DXs.shape[0])],
+        fontsize="x-small",
+    )
+    axes[1, 0].set_yticklabels(
+        ["$2^{-%d}$" % i for i in np.arange(2, 2 + DXs.shape[0])],
+        fontsize="x-small",
+    )
+
+    cbar_err = fig.colorbar(im_err_rel, ax=axes[0, 1])
+    cbar_calib = fig.colorbar(im_calib, ax=axes[1, 1])
+
+    cbar_err.ax.tick_params(labelsize="x-small")
+    cbar_calib.ax.tick_params(labelsize="x-small")
+
+    axes[0, 0].set_title(r"$\bf PN$ Relative RMSE", fontsize="small", loc="left")
+    axes[1, 0].set_title(r"$\bf PN$ $\chi^2$-statistic", fontsize="small", loc="left")
+
+    axes[0, 1].set_title(r"$\bf MOL$ Relative RMSE", fontsize="small", loc="left")
+    axes[1, 1].set_title(r"$\bf MOL$ $\chi^2$-statistic", fontsize="small", loc="left")
+
+    for bottom_ax in axes[-1, :]:
+        bottom_ax.set_xlabel(r"Step-size $\Delta t$", fontsize="small")
+
+    plt.savefig(path + "figure.pdf")
+    plt.show()
+
+
+def figure3_load_results(*, prefix, path=PATH_RESULTS):
+    print(path)
+    path_error_rel = path + prefix + "_error_rel.npy"
+    path_error_abs = path + prefix + "_error_abs.npy"
+    path_std = path + prefix + "_std.npy"
+    path_chi2 = path + prefix + "_chi2.npy"
+    path_runtime = path + prefix + "_runtime.npy"
+    path_dt = path + (prefix + "_dt.npy")
+    path_dx = path + (prefix + "_dx.npy")
+
+    error_rel = jnp.load(path_error_rel)
+    error_abs = jnp.load(path_error_abs)
+    std = jnp.load(path_std)
+    chi2 = jnp.load(path_chi2)
+    runtime = jnp.load(path_runtime)
+    dt = jnp.load(path_dt)
+    dx = jnp.load(path_dx)
+
+    return error_rel, error_abs, std, chi2, runtime, dt, dx
+
+
+def figure3_plot_contour(ax, /, *args, **kwargs):
+    """Contour lines with fill color and sharp edges."""
+    ax.contour(*args, **kwargs)
+    return ax.contourf(*args, **kwargs)
 
 
 def figure_4():
