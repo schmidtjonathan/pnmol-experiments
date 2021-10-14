@@ -13,7 +13,7 @@ import pnmol
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-dts = 2.0 ** jnp.arange(1, -9, step=-1)
+dts = 2.0 ** jnp.arange(1, -12, step=-1)
 
 num_derivatives = 1
 
@@ -26,7 +26,7 @@ for dx in sorted([0.02, 0.1, 0.2]):
     )
     ivp = pde.to_tornadox_ivp()
 
-    ref_scale = 13
+    ref_scale = 19
     pde_ref = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx / ref_scale,
@@ -75,7 +75,7 @@ for dx in sorted([0.02, 0.1, 0.2]):
     # dts = jnp.logspace(0.0, -3.5, -0.5, endpoint=True)
     for dt in sorted(dts):
 
-        if dx > 0.01 and dt > 1e-3:
+        if dx > 0.01:
             # [PNMOL-LATENT] Solve
             steps = pnmol.odetools.step.Constant(dt)
             solver = pnmol.latent.SemiLinearLatentForceEK1(
@@ -219,7 +219,7 @@ for dx in sorted([0.02, 0.1, 0.2]):
         print(
             f"PNMOL(white):\n\tRMSE={rmse_pnmol_white}, chi2={chi2_pnmol_white}, nsteps={sol_pnmol_white_info['num_steps']}, time={time_pnmol_white}"
         )
-        if dx > 0.01 and dt > 1e-3:
+        if dx > 0.01:
             print(
                 f"PNMOL(latent):\n\tRMSE={rmse_pnmol_latent}, chi2={chi2_pnmol_latent}, nsteps={sol_pnmol_latent_info['num_steps']}, time={time_pnmol_latent}"
             )
