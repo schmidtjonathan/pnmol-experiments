@@ -133,7 +133,7 @@ def figure_1_singlerow(
     fig, axes = plt.subplots(
         nrows=1,
         ncols=4,
-        dpi=200,
+        dpi=400,
         figsize=figure_size,
         sharex=True,
         sharey=True,
@@ -181,10 +181,10 @@ def figure_1_singlerow(
     )
 
     title_style = {"loc": "left", "fontsize": "small"}
-    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Error/Uncertainty Ratio", **title_style)
+    ax_mol_error.set_title(r"$\bf MOL/1$. " + "Error/uncertainty ratio", **title_style)
     ax_mol_mean.set_title(r"$\bf MOL/2$. " + "Posterior mean", **title_style)
 
-    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Error/Uncertainty Ratio", **title_style)
+    ax_pnmol_error.set_title(r"$\bf PN/1$. " + "Error/uncertainty ratio", **title_style)
     ax_pnmol_mean.set_title(r"$\bf PN/2$. " + "Posterior mean", **title_style)
 
     plt.savefig(path + "figure.pdf")
@@ -684,7 +684,7 @@ def figure3_plot_contour(ax, /, *args, **kwargs):
 
 def figure_4():
 
-    dxs = [0.02, 0.1]
+    dxs = [0.025, 0.2]
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
@@ -752,7 +752,7 @@ def figure_4():
         )
 
         ax_runtime.set_xlabel("Run time [s]")
-        ax_runtime.loglog(mol_time, mol_rmse, **style_mol, **style_all)
+        ax_runtime.loglog(mol_time, mol_rmse, marker="d", **style_mol, **style_all)
         ax_runtime.loglog(
             pnmol_white_time,
             pnmol_white_rmse,
@@ -800,13 +800,13 @@ def figure_4():
             linewidth=0.5,
         )
 
-    # ax_nsteps.set_xlim((1e0, 1e3))
+    ax_nsteps.set_ylim((2e-4, 5e-1))
 
     axes[0].set_ylabel("RMSE")
     axes[0].legend(
         loc="upper right",
-        handlelength=3.5,
-        fontsize="x-small",
+        handlelength=4,
+        fontsize="xx-small",
         fancybox=False,
         edgecolor="black",
     ).get_frame().set_linewidth(0.5)
@@ -816,21 +816,27 @@ def figure_4():
     axes[-1].legend(
         by_label.values(),
         by_label.keys(),
-        loc="center right",
+        loc="lower right",
         handlelength=2,
-        fontsize="x-small",
+        fontsize="xx-small",
         fancybox=False,
         edgecolor="black",
     ).get_frame().set_linewidth(0.5)
-    axes[-1].set_xlim((1e-8, 1e8))
 
     axes[-1].annotate(
-        "Underconfident", (1.5e-6, 0.7e0), color="gray", alpha=0.8, fontsize="small"
+        "$\longleftarrow$ Underconfident",
+        (2.5e-7, 3e-1),
+        color="gray",
+        alpha=0.8,
+        fontsize="x-small",
     )
     axes[-1].annotate(
-        "Overconfident", (5e1, 2e0), color="gray", alpha=0.8, fontsize="small"
+        "Overconfident $\longrightarrow$",
+        (11 ** 0.42, 3e-1),
+        color="gray",
+        alpha=0.8,
+        fontsize="x-small",
     )
-
     for ax in axes:
         ax.grid(which="minor", axis="y", linewidth=0.5, linestyle="dotted", alpha=0.75)
 
@@ -843,6 +849,7 @@ def figure_4():
     ax_chi2.set_title(
         r"$\bf c.$ " + "RMSE vs. Calibration", loc="left", fontsize="medium"
     )
+    axes[-1].set_xlim((1e-8, 1e8))
 
     ax_chi2.axvline(1.0, color="gray", linewidth=1, alpha=0.8)
     plt.savefig("./experiments/results/figure4/figure.pdf", dpi=300)

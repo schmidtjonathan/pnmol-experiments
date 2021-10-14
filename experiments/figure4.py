@@ -13,20 +13,24 @@ import pnmol
 
 pde_kwargs = {"t0": 0.0, "tmax": 6.0}
 
-dts = 2.0 ** jnp.arange(1, -12, step=-1)
+dts = 2.0 ** jnp.arange(1, -11, step=-2)
 
 num_derivatives = 1
 
-for dx in sorted([0.02, 0.1, 0.2]):
+
+for dx in [0.025, 0.2]:
+    kk = pnmol.kernels.SquareExponential(input_scale=0.25)
     pde = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx,
         stencil_size_interior=3,
         stencil_size_boundary=5,
+        kernel=kk,
     )
     ivp = pde.to_tornadox_ivp()
-
-    ref_scale = 19
+    print(pde.L)
+    print(pde.E_sqrtm @ pde.E_sqrtm.T)
+    ref_scale = 11
     pde_ref = pnmol.pde.examples.lotka_volterra_1d_discretized(
         **pde_kwargs,
         dx=dx / ref_scale,
@@ -40,7 +44,7 @@ for dx in sorted([0.02, 0.1, 0.2]):
         jax.jit(ivp_ref.f),
         ivp_ref.t_span,
         y0=ivp_ref.y0,
-        method="LSODA",
+        method="BDF",
         atol=1e-10,
         rtol=1e-10,
         t_eval=(ivp_ref.t0, ivp_ref.tmax),

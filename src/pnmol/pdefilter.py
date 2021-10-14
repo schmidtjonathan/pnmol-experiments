@@ -93,7 +93,6 @@ class PDEFilter(ABC):
                 diffusion_squared_list.append(state.diffusion_squared_local)
 
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
-
         return PDESolution(
             t=jnp.stack(times),
             mean=jnp.stack(means),
@@ -111,6 +110,9 @@ class PDEFilter(ABC):
                 diffusion_squared_list.extend(state.diffusion_squared_local)
             else:
                 diffusion_squared_list.append(state.diffusion_squared_local)
+
+        # print(diffusion_squared_list)
+
         diffusion_squared_calibrated = jnp.mean(jnp.array(diffusion_squared_list))
         cov_sqrtm_new = state.y.cov_sqrtm * jnp.sqrt(diffusion_squared_calibrated)
         return state._replace(y=state.y._replace(cov_sqrtm=cov_sqrtm_new)), info

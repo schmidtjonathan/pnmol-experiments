@@ -100,7 +100,9 @@ def fd_probabilistic(
         indices_column=neighbor_indices_interior,
         indices_row=indices_interior[:, None],
     )
-    return L_all_weights, E_sqrtm_all_weights
+    return L_all_weights, jnp.sqrt(
+        jnp.maximum(E_sqrtm_all_weights, 0.0 * E_sqrtm_all_weights)
+    )
 
 
 @jax.jit
@@ -155,7 +157,7 @@ def fd_probabilistic_neumann_1d(
     # "points to the left", whereas standard derivatives "point to the right"
     diffmatrix = jax.scipy.linalg.block_diag(-weights_left, weights_right)
     errormatrix = jnp.diag(jnp.array([uncertainty_left, uncertainty_right]))
-    return diffmatrix @ B, errormatrix
+    return diffmatrix @ B, jnp.sqrt(jnp.maximum(errormatrix, 0.0 * errormatrix))
 
 
 def _fd_coefficients_neumann(
@@ -197,7 +199,6 @@ def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
         LLkx = jnp.nan_to_num(LLkx, nan=B)
 
     uncertainty = LLkx - weights @ diffop_at_point
-
     return weights, uncertainty
 
 
