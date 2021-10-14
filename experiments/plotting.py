@@ -688,17 +688,17 @@ def figure_4():
 
     figsize = (AISTATS_LINEWIDTH_DOUBLE, 0.75 * AISTATS_TEXTWIDTH_SINGLE)
     fig, axes = plt.subplots(
-        ncols=3, sharey=True, figsize=figsize, dpi=200, constrained_layout=True
+        ncols=3, sharey=True, figsize=figsize, dpi=400, constrained_layout=True
     )
     ax_nsteps, ax_runtime, ax_chi2 = axes
 
-    for dx, ls in zip(dxs, [":", "-", "--", "-."]):
+    for dx, ls in zip(dxs, ["-", ":", "--", "-."]):
         path = "./experiments/results/figure4/" + f"dx_{dx}_"
 
         style_mol = {
             "color": "gray",
             "linewidth": 3.0,
-            "alpha": 0.4,
+            "alpha": 0.75,
             "label": f"MOL (dx={dx})",
         }
         style_pnmol_white = {
@@ -776,7 +776,6 @@ def figure_4():
             markersize=5,
             label="MOL",
             color="gray",
-            alpha=0.5,
             linestyle="-",
             linewidth=0.5,
         )
@@ -823,10 +822,10 @@ def figure_4():
         fancybox=False,
         edgecolor="black",
     ).get_frame().set_linewidth(0.5)
-    axes[-1].set_xlim((1e-7, 1e7))
+    axes[-1].set_xlim((1e-8, 1e8))
 
     axes[-1].annotate(
-        "Underconfident", (5e-6, 1e0), color="gray", alpha=0.8, fontsize="small"
+        "Underconfident", (1.5e-6, 0.7e0), color="gray", alpha=0.8, fontsize="small"
     )
     axes[-1].annotate(
         "Overconfident", (5e1, 2e0), color="gray", alpha=0.8, fontsize="small"
