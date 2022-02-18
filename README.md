@@ -6,7 +6,7 @@ This code accompanies the paper _"Probabilistic Numerical Method of Lines for Ti
 # :memo: Cite as
 
 ```
-@article{kramer2021probabilistic,
+@article{kramer2022probabilistic,
   title={Probabilistic Numerical Method of Lines for Time-Dependent Partial Differential Equations},
   author={Kr{\"a}mer, Nicholas and Schmidt, Jonathan and Hennig, Philipp},
   journal={AISTATS},
