@@ -19,7 +19,7 @@ This code accompanies the paper _"Probabilistic Numerical Method of Lines for Ti
 ## :gear: 1. Install
 In the root-directory, execute
 ```
-pip install -e .
+pip3 install -e .
 ```
 
 ## :rocket: 2. Run and plot experiments
