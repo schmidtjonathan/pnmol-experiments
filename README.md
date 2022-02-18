@@ -1,6 +1,6 @@
 # Probabilistic Numerical Method of Lines (PNMOL)
 
-This code accompanies the paper _"Probabilistic Numerical Method of Lines for Time-Dependent Partial Differential Equations"_, which is published at the AISTATS 2022 conference and currently available [:link: here (https://arxiv.org/pdf/2110.11847.pdf)](https://arxiv.org/pdf/2110.11847.pdf).
+This code accompanies the paper _"Probabilistic Numerical Method of Lines for Time-Dependent Partial Differential Equations"_, which is published at the AISTATS 2022 conference and currently available [:link: here](https://arxiv.org/pdf/2110.11847.pdf) ([https://arxiv.org/pdf/2110.11847.pdf](https://arxiv.org/pdf/2110.11847.pdf)).
 
 
 # :memo: Cite as
