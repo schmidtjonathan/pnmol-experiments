@@ -29,4 +29,4 @@ pip install -e .
 python3 experiments/figureX.py
 ```
 
-where you just replace `X` by one of {1, 2, 3, 4}.
+where you just replace `X` by one of {`1`, `2`, `3`, `4`}.
