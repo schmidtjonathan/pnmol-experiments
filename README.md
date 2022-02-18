@@ -10,7 +10,7 @@ This code accompanies the paper _"Probabilistic Numerical Method of Lines for Ti
   title={Probabilistic Numerical Method of Lines for Time-Dependent Partial Differential Equations},
   author={Kr{\"a}mer, Nicholas and Schmidt, Jonathan and Hennig, Philipp},
   journal={AISTATS},
-  year={2021}
+  year={2022}
 }
 ```
 
