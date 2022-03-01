@@ -131,7 +131,7 @@ class TestDuplicate:
 def test_input_scale_mle():
 
     mesh_points = jnp.linspace(0, 1, 10)
-    f = lambda x: x ** 2
+    f = lambda x: x**2
     data = f(mesh_points)
     kernel_type = kernels.Matern52
     input_scale_trials = jnp.logspace(-2, 2, 10)

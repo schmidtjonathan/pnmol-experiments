@@ -62,7 +62,7 @@ class TestFDCoefficients:
 
     @staticmethod
     def test_weights(fd_coeff, dx):
-        weights_normalized = fd_coeff[0] * dx ** 2
+        weights_normalized = fd_coeff[0] * dx**2
         assert jnp.allclose(weights_normalized, jnp.array([-2.0, 1.0, 1.0]))
 
     @staticmethod
