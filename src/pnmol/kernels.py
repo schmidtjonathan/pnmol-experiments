@@ -85,7 +85,7 @@ class _RadialKernel(_PairwiseKernel):
 
     @property
     def output_scale_squared(self):
-        return self.output_scale ** 2
+        return self.output_scale**2
 
     @property
     def input_scale(self):
@@ -93,7 +93,7 @@ class _RadialKernel(_PairwiseKernel):
 
     @property
     def input_scale_squared(self):
-        return self.input_scale ** 2
+        return self.input_scale**2
 
     @abc.abstractmethod
     def pairwise(self, X, Y):
@@ -119,7 +119,7 @@ class Matern52(_RadialKernel):
     def pairwise(self, x, y):
         dist_unscaled = self._distance_squared_l2(x, y)
         dist_scaled = jnp.sqrt(5.0 * dist_unscaled * self.input_scale_squared)
-        A = 1 + dist_scaled + dist_scaled ** 2.0 / 3.0
+        A = 1 + dist_scaled + dist_scaled**2.0 / 3.0
         B = jnp.exp(-dist_scaled)
         return self.output_scale_squared * A * B
 
@@ -154,7 +154,7 @@ class WhiteNoise(_PairwiseKernel):
 
     @partial(jax.jit, static_argnums=(0,))
     def pairwise(self, x, y):
-        return self.output_scale ** 2 * jnp.all(x == y)
+        return self.output_scale**2 * jnp.all(x == y)
 
 
 class _StackedKernel(Kernel):

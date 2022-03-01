@@ -127,7 +127,7 @@ def test_to_ivp():
     assert jnp.allclose(dfy0a, dfy0b)
     if bcond == "neumann":
         assert jnp.allclose(
-            dfy0a[0, :2] * dx ** 2 / diffusion_rate, jnp.array([-1.0, 1.0])
+            dfy0a[0, :2] * dx**2 / diffusion_rate, jnp.array([-1.0, 1.0])
         )
     if bcond == "dirichlet":
         assert jnp.allclose(dfy0a, heat.L[1:-1, 1:-1])
@@ -153,7 +153,7 @@ def test_to_ivp():
     assert jnp.allclose(dfy0a, dfy0b)
     if bcond == "neumann":
         assert jnp.allclose(
-            dfy0a[0, :2] * dx ** 2 / diffusion_rate, jnp.array([-1.0, 1.0])
+            dfy0a[0, :2] * dx**2 / diffusion_rate, jnp.array([-1.0, 1.0])
         )
     if bcond == "dirichlet":
         assert jnp.allclose(dfy0a, heat.L[1:-1, 1:-1])

@@ -184,7 +184,7 @@ def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
     if isinstance(k, kernels.Matern52):
         # Hard-code the Taylor series of the Matern52 at zero:
         # See matern-wikipedia ("MacLaurin series on the bottom of the page.")
-        A = k.input_scale ** 2 * k.output_scale ** 2 * 2.5 / (1.0 - 2.5)
+        A = k.input_scale**2 * k.output_scale**2 * 2.5 / (1.0 - 2.5)
         diffop_at_point = jnp.nan_to_num(diffop_at_point, nan=A)
 
     weights = jnp.linalg.solve(gram_matrix, diffop_at_point)
@@ -193,7 +193,7 @@ def fd_coefficients(x, neighbors, k, L_k, LL_k, nugget_gram_matrix=0.0):
         # Hard-code the Taylor series of the Matern52 at zero:
         # See matern-wikipedia ("MacLaurin series on the bottom of the page.")
         s, r = k.output_scale, k.input_scale
-        B = s ** 2 * r ** 4 * 3 * 2.5 ** 2 / (2.0 - 3 * 2.5 + 2.5 ** 2)
+        B = s**2 * r**4 * 3 * 2.5**2 / (2.0 - 3 * 2.5 + 2.5**2)
         LLkx = jnp.nan_to_num(LLkx, nan=B)
 
     uncertainty = LLkx - weights @ diffop_at_point

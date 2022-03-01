@@ -346,11 +346,11 @@ def spruce_budworm_1d(
 
 def gaussian_bell_1d_centered(x, bbox, width=1.0):
     midpoint = 0.5 * (bbox[1] + bbox[0])
-    return jnp.exp(-((x - midpoint) ** 2) / width ** 2)
+    return jnp.exp(-((x - midpoint) ** 2) / width**2)
 
 
 def gaussian_bell_1d(x):
-    return jnp.exp(-(x ** 2))
+    return jnp.exp(-(x**2))
 
 
 def sin_bell_1d(x):
